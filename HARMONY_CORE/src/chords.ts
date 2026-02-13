@@ -1,5 +1,13 @@
 import type { Chord, Extension, Quality } from "./types.js";
 
+/**
+ * Root note to pitch class mapping.
+ *
+ * Known limitation (MVP): Omits theoretical/uncommon enharmonics:
+ * - Cb (=B), Fb (=E), E# (=F), B# (=C)
+ * - All double-accidentals (Cbb, C##, etc.)
+ * These can be added post-MVP if needed.
+ */
 const ROOT_MAP: Record<string, number> = {
   C: 0, "C#": 1, Db: 1,
   D: 2, "D#": 3, Eb: 3,
@@ -41,6 +49,10 @@ const QUALITY_MAP: Record<string, Quality> = {
  * - Augmented extended chords (aug + extension) are rejected.
  */
 export function parseChordSymbol(text: string): Chord {
+  if (!text) {
+    throw new Error('Invalid chord symbol: ""');
+  }
+
   const normalized = text[0]?.toUpperCase() + text.slice(1);
   const match = CHORD_RE.exec(normalized);
   if (!match) {

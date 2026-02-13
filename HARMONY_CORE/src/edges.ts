@@ -7,10 +7,7 @@ import { triVertices } from "./triangles.js";
  * Lexicographic ordering of NodeId strings ensures canonical form.
  * Format: "E:N:a,b|N:c,d" where "N:a,b" <= "N:c,d"
  */
-export function edgeId(
-  a: { u: number; v: number },
-  b: { u: number; v: number },
-): EdgeId {
+export function edgeId(a: NodeCoord, b: NodeCoord): EdgeId {
   const idA = nodeId(a.u, a.v);
   const idB = nodeId(b.u, b.v);
   return (idA <= idB ? `E:${idA}|${idB}` : `E:${idB}|${idA}`) as EdgeId;

@@ -6,6 +6,7 @@
 // Types
 export type {
   NodeCoord,
+  CentroidCoord,
   NodeId,
   TriId,
   EdgeId,

@@ -1,8 +1,23 @@
-/** Lattice node coordinate (integer pair). */
+/**
+ * Lattice coordinate pair.
+ *
+ * Used for both:
+ * - Integer lattice node coordinates (u, v ∈ ℤ) for triangle vertices
+ * - Fractional centroid coordinates (u, v ∈ ℝ) for shape focus points
+ *
+ * The same structure serves both purposes for simplicity. Context determines
+ * whether integer or fractional values are expected.
+ */
 export interface NodeCoord {
   readonly u: number;
   readonly v: number;
 }
+
+/**
+ * Alias for NodeCoord when used as a fractional centroid/focus point.
+ * Semantically indicates the coordinate may have non-integer values.
+ */
+export type CentroidCoord = NodeCoord;
 
 /** Branded string ID for a lattice node. Format: "N:u,v" */
 export type NodeId = string & { readonly __brand: "NodeId" };
@@ -50,7 +65,17 @@ export interface Chord {
   readonly root_pc: number;
   readonly quality: Quality;
   readonly extension: Extension | null;
+  /**
+   * Full pitch-class set for the chord.
+   * Order: triad intervals (root, 3rd, 5th) followed by extension intervals.
+   * Built from Set spread, so insertion order is preserved but NOT sorted by pc value.
+   */
   readonly chord_pcs: number[];
+  /**
+   * Triad pitch classes in interval order: [root, 3rd, 5th].
+   * NOT sorted by pc value — preserves the musical interval structure.
+   * e.g., Cmaj = [0, 4, 7], Fmaj = [5, 9, 0] (root=F, 3rd=A, 5th=C)
+   */
   readonly main_triad_pcs: [number, number, number];
 }
 

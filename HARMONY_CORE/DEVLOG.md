@@ -533,6 +533,135 @@ Status: Complete
 
 ---
 
+### Phase 7a: Optimization
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Refactored `src/indexing.ts`: `buildWindowIndices` now computes `triVertices` once per triangle and derives edges/pcs from that single result (eliminates 2 redundant calls per triangle)
+- Added `edgesFromVerts()` internal helper to compute edges from pre-computed vertices
+- Refactored `src/indexing.ts`: `getEdgeUnionPcs` now uses array with `includes()` instead of Set for small fixed-size arrays
+- Refactored `src/placement.ts`: `clusterCentroid` now uses array with coordinate comparison instead of Map<string, NodeCoord>
+
+**Tests passed:**
+- [x] All 168 existing tests pass after optimization
+- [x] buildWindowIndices produces identical output (verified via existing tests)
+- [x] getEdgeUnionPcs produces identical sorted results
+- [x] clusterCentroid produces identical centroids
+
+**Issues encountered:**
+- None
+
+---
+
+### Phase 7b: Simplification
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Removed redundant `parse()` helper from `src/__tests__/integration.test.ts` — now uses `parseChordSymbol` directly
+- Removed redundant `parse()` helper from `src/__tests__/progression.test.ts` — now uses `parseChordSymbol` directly
+- Added JSDoc to `placeMainTriad` documenting why `main_triad_pcs` re-sort is required (sigToTris keys are sorted)
+- Updated `edgeId` parameter types from inline `{ u: number; v: number }` to `NodeCoord` in `src/edges.ts`
+
+**Tests passed:**
+- [x] All tests pass after removing parse() helper
+- [x] edgeId accepts NodeCoord parameters
+
+**Issues encountered:**
+- None
+
+**Rationale:**
+- The `parse()` helper was calling `computeChordPcs` twice — once inside `parseChordSymbol` and once explicitly. Since `parseChordSymbol` already returns a complete `Chord` with computed pcs, the wrapper was redundant.
+
+---
+
+### Phase 7c: Disambiguation
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Enhanced `NodeCoord` JSDoc in `src/types.ts` to clarify dual semantics (integer lattice nodes vs. fractional centroid points)
+- Added `CentroidCoord` type alias in `src/types.ts` for documentation clarity (zero runtime cost)
+- Exported `CentroidCoord` from `src/index.ts` barrel
+- Added JSDoc to `coord()` helper in `src/coords.ts` explaining it's an internal test utility, not exported from barrel
+- Added JSDoc to `Chord.chord_pcs` documenting insertion order (triad intervals then extensions, NOT sorted)
+- Added JSDoc to `Chord.main_triad_pcs` documenting interval order [root, 3rd, 5th] (NOT sorted by pc value)
+
+**Tests passed:**
+- [x] CentroidCoord exported from barrel (verified via import)
+- [x] All existing tests pass
+
+**Issues encountered:**
+- None
+
+**API changes:**
+- New type export: `CentroidCoord` (alias for `NodeCoord`, documentation-only purpose)
+
+---
+
+### Phase 7d: Bug Prevention & Edge Cases
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Added empty string guard in `parseChordSymbol` in `src/chords.ts` — now throws `'Invalid chord symbol: ""'` immediately
+- Added JSDoc to `ROOT_MAP` in `src/chords.ts` documenting enharmonic limitations (Cb, Fb, E#, B#, double-accidentals omitted for MVP)
+- Added JSDoc to `getTrianglePcs` in `src/triangles.ts` documenting sort guarantee and per-call allocation
+
+**Tests passed:**
+- [x] parseChordSymbol("") throws with clear error message (tested in integration.test.ts)
+- [x] All existing tests pass
+
+**Issues encountered:**
+- None
+
+**Known limitations documented:**
+- ROOT_MAP omits: Cb (=B), Fb (=E), E# (=F), B# (=C), all double-accidentals
+- Can be added post-MVP if needed
+
+---
+
+### Phase 7 Completion
+Date: 2026-02-13
+
+**Phase tests passed:**
+- [x] All 168 tests pass
+- [x] No regressions from optimization changes
+- [x] API surface unchanged (16 functions, new CentroidCoord type alias)
+- [x] No linter errors
+
+**Test totals:** 168 tests across 11 files (10 tests added since Phase 6c via test file changes)
+
+**Review notes:**
+- Optimization in `buildWindowIndices` reduces vertex computation from 3× to 1× per triangle
+- `getEdgeUnionPcs` optimization eliminates Set allocation for what is always a 3+3→4 element union
+- `clusterCentroid` optimization eliminates string key allocation for small vertex sets (4-6 vertices)
+- Test redundancy removed — `parse()` helper was computing pcs twice
+- Type disambiguation via JSDoc and `CentroidCoord` alias improves code clarity without runtime cost
+- Empty string edge case now produces clear error instead of confusing "undefinedundefined" failure
+
+**Doc sync:**
+- DEVPLAN.md: Phase 7 added with all sub-phases
+- DEVLOG.md: Phase 7 log entries added
+- ARCH_HARMONY_CORE.md: No changes needed (internal optimizations don't affect architecture)
+
+**Files modified:**
+| File | Changes |
+|------|---------|
+| `src/types.ts` | Enhanced `NodeCoord` JSDoc, added `CentroidCoord` alias, documented `chord_pcs`/`main_triad_pcs` ordering |
+| `src/coords.ts` | Documented `coord()` helper purpose |
+| `src/edges.ts` | Changed `edgeId` params to use `NodeCoord` type |
+| `src/triangles.ts` | Documented `getTrianglePcs` sort guarantee |
+| `src/indexing.ts` | Optimized `buildWindowIndices` (single `triVertices` call), optimized `getEdgeUnionPcs` (no Set) |
+| `src/chords.ts` | Added empty string guard, documented enharmonic limitations |
+| `src/placement.ts` | Optimized `clusterCentroid`, documented `main_triad_pcs` re-sort rationale |
+| `src/index.ts` | Exported `CentroidCoord` type |
+| `src/__tests__/integration.test.ts` | Removed redundant `parse()` helper |
+| `src/__tests__/progression.test.ts` | Removed redundant `parse()` helper |
+
+---
+
 ## Template
 
 Each entry follows this format:

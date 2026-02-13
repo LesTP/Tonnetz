@@ -22,6 +22,10 @@ export function nodeId(u: number, v: number): NodeId {
 
 /**
  * Construct a NodeCoord from u, v values.
+ *
+ * Internal convenience helper. Not exported from barrel (index.ts).
+ * Production code uses { u, v } object literals directly for clarity.
+ * Kept for test utilities that benefit from a named constructor.
  */
 export function coord(u: number, v: number): NodeCoord {
   return { u, v };

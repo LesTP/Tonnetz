@@ -33,6 +33,10 @@ export function triVertices(tri: TriRef): [NodeCoord, NodeCoord, NodeCoord] {
 
 /**
  * Compute the sorted pitch-class set of a triangle's three vertices.
+ *
+ * Returns a tuple sorted in ascending pc order (0-11). The returned array
+ * is newly allocated per call; callers may rely on the sort guarantee but
+ * should not mutate the result if immutability is expected elsewhere.
  */
 export function getTrianglePcs(tri: TriRef): [number, number, number] {
   const verts = triVertices(tri);

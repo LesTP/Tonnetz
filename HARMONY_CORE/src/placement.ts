@@ -27,23 +27,24 @@ function dist2(a: NodeCoord, b: NodeCoord): number {
 
 /**
  * Compute centroid as mean of all unique vertices across a set of triangles (HC-D9).
+ *
+ * Optimization: Uses array with coordinate comparison instead of Map<string, NodeCoord>
+ * to avoid string allocation. Cluster sizes are tiny (1–3 triangles, 4–6 unique vertices).
  */
 function clusterCentroid(tris: TriRef[]): NodeCoord {
-  const seen = new Map<string, NodeCoord>();
+  const verts: NodeCoord[] = [];
   for (const tri of tris) {
     for (const v of triVertices(tri)) {
-      const key = `${v.u},${v.v}`;
-      if (!seen.has(key)) seen.set(key, v);
+      if (!verts.some((e) => e.u === v.u && e.v === v.v)) verts.push(v);
     }
   }
   let sumU = 0;
   let sumV = 0;
-  for (const v of seen.values()) {
+  for (const v of verts) {
     sumU += v.u;
     sumV += v.v;
   }
-  const n = seen.size;
-  return { u: sumU / n, v: sumV / n };
+  return { u: sumU / verts.length, v: sumV / verts.length };
 }
 
 /**
@@ -52,6 +53,9 @@ function clusterCentroid(tris: TriRef[]): NodeCoord {
  * - Diminished and augmented triads → null (dot-only path, HC-D5)
  * - Finds candidate triangles via sigToTris
  * - Selects nearest to focus; tie-break: lexicographic TriId
+ *
+ * Note: main_triad_pcs is in interval order [root, 3rd, 5th], not sorted by pc value.
+ * The sort here is required because sigToTris keys are built from getTrianglePcs which sorts.
  */
 export function placeMainTriad(
   chord: Chord,

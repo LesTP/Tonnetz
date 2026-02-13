@@ -116,10 +116,12 @@ Harmony Core is the first completed subsystem. Other modules consume it through 
 |----------|-------------|
 | `pc(u, v)` | Pitch class at lattice node (0–11) |
 | `nodeId(u, v)` | Canonical node ID string |
+| `parseNodeId(id)` | Parse node ID back to coordinates |
 | `triId(tri)` | Canonical triangle ID string |
 | `triVertices(tri)` | Three vertex coordinates of a triangle |
-| `getTrianglePcs(tri)` | Three pitch classes of a triangle |
+| `getTrianglePcs(tri)` | Three pitch classes of a triangle (sorted) |
 | `edgeId(a, b)` | Canonical edge ID from two node coordinates |
+| `parseEdgeId(id)` | Parse edge ID back to two node coordinates |
 
 ## Window Indexing
 
@@ -151,7 +153,21 @@ Harmony Core is the first completed subsystem. Other modules consume it through 
 
 ## Key Types
 
-`NodeCoord`, `NodeId`, `TriId`, `EdgeId`, `Orientation`, `TriRef`, `WindowBounds`, `WindowIndices`, `Quality`, `Extension`, `Chord`, `Shape`
+| Type | Description |
+|------|-------------|
+| `NodeCoord` | Lattice coordinate pair `{ u, v }` — used for both integer node positions and fractional centroids |
+| `CentroidCoord` | Alias for `NodeCoord` when used as a fractional centroid/focus coordinate |
+| `NodeId` | Branded string ID for a node (`"N:u,v"`) |
+| `TriId` | Branded string ID for a triangle (`"T:U:u,v"` or `"T:D:u,v"`) |
+| `EdgeId` | Branded string ID for an edge (`"E:N:a,b\|N:c,d"`) |
+| `Orientation` | Triangle orientation (`"U"` or `"D"`) |
+| `TriRef` | Triangle reference (orientation + anchor coordinate) |
+| `WindowBounds` | Rectangular lattice window bounds |
+| `WindowIndices` | Precomputed index maps for active window |
+| `Quality` | Chord quality (`"maj"`, `"min"`, `"dim"`, `"aug"`) |
+| `Extension` | Chord extension (`"6"`, `"7"`, `"maj7"`, `"add9"`, `"6/9"`) |
+| `Chord` | Parsed chord structure with pitch-class sets |
+| `Shape` | Decomposed chord on the lattice (triangles, dots, centroid) |
 
 See ARCH_HARMONY_CORE.md Section 11 for full type definitions and function signatures.
 

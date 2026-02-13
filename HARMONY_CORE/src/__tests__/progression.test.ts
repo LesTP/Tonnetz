@@ -1,18 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mapProgressionToShapes } from "../progression.js";
-import { parseChordSymbol, computeChordPcs } from "../chords.js";
+import { parseChordSymbol } from "../chords.js";
 import { buildWindowIndices } from "../indexing.js";
-import type { Chord, NodeCoord, WindowIndices } from "../types.js";
-
-function parse(sym: string): Chord {
-  const raw = parseChordSymbol(sym);
-  const { chord_pcs, main_triad_pcs } = computeChordPcs(
-    raw.root_pc,
-    raw.quality,
-    raw.extension,
-  );
-  return { ...raw, chord_pcs, main_triad_pcs };
-}
+import type { NodeCoord, WindowIndices } from "../types.js";
 
 const indices: WindowIndices = buildWindowIndices({
   uMin: -4,
@@ -28,7 +18,7 @@ describe("mapProgressionToShapes", () => {
   });
 
   it("single chord placed at initialFocus", () => {
-    const shapes = mapProgressionToShapes([parse("C")], origin, indices);
+    const shapes = mapProgressionToShapes([parseChordSymbol("C")], origin, indices);
     expect(shapes).toHaveLength(1);
     expect(shapes[0].chord.root_pc).toBe(0);
     expect(shapes[0].main_tri).not.toBeNull();
@@ -36,7 +26,7 @@ describe("mapProgressionToShapes", () => {
 
   it("two-chord progression: second focus = first centroid", () => {
     const shapes = mapProgressionToShapes(
-      [parse("C"), parse("Am")],
+      [parseChordSymbol("C"), parseChordSymbol("Am")],
       origin,
       indices,
     );
@@ -48,7 +38,7 @@ describe("mapProgressionToShapes", () => {
 
   it("three-chord chain focus (C → F → G)", () => {
     const shapes = mapProgressionToShapes(
-      [parse("C"), parse("F"), parse("G")],
+      [parseChordSymbol("C"), parseChordSymbol("F"), parseChordSymbol("G")],
       origin,
       indices,
     );
@@ -62,7 +52,7 @@ describe("mapProgressionToShapes", () => {
 
   it("dim chord passes focus through (C → Bdim → Am)", () => {
     const shapes = mapProgressionToShapes(
-      [parse("C"), parse("Bdim"), parse("Am")],
+      [parseChordSymbol("C"), parseChordSymbol("Bdim"), parseChordSymbol("Am")],
       origin,
       indices,
     );
@@ -75,7 +65,7 @@ describe("mapProgressionToShapes", () => {
   });
 
   it("all shapes satisfy coverage invariant", () => {
-    const chords = ["C", "Dm", "Em", "F", "G", "Am", "Bdim"].map(parse);
+    const chords = ["C", "Dm", "Em", "F", "G", "Am", "Bdim"].map(parseChordSymbol);
     const shapes = mapProgressionToShapes(chords, origin, indices);
     expect(shapes).toHaveLength(7);
 
@@ -91,7 +81,7 @@ describe("mapProgressionToShapes", () => {
 
   it("ii–V–I centroids form connected path (no jumps)", () => {
     const shapes = mapProgressionToShapes(
-      [parse("Dm"), parse("G"), parse("C")],
+      [parseChordSymbol("Dm"), parseChordSymbol("G"), parseChordSymbol("C")],
       origin,
       indices,
     );
@@ -108,7 +98,7 @@ describe("mapProgressionToShapes", () => {
 
   it("I–IV–V–I returns to approximately same region", () => {
     const shapes = mapProgressionToShapes(
-      [parse("C"), parse("F"), parse("G"), parse("C")],
+      [parseChordSymbol("C"), parseChordSymbol("F"), parseChordSymbol("G"), parseChordSymbol("C")],
       origin,
       indices,
     );
@@ -122,7 +112,7 @@ describe("mapProgressionToShapes", () => {
 
   it("centroids are fractional (not rounded to integers)", () => {
     const shapes = mapProgressionToShapes(
-      [parse("C"), parse("Am")],
+      [parseChordSymbol("C"), parseChordSymbol("Am")],
       origin,
       indices,
     );
@@ -135,7 +125,7 @@ describe("mapProgressionToShapes", () => {
   it("long progression (8+ chords): no NaN/Infinity", () => {
     const chords = [
       "C", "Am", "Dm", "G", "C", "F", "Bdim", "Em", "Am", "Dm", "G7", "C",
-    ].map(parse);
+    ].map(parseChordSymbol);
     const shapes = mapProgressionToShapes(chords, origin, indices);
     expect(shapes).toHaveLength(12);
 
@@ -148,7 +138,7 @@ describe("mapProgressionToShapes", () => {
   });
 
   it("deterministic: same input → identical output", () => {
-    const chords = [parse("Dm"), parse("G7"), parse("Cmaj7")];
+    const chords = [parseChordSymbol("Dm"), parseChordSymbol("G7"), parseChordSymbol("Cmaj7")];
     const a = mapProgressionToShapes(chords, origin, indices);
     const b = mapProgressionToShapes(chords, origin, indices);
 

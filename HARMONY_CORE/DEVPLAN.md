@@ -489,6 +489,67 @@ Revisit if: Never — trivial to merge later if desired.
 
 ---
 
+## Phase 7: Code Review — Optimization, Simplification, Disambiguation
+
+**Objective:** Address optimization opportunities, code simplification, semantic disambiguation, and edge case handling identified during code review.
+
+### Phase 7a: Optimization
+
+Performance improvements for hot paths and memory allocation reduction.
+
+**Scope:**
+- **7a.1** `buildWindowIndices`: Eliminate redundant `triVertices` calls (3 per triangle → 1)
+- **7a.2** `getEdgeUnionPcs`: Avoid Set overhead for small fixed-size arrays
+- **7a.3** `clusterCentroid`: Replace Map<string, NodeCoord> with array-based deduplication
+
+**Tests:**
+- [x] All existing tests pass after optimization
+- [x] buildWindowIndices produces identical output
+- [x] getEdgeUnionPcs produces identical output
+- [x] clusterCentroid produces identical centroids
+
+### Phase 7b: Simplification
+
+Code cleanup and redundant code removal.
+
+**Scope:**
+- **7b.1** Remove redundant `parse()` helper in tests (calls `computeChordPcs` twice)
+- **7b.2** Document `main_triad_pcs` re-sort rationale in `placeMainTriad`
+- **7b.3** Update `edgeId` parameter types to use `NodeCoord` instead of inline
+
+**Tests:**
+- [x] All tests pass after removing parse() helper
+- [x] edgeId accepts NodeCoord parameters
+
+### Phase 7c: Disambiguation
+
+Type clarity and documentation improvements.
+
+**Scope:**
+- **7c.1** Add JSDoc to `NodeCoord` clarifying dual semantics (integer nodes vs. fractional centroids)
+- **7c.2** Add `CentroidCoord` type alias for documentation clarity
+- **7c.3** Document `coord()` helper purpose (internal test utility)
+- **7c.4** Document `chord_pcs` and `main_triad_pcs` ordering guarantees
+
+**Tests:**
+- [x] CentroidCoord exported from barrel
+- [x] All existing tests pass
+
+### Phase 7d: Bug Prevention & Edge Cases
+
+Safety improvements and documentation of limitations.
+
+**Scope:**
+- **7d.1** Add empty string guard in `parseChordSymbol`
+- **7d.2** Document enharmonic limitations in `ROOT_MAP` (Cb, Fb, E#, B#, double-accidentals)
+- **7d.3** Document sort guarantee on `getTrianglePcs` return value
+
+**Tests:**
+- [x] parseChordSymbol("") throws with clear error message
+- [x] All existing tests pass
+
+---
+
 ## Summary
 
 | Phase | Scope | Steps | Key API Functions |
@@ -499,3 +560,4 @@ Revisit if: Never — trivial to merge later if desired.
 | 4 | Placement & decomposition | 3 | `placeMainTriad`, `decomposeChordToShape` |
 | 5 | Progression mapping | 2 | `mapProgressionToShapes` |
 | 6 | Public API integration | 2 | Full API surface |
+| 7 | Code review — optimization, simplification, disambiguation | 4 | Internal improvements |

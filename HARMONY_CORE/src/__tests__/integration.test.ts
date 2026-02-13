@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   buildWindowIndices,
   parseChordSymbol,
-  computeChordPcs,
   placeMainTriad,
   decomposeChordToShape,
   mapProgressionToShapes,
@@ -13,17 +12,7 @@ import {
   triVertices,
   pc,
 } from "../index.js";
-import type { Chord, NodeCoord } from "../index.js";
-
-function parse(sym: string): Chord {
-  const raw = parseChordSymbol(sym);
-  const { chord_pcs, main_triad_pcs } = computeChordPcs(
-    raw.root_pc,
-    raw.quality,
-    raw.extension,
-  );
-  return { ...raw, chord_pcs, main_triad_pcs };
-}
+import type { NodeCoord } from "../index.js";
 
 const origin: NodeCoord = { u: 0, v: 0 };
 
@@ -31,7 +20,7 @@ describe("Phase 6b: End-to-end integration", () => {
   const indices = buildWindowIndices({ uMin: -4, uMax: 4, vMin: -4, vMax: 4 });
 
   it("Cmaj7: parse → place → decompose → verify shape", () => {
-    const chord = parse("Cmaj7");
+    const chord = parseChordSymbol("Cmaj7");
     expect(chord.chord_pcs).toEqual(expect.arrayContaining([0, 4, 7, 11]));
 
     const mainTri = placeMainTriad(chord, origin, indices);
@@ -56,7 +45,7 @@ describe("Phase 6b: End-to-end integration", () => {
   });
 
   it("Bdim: parse → place → decompose → verify dot-only shape", () => {
-    const chord = parse("Bdim");
+    const chord = parseChordSymbol("Bdim");
     expect(chord.quality).toBe("dim");
 
     const mainTri = placeMainTriad(chord, origin, indices);
@@ -81,7 +70,7 @@ describe("Phase 6b: End-to-end integration", () => {
   });
 
   it("progression: Dm → G7 → Cmaj7 → 3 shapes with chained centroids", () => {
-    const chords = [parse("Dm"), parse("G7"), parse("Cmaj7")];
+    const chords = [parseChordSymbol("Dm"), parseChordSymbol("G7"), parseChordSymbol("Cmaj7")];
     const shapes = mapProgressionToShapes(chords, origin, indices);
 
     expect(shapes).toHaveLength(3);
@@ -107,7 +96,7 @@ describe("Phase 6b: End-to-end integration", () => {
     const smallIdx = buildWindowIndices({ uMin: 0, uMax: 1, vMin: 0, vMax: 1 });
     const largeIdx = buildWindowIndices({ uMin: -6, uMax: 6, vMin: -6, vMax: 6 });
 
-    const chord = parse("C");
+    const chord = parseChordSymbol("C");
     const farFocus: NodeCoord = { u: 5, v: 5 };
 
     const triSmall = placeMainTriad(chord, farFocus, smallIdx);
@@ -151,10 +140,10 @@ describe("Phase 6b: End-to-end integration", () => {
   it("module has zero runtime dependencies on UI, audio, or storage", () => {
     // Verify the full workflow runs in a pure Node environment with no DOM/Web APIs
     const idx = buildWindowIndices({ uMin: -2, uMax: 2, vMin: -2, vMax: 2 });
-    const chord = parse("Am7");
+    const chord = parseChordSymbol("Am7");
     const mainTri = placeMainTriad(chord, origin, idx);
     const shape = decomposeChordToShape(chord, mainTri, origin, idx);
-    const shapes = mapProgressionToShapes([parse("C"), parse("G")], origin, idx);
+    const shapes = mapProgressionToShapes([parseChordSymbol("C"), parseChordSymbol("G")], origin, idx);
 
     expect(shape).toBeDefined();
     expect(shapes).toHaveLength(2);
