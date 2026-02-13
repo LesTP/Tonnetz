@@ -28,9 +28,9 @@ Pure-logic harmonic subsystem for the Tonnetz Interactive Harmonic Explorer. Res
 
 ## Current Status
 
-**Phase:** 1a — Types and pitch-class mapping
-**Focus:** Implement `NodeCoord` (readonly object), branded IDs (`NodeId`), and `pc(u,v)`
-**Blocked/Broken:** Nothing — scaffold complete, all discuss decisions closed
+**Phase:** 3a — Chord parsing
+**Focus:** Implement `parseChordSymbol` with regex parser, case-insensitive root
+**Blocked/Broken:** Nothing — all discuss decisions closed (HC-DEV-D3, D6, D7)
 
 ---
 
@@ -441,11 +441,37 @@ Revisit if: Branding causes ergonomic issues with third-party code.
 ```
 HC-DEV-D3: Chord symbol case sensitivity
 Date: 2026-02-13
-Status: Open
+Status: Closed
 Priority: Important
-Decision: TBD — to be decided in Phase 3a discuss session
-Rationale: "cm" vs "Cm" ambiguity. Needs explicit rule.
+Decision: Root is case-insensitive (first character uppercased), rest is case-sensitive.
+Rationale: Musicians write "Cm7" or "cm7" interchangeably. Quality/extension tokens
+(m, dim, aug, maj7) are conventionally lowercase. Uppercasing the first character
+is the simplest normalization that matches convention.
 Revisit if: User testing reveals confusion.
+```
+
+```
+HC-DEV-D6: Regex-based parser for MVP chord grammar
+Date: 2026-02-13
+Status: Closed
+Priority: Important
+Decision: Single regex with negative lookahead for m/maj disambiguation.
+Pattern: /^([A-G])(#|b)?(m(?!aj)|dim|aug)?(maj7|add9|6\/9|6|7)?$/
+Rationale: Grammar is fixed-structure (root, accidental, quality, extension).
+Not recursive or context-sensitive. Regex handles it in ~15 lines.
+State machine deferred unless grammar grows significantly post-MVP.
+Revisit if: Grammar expansion requires recursive or context-sensitive parsing.
+```
+
+```
+HC-DEV-D7: Chord.extension is singular (Extension | null)
+Date: 2026-02-13
+Status: Closed
+Priority: Important
+Decision: Chord type uses extension: Extension | null, not extensions: Extension[].
+Rationale: MVP grammar allows at most one extension per chord. A single optional
+value avoids unnecessary array access (chord.extensions[0]) for no benefit.
+Revisit if: Future grammar supports multiple simultaneous extensions.
 ```
 
 ---

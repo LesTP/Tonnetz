@@ -21,3 +21,20 @@ export interface TriRef {
   readonly orientation: Orientation;
   readonly anchor: NodeCoord;
 }
+
+/** Rectangular lattice window bounds. */
+export interface WindowBounds {
+  readonly uMin: number;
+  readonly uMax: number;
+  readonly vMin: number;
+  readonly vMax: number;
+}
+
+/** Precomputed index maps for an active lattice window. */
+export interface WindowIndices {
+  readonly bounds: WindowBounds;
+  readonly edgeToTris: Map<EdgeId, TriId[]>;
+  readonly nodeToTris: Map<NodeId, TriId[]>;
+  readonly sigToTris: Map<string, TriId[]>;
+  readonly triIdToRef: Map<TriId, TriRef>;
+}
