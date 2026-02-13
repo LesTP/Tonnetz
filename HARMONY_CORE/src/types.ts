@@ -38,3 +38,18 @@ export interface WindowIndices {
   readonly sigToTris: Map<string, TriId[]>;
   readonly triIdToRef: Map<TriId, TriRef>;
 }
+
+/** Chord quality. */
+export type Quality = "maj" | "min" | "dim" | "aug";
+
+/** Single chord extension (MVP grammar allows at most one). */
+export type Extension = "6" | "7" | "maj7" | "add9" | "6/9";
+
+/** Parsed chord structure. */
+export interface Chord {
+  readonly root_pc: number;
+  readonly quality: Quality;
+  readonly extension: Extension | null;
+  readonly chord_pcs: number[];
+  readonly main_triad_pcs: [number, number, number];
+}
