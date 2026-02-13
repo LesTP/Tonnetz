@@ -29,8 +29,8 @@ Pure-logic harmonic subsystem for the Tonnetz Interactive Harmonic Explorer. Res
 
 ## Current Status
 
-**Phase:** 4b — Shape decomposition
-**Focus:** `decomposeChordToShape` implemented with greedy adjacent-triangle expansion and dot-only fallback; 95 tests pass
+**Phase:** 5b — Progression path geometry
+**Focus:** `mapProgressionToShapes` implemented with chain focus; 106 tests pass
 **Blocked/Broken:** Nothing
 
 ---
@@ -473,6 +473,18 @@ Decision: Chord type uses extension: Extension | null, not extensions: Extension
 Rationale: MVP grammar allows at most one extension per chord. A single optional
 value avoids unnecessary array access (chord.extensions[0]) for no benefit.
 Revisit if: Future grammar supports multiple simultaneous extensions.
+```
+
+```
+HC-DEV-D8: Progression mapping file placement
+Date: 2026-02-13
+Status: Closed
+Priority: Normal
+Decision: New file src/progression.ts for mapProgressionToShapes.
+Rationale: Distinct concern (sequence mapping with chain focus) vs single-chord
+placement/decomposition in placement.ts. Matches DEVPLAN phase separation
+(Phase 5 vs Phase 4). Keeps files small and focused.
+Revisit if: Never — trivial to merge later if desired.
 ```
 
 ---
