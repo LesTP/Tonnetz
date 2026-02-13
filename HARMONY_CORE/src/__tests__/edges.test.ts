@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { edgeId, triEdges } from "../edges.js";
-import type { TriRef } from "../types.js";
+import { edgeId, triEdges, parseEdgeId } from "../edges.js";
+import type { EdgeId, TriRef } from "../types.js";
 
 describe("edgeId", () => {
   it("is order-independent", () => {
@@ -58,5 +58,45 @@ describe("triEdges", () => {
     const edges = triEdges(tri);
     const unique = new Set(edges);
     expect(unique.size).toBe(3);
+  });
+});
+
+describe("parseEdgeId", () => {
+  it("round-trips with edgeId for simple coords", () => {
+    const id = edgeId({ u: 0, v: 0 }, { u: 1, v: 0 });
+    const [a, b] = parseEdgeId(id);
+    // Canonical order: "N:0,0" < "N:1,0"
+    expect(a.u).toBe(0);
+    expect(a.v).toBe(0);
+    expect(b.u).toBe(1);
+    expect(b.v).toBe(0);
+  });
+
+  it("round-trips with edgeId for negative coords", () => {
+    const id = edgeId({ u: -1, v: 2 }, { u: 0, v: 0 });
+    const [a, b] = parseEdgeId(id);
+    expect(a.u).toBe(-1);
+    expect(a.v).toBe(2);
+    expect(b.u).toBe(0);
+    expect(b.v).toBe(0);
+  });
+
+  it("parses raw string correctly", () => {
+    const [a, b] = parseEdgeId("E:N:3,4|N:5,6" as EdgeId);
+    expect(a.u).toBe(3);
+    expect(a.v).toBe(4);
+    expect(b.u).toBe(5);
+    expect(b.v).toBe(6);
+  });
+
+  it("preserves canonical order from edgeId", () => {
+    // edgeId with reversed args should still produce same canonical order
+    const id = edgeId({ u: 5, v: 6 }, { u: 3, v: 4 });
+    const [a, b] = parseEdgeId(id);
+    // "N:3,4" < "N:5,6" lexicographically
+    expect(a.u).toBe(3);
+    expect(a.v).toBe(4);
+    expect(b.u).toBe(5);
+    expect(b.v).toBe(6);
   });
 });

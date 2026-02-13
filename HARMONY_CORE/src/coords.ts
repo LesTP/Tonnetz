@@ -26,3 +26,13 @@ export function nodeId(u: number, v: number): NodeId {
 export function coord(u: number, v: number): NodeCoord {
   return { u, v };
 }
+
+/**
+ * Parse a branded NodeId string back to a NodeCoord.
+ * Inverse of nodeId(). Format: "N:u,v"
+ */
+export function parseNodeId(id: NodeId): NodeCoord {
+  const body = (id as string).slice(2); // strip "N:"
+  const [uStr, vStr] = body.split(",");
+  return { u: Number(uStr), v: Number(vStr) };
+}

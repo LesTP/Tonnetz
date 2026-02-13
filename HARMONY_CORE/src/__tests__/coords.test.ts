@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pc, nodeId, coord } from "../coords.js";
+import { pc, nodeId, coord, parseNodeId } from "../coords.js";
 import type { NodeId } from "../types.js";
 
 describe("pc (pitch class mapping)", () => {
@@ -62,5 +62,34 @@ describe("coord", () => {
     const c = coord(5, -3);
     expect(c.u).toBe(5);
     expect(c.v).toBe(-3);
+  });
+});
+
+describe("parseNodeId", () => {
+  it("round-trips with nodeId for (0, 0)", () => {
+    const id = nodeId(0, 0);
+    const parsed = parseNodeId(id);
+    expect(parsed.u).toBe(0);
+    expect(parsed.v).toBe(0);
+  });
+
+  it("round-trips with nodeId for positive coords", () => {
+    const id = nodeId(3, 7);
+    const parsed = parseNodeId(id);
+    expect(parsed.u).toBe(3);
+    expect(parsed.v).toBe(7);
+  });
+
+  it("round-trips with nodeId for negative coords", () => {
+    const id = nodeId(-5, -2);
+    const parsed = parseNodeId(id);
+    expect(parsed.u).toBe(-5);
+    expect(parsed.v).toBe(-2);
+  });
+
+  it("parses raw string correctly", () => {
+    const parsed = parseNodeId("N:12,34" as NodeId);
+    expect(parsed.u).toBe(12);
+    expect(parsed.v).toBe(34);
   });
 });

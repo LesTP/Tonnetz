@@ -1,5 +1,5 @@
-import type { EdgeId, TriRef } from "./types.js";
-import { nodeId } from "./coords.js";
+import type { EdgeId, NodeCoord, NodeId, TriRef } from "./types.js";
+import { nodeId, parseNodeId } from "./coords.js";
 import { triVertices } from "./triangles.js";
 
 /**
@@ -23,4 +23,17 @@ export function edgeId(
 export function triEdges(tri: TriRef): [EdgeId, EdgeId, EdgeId] {
   const [v0, v1, v2] = triVertices(tri);
   return [edgeId(v0, v1), edgeId(v1, v2), edgeId(v2, v0)];
+}
+
+/**
+ * Parse a branded EdgeId string back to two NodeCoords.
+ * Inverse of edgeId(). Format: "E:N:u1,v1|N:u2,v2"
+ */
+export function parseEdgeId(id: EdgeId): [NodeCoord, NodeCoord] {
+  const body = (id as string).slice(2); // strip "E:"
+  const [nodeA, nodeB] = body.split("|");
+  return [
+    parseNodeId(nodeA as NodeId),
+    parseNodeId(nodeB as NodeId),
+  ];
 }

@@ -59,11 +59,19 @@ describe("Phase 6a: Public API surface", () => {
     expect(typeof HarmonyCore.mapProgressionToShapes).toBe("function");
   });
 
-  it("exports exactly 14 functions", () => {
+  it("exports parseNodeId", () => {
+    expect(typeof HarmonyCore.parseNodeId).toBe("function");
+  });
+
+  it("exports parseEdgeId", () => {
+    expect(typeof HarmonyCore.parseEdgeId).toBe("function");
+  });
+
+  it("exports exactly 16 functions", () => {
     const fns = Object.entries(HarmonyCore).filter(
       ([, v]) => typeof v === "function",
     );
-    expect(fns.length).toBe(14);
+    expect(fns.length).toBe(16);
   });
 
   // Encapsulation: internal helpers should NOT be on the barrel export

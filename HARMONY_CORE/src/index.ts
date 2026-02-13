@@ -20,12 +20,12 @@ export type {
 } from "./types.js";
 
 // Coordinate system
-export { pc } from "./coords.js";
+export { pc, parseNodeId } from "./coords.js";
 
 // Node / triangle / edge ID construction (needed by consumers for index lookups)
 export { nodeId } from "./coords.js";
 export { triId, triVertices, getTrianglePcs } from "./triangles.js";
-export { edgeId } from "./edges.js";
+export { edgeId, parseEdgeId } from "./edges.js";
 
 // Window indexing
 export {
