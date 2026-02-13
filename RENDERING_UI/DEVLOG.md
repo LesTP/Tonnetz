@@ -679,3 +679,197 @@ Thorough code review of all 10 source files and 9 test files (~4,100 lines). Ide
 | *(internal)* `applyPan` with bounds | Also: `applyPanWithExtent(camera, dx, dy, extent)` (new export) |
 | *(internal)* `windowWorldExtent` | Now exported |
 | *(new)* | `WorldExtent` type, `ViewBoxLike` type |
+
+---
+
+## Entry 20 — Phase 3: Shape Rendering (Complete)
+
+**Date:** 2026-02-13
+
+### Summary
+
+Phase 3 delivered Shape rendering and highlight functionality for the Tonnetz lattice:
+
+- **Shape rendering:** `renderShape()` renders Harmony Core `Shape` objects with triangle fills, extension fills, root markers, and dot clusters
+- **Highlight API:** `highlightTriangle()`, `highlightShape()`, `clearHighlight()`, `clearAllHighlights()` provide selection feedback overlays
+- **Integration pattern:** Demonstrated consumer-side wiring of interaction callbacks to highlight API
+
+### 3a: Shape Rendering Module ✅
+
+Created `src/shape-renderer.ts`:
+- `renderShape(layerChords, layerDots, shape, indices, options?)` → `ShapeHandle`
+- Renders `main_tri` as filled polygon with semi-transparent blue fill
+- Renders `ext_tris` as filled polygons with lighter fill
+- Renders root vertex marker at `root_vertex_index` position
+- Renders `dot_pcs` as circles at pitch-class node positions
+- `clearShape(handle)` removes all rendered elements
+- Supports custom colors via `ShapeRenderOptions`
+
+**16 tests** covering basic triads, extended chords, dot-only shapes, multiple shapes, and options.
+
+### 3b: Dot Cluster Rendering ✅
+
+Part of 3a. Dots for dim/aug triads (no main_tri) rendered on `layer-dots`:
+- `findNodeForPc()` locates node with matching pitch class in window
+- MVP uses first match (future: nearest to centroid)
+
+### 3c: Highlight API ✅
+
+Created `src/highlight.ts`:
+- `highlightTriangle(layer, triId, indices, style?)` → `HighlightHandle`
+- `highlightShape(layer, shape, indices, style?)` → `HighlightHandle`
+- `clearHighlight(handle)` — remove single highlight
+- `clearAllHighlights(layer)` — remove all highlights from layer
+- Highlights rendered on `layer-interaction` (topmost layer)
+- Supports custom `HighlightStyle` (fill, stroke, strokeWidth)
+- Returns no-op handle for triangles not in current window
+
+**14 tests** covering single highlight, shape highlight, clearing, and multiple highlights.
+
+### 3d: Integration Pattern ✅
+
+Added integration test demonstrating consumer-side wiring:
+```ts
+// On onTriangleSelect callback:
+clearAllHighlights(layerInteraction);
+const handle = highlightTriangle(layerInteraction, triId, indices);
+```
+
+**1 integration test** demonstrating the pattern.
+
+### 3e: Review & Cleanup ✅
+
+- Updated barrel exports in `src/index.ts`
+- Updated DEVPLAN with Phase 3 status
+- Updated ARCH_RENDERING_UI.md with new exports
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `src/shape-renderer.ts` | New — Shape rendering module |
+| `src/highlight.ts` | New — Highlight API |
+| `src/__tests__/shape-renderer.test.ts` | New — 17 tests |
+| `src/__tests__/highlight.test.ts` | New — 14 tests |
+| `src/index.ts` | Added Phase 3 exports |
+
+### API Exports Added
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `renderShape` | Function | Render Shape to chord/dot layers |
+| `clearShape` | Function | Remove rendered shape elements |
+| `ShapeHandle` | Type | Handle for clearing rendered shapes |
+| `ShapeRenderOptions` | Type | Customization options |
+| `highlightTriangle` | Function | Highlight single triangle |
+| `highlightShape` | Function | Highlight entire Shape |
+| `clearHighlight` | Function | Clear single highlight |
+| `clearAllHighlights` | Function | Clear all highlights from layer |
+| `HighlightHandle` | Type | Handle for clearing highlights |
+| `HighlightStyle` | Type | Style customization options |
+
+### Test Summary
+
+| Phase | Tests Added | Running Total |
+|-------|-------------|---------------|
+| Phase 1 | 107 | 107 |
+| Phase 2 | 66 | 173 |
+| Phase 3 | 31 | 204 |
+
+**Running totals:** 12 source files, 11 test files, 204 RU tests, 168 HC tests
+
+---
+
+## Entry 21 — Phase 3f: Code Review & Optimizations (Complete)
+
+Date: 2026-02-13
+
+### Summary
+
+Code review of Phase 3 (shape-renderer.ts, highlight.ts) identified 8 potential improvements. Implemented 3 high-value optimizations:
+
+1. **Extract `triPolygonPoints` to shared utility** — DRY violation fix
+2. **Use `parseNodeId` from harmony-core** — Replace inline regex
+3. **Add `DocumentFragment` batching** — Consistent with Phase 2f optimization
+
+### Changes Implemented
+
+#### 1. Extract `triPolygonPoints` to `coords.ts`
+
+Both `shape-renderer.ts` and `highlight.ts` had identical `triPolygonPoints(tri: TriRef): string` functions. Extracted to `coords.ts` as a shared utility and exported via barrel.
+
+```ts
+// coords.ts
+export function triPolygonPoints(tri: TriRef): string {
+  const verts = triVertices(tri);
+  return verts
+    .map((v) => {
+      const w = latticeToWorld(v.u, v.v);
+      return `${w.x},${w.y}`;
+    })
+    .join(" ");
+}
+```
+
+#### 2. Use `parseNodeId` from harmony-core
+
+`findNodeForPc` in `shape-renderer.ts` used inline regex to parse `NodeId` strings:
+
+```ts
+// Before: inline regex parsing
+const match = (nid as string).match(/^N:(-?\d+),(-?\d+)$/);
+if (!match) continue;
+const u = parseInt(match[1], 10);
+const v = parseInt(match[2], 10);
+
+// After: use harmony-core's parseNodeId
+const coord = parseNodeId(nid);
+if (coord === null) continue;
+```
+
+#### 3. Add `DocumentFragment` batching to `renderShape`
+
+`renderShape` was appending elements one-by-one, causing multiple reflows. Now uses `DocumentFragment` pattern consistent with Phase 2f:
+
+```ts
+// Use DocumentFragment for batched DOM insertion (avoid multiple reflows)
+const chordFrag = document.createDocumentFragment();
+const dotFrag = document.createDocumentFragment();
+
+// ... build elements, append to fragments ...
+
+// Single DOM insertion per layer (batched)
+layerChords.appendChild(chordFrag);
+layerDots.appendChild(dotFrag);
+```
+
+### Items Deferred (Low-value / Documentation-only)
+
+| # | Issue | Disposition |
+|---|-------|-------------|
+| 4 | `_indices` parameter in `highlightShape` | Keep for API consistency; self-documenting with underscore prefix |
+| 5 | Trivial wrapper functions (`clearShape`, `clearHighlight`) | Keep for API symmetry |
+| 6 | Inconsistent `data-*` attribute naming | Document pattern in future; not blocking |
+| 7 | Undocumented magic numbers | Add comments in future cleanup pass |
+| 8 | Unused `_centroid` parameter in `findNodeForPc` | Keep for future proximity-sorted improvement |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `src/coords.ts` | Added `triPolygonPoints` export, imports from harmony-core |
+| `src/shape-renderer.ts` | Use shared `triPolygonPoints`, `parseNodeId`, DocumentFragment batching |
+| `src/highlight.ts` | Use shared `triPolygonPoints` |
+| `src/index.ts` | Export `triPolygonPoints`, `ViewBoxLike` |
+| `src/__tests__/coords.test.ts` | Added 3 tests for `triPolygonPoints` |
+
+### Test Summary
+
+| Phase | Tests Added | Running Total |
+|-------|-------------|---------------|
+| Phase 1 | 107 | 107 |
+| Phase 2 | 66 | 173 |
+| Phase 3 | 31 | 204 |
+| Phase 3f (review) | 3 | 207 |
+
+**Running totals:** 12 source files, 11 test files, 207 RU tests, 168 HC tests

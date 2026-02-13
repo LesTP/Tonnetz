@@ -2,8 +2,8 @@
  * Rendering/UI — Tonnetz SVG rendering and interaction module.
  * Public API surface per ARCH_RENDERING_UI.md Section 11.
  */
-export { latticeToWorld, worldToLattice, screenToWorld } from "./coords.js";
-export type { WorldPoint, LatticePoint } from "./coords.js";
+export { latticeToWorld, worldToLattice, screenToWorld, triPolygonPoints } from "./coords.js";
+export type { WorldPoint, LatticePoint, ViewBoxLike } from "./coords.js";
 
 export {
   computeWindowBounds,
@@ -61,3 +61,25 @@ export type {
   InteractionControllerOptions,
   InteractionCallbacks,
 } from "./interaction-controller.js";
+
+// Phase 3: Shape rendering
+export {
+  renderShape,
+  clearShape,
+} from "./shape-renderer.js";
+export type {
+  ShapeHandle,
+  ShapeRenderOptions,
+} from "./shape-renderer.js";
+
+// Phase 3: Highlight API
+export {
+  highlightTriangle,
+  highlightShape,
+  clearHighlight,
+  clearAllHighlights,
+} from "./highlight.js";
+export type {
+  HighlightHandle,
+  HighlightStyle,
+} from "./highlight.js";

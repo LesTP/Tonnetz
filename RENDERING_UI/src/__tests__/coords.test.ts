@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { latticeToWorld, worldToLattice, screenToWorld } from "../coords.js";
+import { latticeToWorld, worldToLattice, screenToWorld, triPolygonPoints } from "../coords.js";
 
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
 const SQRT3 = Math.sqrt(3);
@@ -166,5 +166,70 @@ describe("screenToWorld", () => {
     const w = screenToWorld(200, 200, -1, -1, 2, 2, 400, 400);
     expect(w.x).toBeCloseTo(0, 10);  // center → 0
     expect(w.y).toBeCloseTo(0, 10);  // center → 0
+  });
+});
+
+describe("triPolygonPoints", () => {
+  it("builds correct polygon points for U-oriented triangle at origin", () => {
+    // U(0,0) vertices: (0,0), (1,0), (0,1) → world: (0,0), (1,0), (0.5, √3/2)
+    const points = triPolygonPoints({ orientation: "U", anchor: { u: 0, v: 0 } });
+    const parts = points.split(" ");
+    expect(parts).toHaveLength(3);
+
+    // Parse coordinates
+    const coords = parts.map(p => {
+      const [x, y] = p.split(",").map(Number);
+      return { x, y };
+    });
+
+    // Vertex 0: (0,0) → world (0,0)
+    expect(coords[0].x).toBeCloseTo(0, 10);
+    expect(coords[0].y).toBeCloseTo(0, 10);
+
+    // Vertex 1: (1,0) → world (1,0)
+    expect(coords[1].x).toBeCloseTo(1, 10);
+    expect(coords[1].y).toBeCloseTo(0, 10);
+
+    // Vertex 2: (0,1) → world (0.5, √3/2)
+    expect(coords[2].x).toBeCloseTo(0.5, 10);
+    expect(coords[2].y).toBeCloseTo(SQRT3_OVER_2, 10);
+  });
+
+  it("builds correct polygon points for D-oriented triangle at origin", () => {
+    // D(0,0) vertices: (1,1), (1,0), (0,1) → world: (1.5, √3/2), (1,0), (0.5, √3/2)
+    const points = triPolygonPoints({ orientation: "D", anchor: { u: 0, v: 0 } });
+    const parts = points.split(" ");
+    expect(parts).toHaveLength(3);
+
+    const coords = parts.map(p => {
+      const [x, y] = p.split(",").map(Number);
+      return { x, y };
+    });
+
+    // Vertex 0: (1,1) → world (1.5, √3/2)
+    expect(coords[0].x).toBeCloseTo(1.5, 10);
+    expect(coords[0].y).toBeCloseTo(SQRT3_OVER_2, 10);
+
+    // Vertex 1: (1,0) → world (1, 0)
+    expect(coords[1].x).toBeCloseTo(1, 10);
+    expect(coords[1].y).toBeCloseTo(0, 10);
+
+    // Vertex 2: (0,1) → world (0.5, √3/2)
+    expect(coords[2].x).toBeCloseTo(0.5, 10);
+    expect(coords[2].y).toBeCloseTo(SQRT3_OVER_2, 10);
+  });
+
+  it("handles offset anchor coordinates", () => {
+    // U(2,3) → vertices offset by anchor
+    const points = triPolygonPoints({ orientation: "U", anchor: { u: 2, v: 3 } });
+    const parts = points.split(" ");
+    expect(parts).toHaveLength(3);
+
+    // Just verify it returns valid coordinates (not NaN)
+    for (const part of parts) {
+      const [x, y] = part.split(",").map(Number);
+      expect(Number.isNaN(x)).toBe(false);
+      expect(Number.isNaN(y)).toBe(false);
+    }
   });
 });

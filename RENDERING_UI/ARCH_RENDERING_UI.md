@@ -264,17 +264,27 @@ Actual exported API surface from `src/index.ts`:
 | `InteractionController` | Type | `interaction-controller.ts` | `{ destroy }` |
 | `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types |
 
-### Planned — Phase 3+ (Draft)
+### Planned — Phase 4+ (Draft)
 
 | Function | Description |
 |----------|-------------|
-| `renderShape(shape)` | Render a chord Shape (triangles, extensions, dots, root marker) |
 | `renderProgressionPath(shapes)` | Render centroid-connected path for a progression |
-| `highlightTriangle(tri)` | Apply highlight style to a triangle |
-| `highlightEdge(edgeId)` | Apply highlight style to a shared edge and both adjacent triangles (sufficient for MVP union chord visualization; a dedicated `renderUnionShape` may be added if union chords need distinct visual treatment beyond edge+triangle highlighting) |
-| `renderDotCluster(pcs, position)` | Render dot markers for non-triangulated pitch classes |
-| `clearHighlights()` | Remove all highlight styles |
 | `clearProgression()` | Remove progression path and return to normal rendering |
+
+### Implemented — Phase 3
+
+| Export | Type | Source | Description |
+|--------|------|--------|-------------|
+| `renderShape(layerChords, layerDots, shape, indices, options?)` | Function | `shape-renderer.ts` | Render Shape to chord/dot layers |
+| `clearShape(handle)` | Function | `shape-renderer.ts` | Remove rendered shape elements |
+| `ShapeHandle` | Type | `shape-renderer.ts` | Handle for clearing rendered shapes |
+| `ShapeRenderOptions` | Type | `shape-renderer.ts` | Customization options (fills, root marker) |
+| `highlightTriangle(layer, triId, indices, style?)` | Function | `highlight.ts` | Highlight single triangle |
+| `highlightShape(layer, shape, indices, style?)` | Function | `highlight.ts` | Highlight entire Shape |
+| `clearHighlight(handle)` | Function | `highlight.ts` | Clear single highlight |
+| `clearAllHighlights(layer)` | Function | `highlight.ts` | Clear all highlights from layer |
+| `HighlightHandle` | Type | `highlight.ts` | Handle for clearing highlights |
+| `HighlightStyle` | Type | `highlight.ts` | Style customization options |
 
 ---
 

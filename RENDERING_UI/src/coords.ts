@@ -1,3 +1,6 @@
+import type { TriRef } from "harmony-core";
+import { triVertices } from "harmony-core";
+
 /** Point in world coordinate space (equilateral triangle layout). */
 export interface WorldPoint {
   readonly x: number;
@@ -123,4 +126,22 @@ export function screenToWorld(
     x: viewBoxOrMinX + (screenX / clientWidth!) * viewBoxWidthOrClientHeight,
     y: viewBoxMinYOrClientWidth + (screenY / clientHeight!) * viewBoxHeight!,
   };
+}
+
+/**
+ * Build an SVG polygon points string from a triangle reference.
+ *
+ * Converts the three lattice-coordinate vertices to world coordinates
+ * and formats them as "x1,y1 x2,y2 x3,y3" for SVG polygon element.
+ *
+ * Shared utility used by shape-renderer.ts and highlight.ts.
+ */
+export function triPolygonPoints(tri: TriRef): string {
+  const verts = triVertices(tri);
+  return verts
+    .map((v) => {
+      const w = latticeToWorld(v.u, v.v);
+      return `${w.x},${w.y}`;
+    })
+    .join(" ");
 }
