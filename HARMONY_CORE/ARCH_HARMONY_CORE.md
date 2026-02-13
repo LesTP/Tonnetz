@@ -184,14 +184,16 @@ Chord:
 
 ## 6. Chord Placement and Shape Decomposition
 
-### 6.1 Diminished triad handling
+### 6.1 Diminished and augmented triad handling
 
-**HC-D5: Diminished triads as dot clusters**
-Status: Closed
+**HC-D5: Diminished and augmented triads as dot clusters**
+Status: Closed (revised 2026-02-13)
 
 Diminished triads do not form triangles in the (7u + 4v) lattice because their interval structure (stacked minor thirds) does not correspond to adjacent nodes.
 
-Diminished triads are represented entirely as `dot_pcs` clusters positioned near the focus coordinate, with no `main_tri` or `ext_tris`. The `main_tri` field is `null` for these shapes.
+Augmented triads similarly do not form triangles: their interval structure (stacked major thirds) places all three nodes along the same diagonal axis rather than forming a closed triangle.
+
+Both are represented entirely as `dot_pcs` clusters positioned near the focus coordinate, with no `main_tri` or `ext_tris`. The `main_tri` field is `null` for these shapes.
 
 ---
 
@@ -202,7 +204,7 @@ Status: Closed
 
 Algorithm:
 
-1. if triad is diminished → emit dot-only shape (see HC-D5)
+1. if triad is diminished or augmented → emit dot-only shape (see HC-D5)
 2. compute triad pitch signature
 3. find candidate triangles via `sigToTris`
 4. select candidate closest to focus `(u0,v0)` using lattice distance
@@ -257,7 +259,7 @@ Shape:
   centroid_uv: (u,v)
 ```
 
-`main_tri` and `root_vertex_index` are `null` for dot-only shapes (e.g., diminished triads).
+`main_tri` and `root_vertex_index` are `null` for dot-only shapes (e.g., diminished and augmented triads).
 
 ### HC-D9: Centroid computation
 
@@ -351,6 +353,7 @@ Note: `mapProgressionToShapes` uses chain focus policy (HC-D11). The `initialFoc
 * decomposition correctness tests
 * deterministic placement tests
 * diminished triad dot-cluster tests
+* augmented triad dot-cluster tests
 * edge union pitch-class tests
 * chain focus progression placement tests
 
@@ -362,7 +365,7 @@ Note: `mapProgressionToShapes` uses chain focus policy (HC-D11). The `initialFoc
 * HC-D2: triangle orientation convention
 * HC-D3: renderer supplies window bounds
 * HC-D4: MVP chord grammar (aug extended excluded)
-* HC-D5: diminished triads as dot clusters
+* HC-D5: diminished and augmented triads as dot clusters
 * HC-D6: nearest-placement strategy
 * HC-D7: greedy adjacent-triangle decomposition
 * HC-D8: simplification deferred

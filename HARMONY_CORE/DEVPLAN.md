@@ -20,6 +20,7 @@ Pure-logic harmonic subsystem for the Tonnetz Interactive Harmonic Explorer. Res
 - Centroid = arithmetic mean of unique vertex coordinates; dot-only shapes use focus as centroid (HC-D9)
 
 **Gotchas:**
+- This is a **plain git repo** (not Sapling/ISL) — commit with `git add -A && git commit`, not `sl` or `jf`
 - JavaScript `%` operator returns negative values for negative operands — must use `((n % 12) + 12) % 12` for pitch-class mod
 - Edge IDs must be canonical (lexicographic node ordering) or adjacency lookups will silently fail
 - `sigToTris` keys are sorted pitch-class signatures (`"0-4-7"` not `"4-7-0"`) — inconsistent sorting breaks placement
@@ -28,9 +29,9 @@ Pure-logic harmonic subsystem for the Tonnetz Interactive Harmonic Explorer. Res
 
 ## Current Status
 
-**Phase:** 3a — Chord parsing
-**Focus:** Implement `parseChordSymbol` with regex parser, case-insensitive root
-**Blocked/Broken:** Nothing — all discuss decisions closed (HC-DEV-D3, D6, D7)
+**Phase:** 4b — Shape decomposition
+**Focus:** `decomposeChordToShape` implemented with greedy adjacent-triangle expansion and dot-only fallback; 95 tests pass
+**Blocked/Broken:** Nothing
 
 ---
 

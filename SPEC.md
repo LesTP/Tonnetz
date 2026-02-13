@@ -49,7 +49,7 @@ Develop an interactive Tonnetz-based harmonic exploration application that allow
 
 ### MVP Chord Limitations
 
-* diminished triads are represented as dot clusters (not triangles) on the lattice
+* diminished and augmented triads are represented as dot clusters (not triangles) on the lattice
 * extended chords built on augmented triads (e.g., aug7, augMaj7) are excluded from MVP
 
 ---
@@ -180,14 +180,15 @@ See HC-D11 in ARCH_HARMONY_CORE.md.
 ```
 
 ```
-D-7: Diminished triads as dot clusters
+D-7: Diminished and augmented triads as dot clusters
 Date: 2026-02-13
 Status: Closed
 Priority: Important
 Decision:
-Diminished triads do not form triangles in the Tonnetz lattice and are represented as dot-cluster shapes.
+Diminished and augmented triads do not form triangles in the Tonnetz lattice and are represented as dot-cluster shapes.
 Rationale:
-Stacked minor-third intervals do not correspond to adjacent nodes in the (7u + 4v) lattice.
+Diminished: stacked minor-third intervals do not correspond to adjacent nodes.
+Augmented: stacked major-third intervals place all three nodes along the same diagonal axis.
 See HC-D5 in ARCH_HARMONY_CORE.md.
 ```
 
@@ -258,6 +259,7 @@ Deliver playable harmonic instrument with progression visualization.
 * chord decomposition
 * edge union pitch-class computation
 * diminished triad dot-cluster generation
+* augmented triad dot-cluster generation
 
 ## Integration Tests
 
@@ -300,7 +302,7 @@ Deliver playable harmonic instrument with progression visualization.
 # Known Limitations (v1)
 
 * limited chord grammar (no augmented extended chords)
-* diminished triads rendered as dot clusters, not triangles
+* diminished and augmented triads rendered as dot clusters, not triangles
 * no shared progression library
 * simple synthesis model
 * minimal voice-leading optimization
@@ -310,7 +312,7 @@ Deliver playable harmonic instrument with progression visualization.
 # Glossary
 
 * **Tonnetz** — geometric harmonic lattice representing pitch relationships
-* **Triangle** — triad representation on the lattice (maj, min, aug only; dim uses dots)
+* **Triangle** — triad representation on the lattice (maj and min only; dim and aug use dots)
 * **Shape** — chord representation (triangles + dots)
 * **Dot Cluster** — non-triangulated pitch-class representation for chords without lattice triangles
 * **Edge Union Chord** — 4-note chord formed by the pitch-class union of two adjacent triangles

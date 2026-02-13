@@ -42,7 +42,7 @@ Serves as the authoritative cross-module UX reference.
 * Main triad → bright fill
 * Extension triangles → pale fill
 * Non-triangulated tones → dot markers
-* Dot-only chords (e.g., diminished triads) → cluster of dot markers near focus
+* Dot-only chords (e.g., diminished and augmented triads) → cluster of dot markers near focus
 * Selected chord → highlighted cluster
 * Root tone → distinct outline on root vertex
 * Progression path → centroid-connected overlay

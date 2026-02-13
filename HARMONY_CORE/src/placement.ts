@@ -1,0 +1,183 @@
+import type { Chord, NodeCoord, Shape, TriId, TriRef, WindowIndices } from "./types.js";
+import { pc } from "./coords.js";
+import { triId, triVertices, getTrianglePcs } from "./triangles.js";
+import { getAdjacentTriangles } from "./indexing.js";
+
+const MAX_EXT_TRIS = 2;
+
+/**
+ * Compute the centroid of a triangle (mean of its 3 vertices).
+ */
+export function triCentroid(tri: TriRef): NodeCoord {
+  const [v0, v1, v2] = triVertices(tri);
+  return {
+    u: (v0.u + v1.u + v2.u) / 3,
+    v: (v0.v + v1.v + v2.v) / 3,
+  };
+}
+
+/**
+ * Squared Euclidean distance between two points.
+ */
+function dist2(a: NodeCoord, b: NodeCoord): number {
+  const du = a.u - b.u;
+  const dv = a.v - b.v;
+  return du * du + dv * dv;
+}
+
+/**
+ * Compute centroid as mean of all unique vertices across a set of triangles (HC-D9).
+ */
+function clusterCentroid(tris: TriRef[]): NodeCoord {
+  const seen = new Map<string, NodeCoord>();
+  for (const tri of tris) {
+    for (const v of triVertices(tri)) {
+      const key = `${v.u},${v.v}`;
+      if (!seen.has(key)) seen.set(key, v);
+    }
+  }
+  let sumU = 0;
+  let sumV = 0;
+  for (const v of seen.values()) {
+    sumU += v.u;
+    sumV += v.v;
+  }
+  const n = seen.size;
+  return { u: sumU / n, v: sumV / n };
+}
+
+/**
+ * Place a chord's main triad on the lattice (HC-D6).
+ *
+ * - Diminished and augmented triads → null (dot-only path, HC-D5)
+ * - Finds candidate triangles via sigToTris
+ * - Selects nearest to focus; tie-break: lexicographic TriId
+ */
+export function placeMainTriad(
+  chord: Chord,
+  focus: NodeCoord,
+  indices: WindowIndices,
+): TriRef | null {
+  if (chord.quality === "dim" || chord.quality === "aug") return null;
+
+  const sig = [...chord.main_triad_pcs].sort((a, b) => a - b).join("-");
+  const candidates = indices.sigToTris.get(sig);
+  if (!candidates || candidates.length === 0) return null;
+
+  let bestId: TriId = candidates[0];
+  let bestRef: TriRef = indices.triIdToRef.get(bestId)!;
+  let bestDist = dist2(triCentroid(bestRef), focus);
+
+  for (let i = 1; i < candidates.length; i++) {
+    const cid = candidates[i];
+    const cref = indices.triIdToRef.get(cid)!;
+    const cdist = dist2(triCentroid(cref), focus);
+
+    if (cdist < bestDist || (cdist === bestDist && cid < bestId)) {
+      bestId = cid;
+      bestRef = cref;
+      bestDist = cdist;
+    }
+  }
+
+  return bestRef;
+}
+
+/**
+ * Decompose a chord into a Tonnetz shape (HC-D7, HC-D9).
+ *
+ * Triangulated path (maj, min): greedy adjacent-triangle expansion from main_tri.
+ * Dot-only path (dim, aug): all chord_pcs as dots, centroid = focus.
+ */
+export function decomposeChordToShape(
+  chord: Chord,
+  mainTri: TriRef | null,
+  focus: NodeCoord,
+  indices: WindowIndices,
+): Shape {
+  // Dot-only path
+  if (mainTri === null) {
+    return {
+      chord,
+      main_tri: null,
+      ext_tris: [],
+      dot_pcs: [...chord.chord_pcs],
+      covered_pcs: new Set(),
+      root_vertex_index: null,
+      centroid_uv: focus,
+    };
+  }
+
+  // Triangulated path
+  const chordPcSet = new Set(chord.chord_pcs);
+  const cluster: TriRef[] = [mainTri];
+  const clusterIds = new Set<TriId>([triId(mainTri)]);
+  const covered = new Set(getTrianglePcs(mainTri));
+  const ext_tris: TriRef[] = [];
+  const mainCentroid = triCentroid(mainTri);
+
+  for (let round = 0; round < MAX_EXT_TRIS; round++) {
+    let bestRef: TriRef | null = null;
+    let bestId: TriId | null = null;
+    let bestNewCount = 0;
+    let bestDist = Infinity;
+
+    // Frontier: adjacents of all triangles in cluster
+    for (const tri of cluster) {
+      const adjIds = getAdjacentTriangles(tri, indices);
+      for (const adjId of adjIds) {
+        if (clusterIds.has(adjId)) continue;
+
+        const adjRef = indices.triIdToRef.get(adjId)!;
+        const adjPcs = getTrianglePcs(adjRef);
+
+        // All pcs must be subset of chord_pcs
+        if (!adjPcs.every((p) => chordPcSet.has(p))) continue;
+
+        // Count new (uncovered) pcs
+        const newCount = adjPcs.filter((p) => !covered.has(p)).length;
+        if (newCount === 0) continue;
+
+        const d = dist2(triCentroid(adjRef), mainCentroid);
+
+        if (
+          newCount > bestNewCount ||
+          (newCount === bestNewCount && d < bestDist) ||
+          (newCount === bestNewCount && d === bestDist && adjId < bestId!)
+        ) {
+          bestRef = adjRef;
+          bestId = adjId;
+          bestNewCount = newCount;
+          bestDist = d;
+        }
+      }
+    }
+
+    if (!bestRef || !bestId) break;
+
+    ext_tris.push(bestRef);
+    cluster.push(bestRef);
+    clusterIds.add(bestId);
+    for (const p of getTrianglePcs(bestRef)) {
+      covered.add(p);
+    }
+  }
+
+  const dot_pcs = chord.chord_pcs.filter((p) => !covered.has(p));
+
+  // root_vertex_index: which vertex of main_tri has the root pc
+  const mainVerts = triVertices(mainTri);
+  const rootIdx = mainVerts.findIndex(
+    (v) => pc(v.u, v.v) === chord.root_pc,
+  );
+
+  return {
+    chord,
+    main_tri: mainTri,
+    ext_tris,
+    dot_pcs,
+    covered_pcs: covered,
+    root_vertex_index: (rootIdx >= 0 ? rootIdx : null) as 0 | 1 | 2 | null,
+    centroid_uv: clusterCentroid(cluster),
+  };
+}

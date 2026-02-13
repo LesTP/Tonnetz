@@ -195,6 +195,88 @@ Date: 2026-02-13
 
 ---
 
+### Phase 3a: parseChordSymbol
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Added `Quality`, `Extension`, `Chord` types to `src/types.ts`
+- Created `src/chords.ts`: `parseChordSymbol(text)`, `computeChordPcs(rootPc, quality, extension)`
+- Created `src/__tests__/chords.test.ts`
+
+**Tests passed:**
+- [x] `"C"` → root_pc=0, quality=maj, extension=null
+- [x] `"Am"` → root_pc=9, quality=min, extension=null
+- [x] `"F#dim"` → root_pc=6, quality=dim, extension=null
+- [x] `"Bb7"` → root_pc=10, quality=maj, extension=7
+- [x] `"Dmaj7"` → root_pc=2, quality=maj, extension=maj7
+- [x] `"Cm7"` → root_pc=0, quality=min, extension=7 (m is quality, 7 is extension)
+- [x] `"Ebadd9"` → root_pc=3, quality=maj, extension=add9
+- [x] `"G6/9"` → root_pc=7, quality=maj, extension=6/9
+- [x] `"Caug"` → root_pc=0, quality=aug, extension=null (plain aug allowed)
+- [x] `"Caug7"` → rejected (augmented extended excluded from MVP)
+- [x] Invalid input `"XYZ"` → error
+- [x] Case handling: lowercase root accepted (`"cm7"` → C minor 7)
+- [x] All 12 root notes parseable
+
+**Issues encountered:**
+- None
+
+**Decisions made:**
+- HC-DEV-D3: Root case-insensitive, rest case-sensitive (closed)
+- HC-DEV-D6: Regex-based parser with `m(?!aj)` lookahead (closed)
+- HC-DEV-D7: Chord.extension is singular `Extension | null` (closed)
+
+---
+
+### Phase 3b: computeChordPcs
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Implemented within `src/chords.ts` alongside `parseChordSymbol`
+- Tests in same file `src/__tests__/chords.test.ts`
+
+**Tests passed:**
+- [x] C major: chord_pcs = {0,4,7}, main_triad_pcs = [0,4,7]
+- [x] A minor: chord_pcs = {9,0,4}, main_triad_pcs = [9,0,4]
+- [x] Bdim: chord_pcs = {11,2,5}, main_triad_pcs = [11,2,5]
+- [x] Caug: chord_pcs = {0,4,8}, main_triad_pcs = [0,4,8]
+- [x] Cmaj7: chord_pcs = {0,4,7,11}
+- [x] C7: chord_pcs = {0,4,7,10}
+- [x] Cm7: chord_pcs = {0,3,7,10}
+- [x] C6: chord_pcs = {0,4,7,9}
+- [x] Cadd9: chord_pcs = {0,4,7,2}
+- [x] C6/9: chord_pcs = {0,4,7,9,2}
+- [x] All pcs in 0..11
+
+**Issues encountered:**
+- None
+
+---
+
+### Phase 3 Completion
+Date: 2026-02-13
+
+**Phase tests passed:**
+- [x] Round-trip: parse symbol → compute pcs → verify against known pitch-class sets for all MVP chord types
+- [x] All 12 roots × maj quality produce correct pcs
+- [x] All 12 roots × min quality produce correct pcs
+
+**Test totals:** 26 chord tests + 47 prior = 73 total
+
+**Review notes:**
+- Regex `m(?!aj)` negative lookahead cleanly disambiguates `Cm7` (quality=min, ext=7) from `Cmaj7` (quality=maj, ext=maj7)
+- `computeChordPcs` is a separate exported function, enabling direct use by tests and future callers that already have parsed components
+- Extension intervals stored as arrays to support `6/9` which adds two pcs ([9, 2])
+
+**Doc sync:**
+- DEVPLAN: HC-DEV-D3, D6, D7 closed; Current Status advanced to Phase 3a
+
+**Commit:** `99f5546` — "Phase 3: Chord parsing and pitch-class computation"
+
+---
+
 ## Template
 
 Each entry follows this format:

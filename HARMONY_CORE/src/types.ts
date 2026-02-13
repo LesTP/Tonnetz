@@ -53,3 +53,14 @@ export interface Chord {
   readonly chord_pcs: number[];
   readonly main_triad_pcs: [number, number, number];
 }
+
+/** Decomposed chord shape on the Tonnetz lattice. */
+export interface Shape {
+  readonly chord: Chord;
+  readonly main_tri: TriRef | null;
+  readonly ext_tris: TriRef[];
+  readonly dot_pcs: number[];
+  readonly covered_pcs: ReadonlySet<number>;
+  readonly root_vertex_index: 0 | 1 | 2 | null;
+  readonly centroid_uv: NodeCoord;
+}
