@@ -29,8 +29,8 @@ Pure-logic harmonic subsystem for the Tonnetz Interactive Harmonic Explorer. Res
 ## Current Status
 
 **Phase:** 1a — Types and pitch-class mapping
-**Focus:** Implement core types (`NodeCoord`, `NodeId`, `pc(u,v)`) and project scaffolding (TS + Vitest)
-**Blocked/Broken:** Nothing
+**Focus:** Implement `NodeCoord` (readonly object), branded IDs (`NodeId`), and `pc(u,v)`
+**Blocked/Broken:** Nothing — scaffold complete, all discuss decisions closed
 
 ---
 
@@ -413,6 +413,29 @@ Decision: Vitest
 Rationale: Native TS support with zero config. ESM-first aligns with browser delivery target.
 Jest-compatible API. Fast watch mode for ~100 test cases across 6 phases.
 Revisit if: Build toolchain decision constrains choice.
+```
+
+```
+HC-DEV-D4: NodeCoord as readonly object interface
+Date: 2026-02-13
+Status: Closed
+Priority: Important
+Decision: NodeCoord is an interface { readonly u: number; readonly v: number }.
+Rationale: Named properties (coord.u, coord.v) prevent u/v transposition bugs.
+Readonly fields enforce value semantics. Consistent with TriRef object shape.
+Revisit if: Performance profiling shows object allocation is a bottleneck.
+```
+
+```
+HC-DEV-D5: Branded string IDs (NodeId, TriId, EdgeId)
+Date: 2026-02-13
+Status: Closed
+Priority: Important
+Decision: IDs are branded strings (string & { readonly __brand: "NodeId" } etc.).
+Constructor functions (nodeId, triId, edgeId) are the only way to produce them.
+Rationale: Zero runtime overhead (plain strings, valid Map keys).
+Compile-time type safety prevents cross-map key confusion in the index system.
+Revisit if: Branding causes ergonomic issues with third-party code.
 ```
 
 ```
