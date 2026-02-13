@@ -277,6 +277,262 @@ Date: 2026-02-13
 
 ---
 
+### Phase 4a: placeMainTriad
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Created `src/placement.ts`: `triCentroid(tri)`, `placeMainTriad(chord, focus, indices)`
+- Created `src/__tests__/placement.test.ts`
+
+**Tests passed:**
+- [x] C major at focus (0,0) → selects U(0,0)
+- [x] C major at focus (3,3) → selects nearer candidate, not (0,0)
+- [x] Bdim → returns null (dot-only)
+- [x] Caug → returns null (dot-only, discovered aug triads don't form lattice triangles)
+- [x] Equidistant tie-break: lexicographic TriId wins
+- [x] Returned triangle pcs match chord's main_triad_pcs
+- [x] Am at origin → valid minor triangle
+- [x] F at origin → valid major triangle
+
+**Issues encountered:**
+- Caug test failure: augmented triads (stacked major thirds) place all nodes along the same diagonal axis — they don't form lattice triangles. Fixed by adding `chord.quality === "aug"` to the null-return check alongside `"dim"`.
+
+**Decisions made:**
+- HC-D5 revised: both dim AND aug triads use dot-cluster representation
+
+---
+
+### Phase 4b: decomposeChordToShape
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Added `Shape` interface to `src/types.ts`
+- Added `decomposeChordToShape(chord, mainTri, focus, indices)` to `src/placement.ts`
+- Added 14 decomposition tests to `src/__tests__/placement.test.ts`
+
+**Tests passed:**
+- [x] C major triad → main_tri only, ext_tris=[], dot_pcs=[], covered_pcs={0,4,7}
+- [x] Cmaj7 → main_tri + ext_tri covering pc 11, dot_pcs=[]
+- [x] C7 → extension covers pc 10
+- [x] C6/9 (5 pcs) → main_tri + ext_tris + remaining in dot_pcs
+- [x] root_vertex_index correctly identifies root vertex
+- [x] centroid_uv for single triangle = mean of 3 vertices
+- [x] centroid_uv for tri + ext = mean of unique vertices
+- [x] covered_pcs ∪ dot_pcs = chord_pcs (coverage invariant)
+- [x] ext_tris never exceeds MAX_EXT_TRIS (2)
+- [x] Bdim → dot-only: main_tri=null, dot_pcs=[11,2,5], centroid=focus
+- [x] Caug → dot-only: main_tri=null, dot_pcs=[0,4,8], centroid=focus
+- [x] Dot-only: covered_pcs is empty, root_vertex_index=null
+- [x] Am triad decomposition
+- [x] Cm7 decomposition
+
+**Issues encountered:**
+- Minor ARCH API deviation: `decomposeChordToShape` takes a `focus` parameter not in original ARCH spec, needed for dot-only centroid computation
+
+---
+
+### Phase 4 Completion
+Date: 2026-02-13
+
+**Phase tests passed:**
+- [x] Decompose all MVP chord types for root C — all Shape fields valid
+- [x] Coverage invariant: `covered_pcs ∪ dot_pcs == chord_pcs` for all tested chords
+- [x] Shape invariant: `main_tri is null` ↔ `quality ∈ {dim, aug}`
+- [x] Deterministic: same inputs → identical shape
+
+**Test totals:** 22 placement tests + 73 prior = 95 total
+
+**Review notes:**
+- Greedy adjacent-triangle expansion with 3-tier tie-break (new pc count > distance > TriId) is simple and deterministic
+- `clusterCentroid` deduplicates shared vertices via coordinate string key
+- Aug triad discovery was a valuable find — updated HC-D5 across all three spec docs
+
+**Doc sync:**
+- ARCH_HARMONY_CORE.md: HC-D5 revised for aug triads
+- SPEC.md: D-7 updated, glossary, known limitations
+- UX_SPEC.md: visual encoding updated for aug dot clusters
+- DEVPLAN: Current Status advanced to Phase 4b
+
+**Commit:** `883a58f` — "Phase 4: Chord placement & shape decomposition"
+
+---
+
+### Phase 5a: mapProgressionToShapes
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Created `src/progression.ts`: `mapProgressionToShapes(chords, initialFocus, indices)`
+- Created `src/__tests__/progression.test.ts`
+
+**Tests passed:**
+- [x] Empty progression → empty array
+- [x] Single chord placed at initialFocus
+- [x] Two-chord progression: second focus = first centroid
+- [x] Three-chord chain focus (C → F → G)
+- [x] Dim chord passes focus through (C → Bdim → Am): centroid preserved
+- [x] All shapes satisfy coverage invariant across 7-chord diatonic progression
+
+**Issues encountered:**
+- None
+
+**Decisions made:**
+- HC-DEV-D8: New file `src/progression.ts` for progression mapping (closed)
+
+---
+
+### Phase 5b: Progression path geometry
+Date: 2026-02-13
+Status: Complete
+
+**Tests passed:**
+- [x] ii–V–I centroids form connected path (distance < 5 between consecutive)
+- [x] I–IV–V–I returns to approximately same region (distance < 4)
+- [x] Centroids are fractional (not rounded to integers)
+- [x] Long progression (12 chords): no NaN/Infinity
+- [x] Deterministic: same input → identical output
+
+**Issues encountered:**
+- None
+
+---
+
+### Phase 5 Completion
+Date: 2026-02-13
+
+**Phase tests passed:**
+- [x] All shapes from progression mapping satisfy Shape invariants
+- [x] Deterministic: same input → identical output
+- [x] 12-chord progression completes without degenerate values
+
+**Test totals:** 11 progression tests + 95 prior = 106 total
+
+**Review notes:**
+- `mapProgressionToShapes` is pure glue — ~10 lines of logic over Phase 4 APIs
+- Chain focus threading is clean: `focus = shape.centroid_uv` after each chord
+- Dot-only chords (dim/aug) pass focus through unchanged, which is correct per HC-D11/HC-D9
+
+**Doc sync:**
+- DEVPLAN: HC-DEV-D8 closed; Current Status advanced to Phase 5b
+
+**Commit:** `03e2a43` — "Phase 5: Progression mapping (mapProgressionToShapes with chain focus)"
+
+---
+
+### Phase 6a: API surface assembly
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Rewrote `src/index.ts` as barrel export file: 14 public functions + 14 types
+- Updated ARCH_HARMONY_CORE.md Section 11 to match actual function signatures
+- Created `src/__tests__/api-surface.test.ts`
+
+**Tests passed:**
+- [x] All 14 public functions exported and callable (pc, nodeId, triId, triVertices, getTrianglePcs, edgeId, buildWindowIndices, getAdjacentTriangles, getEdgeUnionPcs, parseChordSymbol, computeChordPcs, placeMainTriad, decomposeChordToShape, mapProgressionToShapes)
+- [x] Exactly 14 functions exported (no extras)
+- [x] `coord` not exported (internal helper)
+- [x] `triEdges` not exported (internal helper)
+- [x] `triCentroid` not exported (internal helper)
+- [x] `dist2` not exported (internal helper)
+- [x] `pc` returns a number
+- [x] `nodeId` returns a branded string
+- [x] `buildWindowIndices` returns object with expected maps (edgeToTris, nodeToTris, sigToTris, triIdToRef, bounds)
+- [x] `parseChordSymbol` returns object with root_pc, quality, extension
+
+**Issues encountered:**
+- ARCH Section 11 had 3 signature mismatches vs implementation (getAdjacentTriangles missing indices param, computeChordPcs taking 3 args not 1, decomposeChordToShape extra focus param). Updated ARCH to match reality.
+
+**Decisions made:**
+- Export `nodeId`, `triId`, `edgeId`, `triVertices` in addition to the 9 ARCH-spec functions — consumers need ID construction and vertex positions for rendering
+
+---
+
+### Phase 6b: End-to-end integration tests
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Created `src/__tests__/integration.test.ts`
+
+**Tests passed:**
+- [x] Cmaj7: parse → place → decompose → verify shape (coverage invariant, root_vertex_index, centroid)
+- [x] Bdim: parse → place → decompose → verify dot-only shape
+- [x] Edge union: shared edge → getEdgeUnionPcs → verify 4 pcs {0,4,7,11}
+- [x] Progression Dm → G7 → Cmaj7: 3 shapes with chained centroids, connected path
+- [x] Different window sizes → same chord produces different (but valid) placement
+- [x] Invalid input produces clear errors (XYZ, empty, Caug7 all throw)
+- [x] No circular dependencies (all imports resolve via barrel)
+- [x] Module has zero runtime dependencies on UI, audio, or storage
+
+**Issues encountered:**
+- None
+
+---
+
+### Phase 6 Completion
+Date: 2026-02-13
+
+**Phase tests passed:**
+- [x] Full test suite passes (137 tests across 10 files)
+- [x] No circular dependencies within the module
+- [x] Module has zero runtime dependencies on UI, audio, or storage code
+- [x] All API calls with invalid input produce clear errors
+
+**Test totals:** 23 API surface + 8 integration + 106 prior = 137 total
+
+**Review notes:**
+- Barrel export in index.ts is clean and organized by concern (coords, IDs, indexing, chords, placement, progression)
+- ARCH Section 11 now documents actual signatures with notes explaining deviations from original spec
+- Integration tests exercise the full consumer workflow through the public API only — no internal imports
+
+**Doc sync:**
+- ARCH_HARMONY_CORE.md: Section 11 rewritten with full signatures and notes
+- DEVPLAN: HC-DEV-D8 closed; Current Status advanced to Phase 6b
+
+**Commit:** (pending — will be committed with Phase 6)
+
+---
+
+### Phase 6c: Performance & edge case tests
+Date: 2026-02-13
+Status: Complete
+
+**Changes:**
+- Created `src/__tests__/perf-edge.test.ts`
+
+**Tests passed:**
+- [x] buildWindowIndices for 10×10 window completes in < 50ms
+- [x] 50-chord progression completes in < 100ms
+- [x] 100-chord progression completes in < 200ms
+- [x] Large window (20×20) builds in < 500ms (882 triangles)
+- [x] Large negative/positive coordinates produce valid pcs (±100)
+- [x] nodeId with large coordinates produces valid string
+- [x] Zero-area window produces 2 triangles
+- [x] Negative-anchored window works correctly
+- [x] Asymmetric window works correctly
+- [x] Every enharmonic root (17 spellings) parses correctly
+- [x] Every MVP chord type × 12 roots produces valid pcs (120 combinations)
+- [x] Every MVP chord type decomposes with valid Shape invariants (root C)
+- [x] Same set for root F# (non-zero root stress test)
+- [x] Focus far from origin still finds valid placement
+- [x] Boundary edge returns null from getEdgeUnionPcs (or valid result)
+- [x] Non-existent edge returns null from getEdgeUnionPcs
+- [x] Every interior edge has exactly 4 union pcs
+- [x] Progression of all same chord is stable (focus converges)
+- [x] Alternating dim/aug progression never produces NaN
+- [x] Progression with non-origin initial focus
+
+**Issues encountered:**
+- Triangle count for 20×20 window was 882, not 800 as initially calculated (off-by-one in inclusive bounds formula). Fixed assertion.
+- Unused `getAdjacentTriangles` import found during code review — removed.
+
+**Test totals:** 21 perf/edge tests + 137 prior = 158 total
+
+---
+
 ## Template
 
 Each entry follows this format:

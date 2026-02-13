@@ -29,9 +29,9 @@ Pure-logic harmonic subsystem for the Tonnetz Interactive Harmonic Explorer. Res
 
 ## Current Status
 
-**Phase:** 5b — Progression path geometry
-**Focus:** `mapProgressionToShapes` implemented with chain focus; 106 tests pass
-**Blocked/Broken:** Nothing
+**Phase:** 6c — Performance & edge case tests
+**Focus:** All 6 phases complete; 158 tests pass across 11 test files
+**Blocked/Broken:** Nothing — Harmony Core module is feature-complete
 
 ---
 

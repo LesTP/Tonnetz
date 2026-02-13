@@ -330,18 +330,36 @@ Event-stream storage handled by Persistence subsystem.
 ## 11. Public API (Module Interface)
 
 ```text
-buildWindowIndices(bounds)
-getTrianglePcs(tri)
-getAdjacentTriangles(tri)
-getEdgeUnionPcs(edgeId, indices)
-parseChordSymbol(text)
-computeChordPcs(chord)
-placeMainTriad(chord, focus, indices)
-decomposeChordToShape(chord, mainTri, indices)
-mapProgressionToShapes(chords, initialFocus, indices)
+// Coordinate system & ID construction
+pc(u, v) → number
+nodeId(u, v) → NodeId
+triId(tri) → TriId
+triVertices(tri) → [NodeCoord, NodeCoord, NodeCoord]
+getTrianglePcs(tri) → number[]
+edgeId(a, b) → EdgeId
+
+// Window indexing
+buildWindowIndices(bounds) → WindowIndices
+getAdjacentTriangles(tri, indices) → TriId[]
+getEdgeUnionPcs(edgeId, indices) → number[] | null
+
+// Chord parsing
+parseChordSymbol(text) → { root_pc, quality, extension }
+computeChordPcs(rootPc, quality, extension) → { chord_pcs, main_triad_pcs }
+
+// Placement & decomposition
+placeMainTriad(chord, focus, indices) → TriRef | null
+decomposeChordToShape(chord, mainTri, focus, indices) → Shape
+
+// Progression mapping
+mapProgressionToShapes(chords, initialFocus, indices) → Shape[]
 ```
 
-Note: `mapProgressionToShapes` uses chain focus policy (HC-D11). The `initialFocus` parameter sets the focus for the first chord; subsequent chords use the preceding shape's centroid.
+Notes:
+- `getAdjacentTriangles` requires `indices` for edge-based adjacency lookup.
+- `computeChordPcs` takes decomposed args (rootPc, quality, extension), not a Chord object, to allow use independent of the parser.
+- `decomposeChordToShape` takes a `focus` parameter (in addition to `mainTri` and `indices`) for dot-only centroid computation (HC-D9 fallback).
+- `mapProgressionToShapes` uses chain focus policy (HC-D11). The `initialFocus` parameter sets the focus for the first chord; subsequent chords use the preceding shape's centroid.
 
 ---
 
