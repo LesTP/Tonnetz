@@ -144,9 +144,14 @@ See UX-D3 in UX_SPEC.md §11.
 Status: Closed
 
 * Interactive actions trigger immediate visual updates.
-* Scheduled playback uses a **shared transport timebase** defined by the Audio Engine (see ARCH_AUDIO_ENGINE.md §5).
+* Scheduled playback uses a **shared transport timebase** defined by the Audio Engine (see ARCH_AUDIO_ENGINE.md §5–6).
 
-The renderer queries the Audio Engine's transport clock to synchronize chord highlighting and path animation with scheduled playback.
+The renderer synchronizes with the Audio Engine via the `AudioTransport` interface:
+
+* **Event-driven:** Subscribe to `onChordChange` for discrete chord highlight updates
+* **Polling:** Query `getTime()` in rAF loop for smooth path progress animation
+
+See ARCH_AUDIO_ENGINE.md §6.3 for the cross-module usage pattern.
 
 ---
 
@@ -264,12 +269,21 @@ Actual exported API surface from `src/index.ts`:
 | `InteractionController` | Type | `interaction-controller.ts` | `{ destroy }` |
 | `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types |
 
-### Planned — Phase 4+ (Draft)
+### Planned — Phase 4b+ (Draft)
 
 | Function | Description |
 |----------|-------------|
-| `renderProgressionPath(shapes)` | Render centroid-connected path for a progression |
-| `clearProgression()` | Remove progression path and return to normal rendering |
+| Playback animation integration | Subscribe to AudioTransport for chord changes (deferred until Audio Engine) |
+| Clear button wiring | Wire to Control Panel UI (deferred until Layout integration) |
+
+### Implemented — Phase 4a
+
+| Export | Type | Source | Description |
+|--------|------|--------|-------------|
+| `renderProgressionPath(layerPath, shapes, options?)` | Function | `path-renderer.ts` | Render centroid-connected path for a progression |
+| `clearProgression(handle)` | Function | `path-renderer.ts` | Remove progression path elements |
+| `PathHandle` | Type | `path-renderer.ts` | Handle with `clear()`, `setActiveChord(index)`, `getChordCount()` |
+| `PathRenderOptions` | Type | `path-renderer.ts` | Customization options (stroke, fills, markers) |
 
 ### Implemented — Phase 3
 

@@ -36,11 +36,13 @@ SVG-based rendering and interaction subsystem for the Tonnetz Interactive Harmon
 
 ## Current Status
 
-**Phase:** 3 — Shape Rendering ✅ (all steps 3a–3f complete)
+**Phase:** 4 — Path Rendering ✅ COMPLETE
 **Blocked/Broken:** Nothing
-**Test count:** RU 207 passing (11 test files, 12 source files), HC 168 passing
+**Test count:** RU 232 passing (12 test files, 13 source files), HC 168 passing
 
-**Harmony Core Dependency:** Phase 7 (Code Review) complete. New `CentroidCoord` type alias exported for centroid handling. See HARMONY_CORE/DEVLOG.md Entry Phase 7. **No HC changes required for Phase 2 — all needed APIs are already exported.**
+**Harmony Core Dependency:** Phase 7 (Code Review) complete. New `CentroidCoord` type alias exported for centroid handling. See HARMONY_CORE/DEVLOG.md Entry Phase 7. **No HC changes required — all needed APIs are already exported.**
+
+**Next Phase:** 5 — Layout Integration
 
 ---
 
@@ -214,12 +216,32 @@ Code review identified 7 improvements (see DEVLOG Entry 19):
 
 ## Future Phases
 
-| Phase | Scope | Depends On |
-|-------|-------|------------|
-| 3 | Shape rendering — triangle fills, extension fills, dot clusters, root marker | Phase 2 |
-| 4 | Progression path rendering — centroid path, playback animation, clear button | Phase 3 |
-| 5 | Layout integration — control panel, toolbar, responsive resize | Phase 1 + Phase 4 |
-| 6 | Public API assembly, type signatures, integration tests | All above |
+| Phase | Scope | Depends On | Status |
+|-------|-------|------------|--------|
+| 3 | Shape rendering — triangle fills, extension fills, dot clusters, root marker | Phase 2 | ✅ Complete |
+| 4 | Progression path rendering — centroid path, `setActiveChord` API | Phase 3 | ✅ Complete |
+| 5 | Layout integration — control panel (incl. clear button), toolbar, responsive resize | Phase 4 | Ready |
+| 6 | Public API assembly, type signatures, integration tests | Phase 5 | Pending |
+| — | **Deferred: Audio Integration** | Audio Engine | Blocked |
+
+### Deferred Work (Audio Integration)
+
+The following items are blocked by Audio Engine implementation:
+
+| Item | Description | Dependency |
+|------|-------------|------------|
+| Playback animation | Subscribe to `AudioTransport.onChordChange()`, call `PathHandle.setActiveChord()` | Audio Engine transport |
+| Transport sync | rAF loop with `AudioTransport.getTime()` for smooth path progress | Audio Engine transport |
+
+These will be addressed in a cross-module integration phase after Audio Engine is implemented. The `PathHandle.setActiveChord()` API is already available — integration is trivial wiring.
+
+### Phase 5 Scope (Expanded)
+
+Phase 5 (Layout Integration) now includes clear button integration:
+- Control Panel UI with progression input, playback controls, tempo
+- **Clear button** → calls `clearProgression(handle)`, state transition: Progression Loaded → Idle Exploration (UX-D5)
+- Toolbar with view reset, optional overlays, mode toggles
+- Responsive resize behavior for layout zones
 
 ---
 
@@ -365,3 +387,101 @@ Review pass, update barrel exports, update DEVPLAN/DEVLOG.
 | 3e | — | Review, exports, docs | — |
 | 3f | coords.ts, shape-renderer.ts, highlight.ts | `triPolygonPoints` extraction, `parseNodeId`, DocumentFragment batching | 3 |
 | **Total** | **12 source files, 11 test files** | | **207** |
+
+---
+
+## Phase 4: Progression Path Rendering
+
+**Objective:** Render progression paths connecting Shape centroids, with support for active chord highlighting during playback. Provide clear button integration for returning to Idle Exploration state.
+
+**Key specs:** ARCH §6 (AudioTransport interface sync), ARCH §10 (centroid-based path rendering), UX-D5 (clear button), ARCH_AUDIO_ENGINE.md §6 (transport interface).
+
+### Pre-Implementation Analysis
+
+#### Centroid Path Rendering
+
+Progression paths are rendered as polylines connecting Shape centroids. Each Shape's `centroid_uv` is transformed to world coordinates via `latticeToWorld`.
+
+#### API Design
+
+```ts
+// Path rendering
+renderProgressionPath(layerPath, shapes, options?): PathHandle;
+clearProgression(handle): void;
+
+// PathHandle methods
+interface PathHandle {
+  clear(): void;
+  setActiveChord(index: number): void;  // highlight during playback
+  getChordCount(): number;
+}
+```
+
+#### Transport Interface Dependency
+
+For playback animation (Phase 4b), Rendering/UI will consume the `AudioTransport` interface from Audio Engine. The interface is defined in ARCH_AUDIO_ENGINE.md §6:
+
+- `onChordChange(callback)` — subscribe to chord index changes
+- `getTime()` — query transport time for smooth animation
+- `isPlaying()` — check playback state
+
+Phase 4a (path rendering) has no Audio Engine dependencies. Phase 4b (playback animation) will be deferred until Audio Engine transport is implemented.
+
+### 4a: Path Rendering Module ✅
+
+`src/path-renderer.ts` — Render progression paths connecting Shape centroids.
+
+- `renderProgressionPath(layerPath, shapes, options?)` → `PathHandle`
+  - Render SVG `<polyline>` connecting all Shape centroids
+  - Render centroid markers (circles) at each chord position
+  - Render active chord marker (initially hidden)
+  - Transform `centroid_uv` to world coordinates via `latticeToWorld`
+  - Return handle for clearing and active chord management
+- `clearProgression(handle)` — remove rendered path elements
+- `PathHandle.setActiveChord(index)` — move/show active marker at index, hide for -1 or out-of-bounds
+- `PathHandle.getChordCount()` — return progression length
+
+**Implemented files:**
+- `src/path-renderer.ts` — Path rendering module
+- `src/__tests__/path-renderer.test.ts` — 25 tests
+
+**Test coverage:**
+- [x] renderProgressionPath renders polyline connecting centroids
+- [x] Polyline has correct number of points
+- [x] Centroid markers rendered at each chord
+- [x] Markers have data-chord-index attributes
+- [x] Active marker initially hidden
+- [x] getChordCount returns correct count
+- [x] Empty progression handled gracefully
+- [x] Single-chord progression renders correctly
+- [x] setActiveChord shows marker at correct position
+- [x] setActiveChord(-1) hides marker
+- [x] Out-of-bounds index hides marker
+- [x] clearProgression removes all elements
+- [x] Options: pathStroke, pathStrokeWidth, centroidFill, activeFill
+- [x] showCentroidMarkers=false hides centroid markers
+- [x] World coordinate conversion correct
+
+### 4b: Playback Animation (Deferred)
+
+**Blocked by:** Audio Engine transport implementation (ARCH_AUDIO_ENGINE.md §6)
+
+Will implement:
+- Subscribe to `AudioTransport.onChordChange()` for active chord updates
+- Use `PathHandle.setActiveChord()` to highlight current chord
+- Optional: rAF loop with `getTime()` for smooth path progress indicator
+
+### 4c: Clear Button Integration (Future)
+
+Wire `clearProgression()` to Control Panel UI. State transition: Progression Loaded → Idle Exploration.
+
+Depends on Layout integration (Phase 5).
+
+---
+
+## Phase 4a Summary
+
+| Step | Key Files | Key Functions | Tests |
+|------|-----------|---------------|-------|
+| 4a | path-renderer.ts | `renderProgressionPath`, `clearProgression`, `PathHandle` | 25 |
+| **Total** | **13 source files, 12 test files** | | **232** |

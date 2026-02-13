@@ -873,3 +873,113 @@ layerDots.appendChild(dotFrag);
 | Phase 3f (review) | 3 | 207 |
 
 **Running totals:** 12 source files, 11 test files, 207 RU tests, 168 HC tests
+
+---
+
+## Entry 21 — Phase 4a: Path Rendering Module
+
+Date: 2026-02-13
+
+### Work Completed
+
+Implemented `path-renderer.ts` — progression path rendering connecting Shape centroids.
+
+**New module:** `src/path-renderer.ts`
+
+| Function | Description |
+|----------|-------------|
+| `renderProgressionPath(layerPath, shapes, options?)` | Render polyline connecting Shape centroids with markers |
+| `clearProgression(handle)` | Remove rendered path elements |
+| `PathHandle.setActiveChord(index)` | Move/show active chord marker at index |
+| `PathHandle.getChordCount()` | Return number of chords in progression |
+
+**Implementation details:**
+- Renders SVG `<polyline>` connecting all Shape centroids
+- Renders centroid markers (circles with `data-chord-index` attributes) at each chord position
+- Renders active chord marker (initially hidden) for playback animation
+- Uses DocumentFragment for batched DOM insertion
+- Transforms `centroid_uv` to world coordinates via `latticeToWorld`
+- Options: `pathStroke`, `pathStrokeWidth`, `centroidFill`, `activeFill`, `showCentroidMarkers`
+
+**Test file:** `src/__tests__/path-renderer.test.ts` — 25 tests covering:
+- Basic rendering (polyline, markers, active marker)
+- Empty and single-chord progressions
+- setActiveChord behavior (show, hide, out-of-bounds)
+- clearProgression cleanup
+- Options customization
+- World coordinate conversion accuracy
+
+### Deferred to Future Phases
+
+**Phase 4b: Playback Animation**
+- Blocked by Audio Engine transport implementation
+- Will subscribe to `AudioTransport.onChordChange()` for active chord updates
+- Transport interface defined in ARCH_AUDIO_ENGINE.md §6
+
+**Phase 4c: Clear Button Integration**
+- Depends on Layout integration (Phase 5)
+- Will wire `clearProgression()` to Control Panel UI
+
+### Files Added/Modified
+
+| File | Change |
+|------|--------|
+| `src/path-renderer.ts` | New module — path rendering |
+| `src/__tests__/path-renderer.test.ts` | 25 tests |
+| `src/index.ts` | Export `renderProgressionPath`, `clearProgression`, `PathHandle`, `PathRenderOptions` |
+| DEVPLAN.md | Added Phase 4 section |
+| ARCH_AUDIO_ENGINE.md | Added §6 AudioTransport interface contract |
+| ARCH_RENDERING_UI.md | Updated §6 transport reference |
+
+### Test Summary
+
+| Phase | Tests Added | Running Total |
+|-------|-------------|---------------|
+| Phase 1 | 107 | 107 |
+| Phase 2 | 66 | 173 |
+| Phase 3 | 34 | 207 |
+| Phase 4a | 25 | 232 |
+
+**Running totals:** 13 source files, 12 test files, 232 RU tests, 168 HC tests
+
+---
+
+## Entry 22 — Phase 4 Reorganization
+
+Date: 2026-02-13
+
+### Summary
+
+Reorganized Phase 4 to improve modularity and remove circular dependencies.
+
+### Changes
+
+**Before:**
+- Phase 4a: Path rendering ✅
+- Phase 4b: Playback animation (blocked by Audio Engine)
+- Phase 4c: Clear button integration (blocked by Phase 5 Layout)
+
+**Problem:** 4c depended on Phase 5, creating a circular dependency where Phase 4 couldn't complete until Phase 5 was done.
+
+**After:**
+- **Phase 4:** Path rendering only (4a) — ✅ COMPLETE
+- **Phase 5:** Layout integration — includes clear button (moved from 4c)
+- **Deferred (Audio Integration):** Playback animation — blocked by Audio Engine
+
+### Rationale
+
+1. Clear button is naturally part of Control Panel UI (Phase 5)
+2. Playback animation truly requires Audio Engine — deferred indefinitely
+3. Phase 4 is now self-contained and complete
+4. `PathHandle.setActiveChord()` API is ready for future audio integration
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| DEVPLAN.md | Reorganized phases, updated Future Phases table, expanded Phase 5 scope |
+
+### Status
+
+**Phase 4:** ✅ COMPLETE
+**Next:** Phase 5 — Layout Integration

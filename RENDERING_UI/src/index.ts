@@ -83,3 +83,13 @@ export type {
   HighlightHandle,
   HighlightStyle,
 } from "./highlight.js";
+
+// Phase 4: Path rendering
+export {
+  renderProgressionPath,
+  clearProgression,
+} from "./path-renderer.js";
+export type {
+  PathHandle,
+  PathRenderOptions,
+} from "./path-renderer.js";
