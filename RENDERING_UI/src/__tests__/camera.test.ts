@@ -183,6 +183,89 @@ describe("applyPan", () => {
   });
 });
 
+describe("applyPan — boundary clamping (RU-DEV-D7)", () => {
+  // Use a known bounds: uMin=-3, uMax=3, vMin=-3, vMax=3
+  // World extent corners: latticeToWorld(-3,-3), latticeToWorld(4,-3),
+  //   latticeToWorld(-3,4), latticeToWorld(4,4)
+  // x range: min = -3 + (-3)*0.5 = -4.5, max = 4 + 4*0.5 = 6
+  // y range: min = -3 * √3/2 ≈ -2.598, max = 4 * √3/2 ≈ 3.464
+  const bounds = { uMin: -3, uMax: 3, vMin: -3, vMax: 3 };
+
+  // Pre-compute expected extent
+  const corners = [
+    latticeToWorld(-3, -3),
+    latticeToWorld(4, -3),
+    latticeToWorld(-3, 4),
+    latticeToWorld(4, 4),
+  ];
+  const extMinX = Math.min(...corners.map(c => c.x));
+  const extMaxX = Math.max(...corners.map(c => c.x));
+  const extMinY = Math.min(...corners.map(c => c.y));
+  const extMaxY = Math.max(...corners.map(c => c.y));
+  const worldW = extMaxX - extMinX;
+  const worldH = extMaxY - extMinY;
+
+  it("pan within bounds is not clamped", () => {
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+    const panned = applyPan(cam, 1, 0.5, bounds);
+    expect(panned.centerX).toBe(1);
+    expect(panned.centerY).toBe(0.5);
+  });
+
+  it("pan far beyond extent is clamped to extent + margin (default factor 1.5)", () => {
+    const marginX = worldW * (1.5 - 1) / 2;
+    const marginY = worldH * (1.5 - 1) / 2;
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+
+    // Pan way beyond the right edge
+    const panned = applyPan(cam, 1000, 1000, bounds);
+    expect(panned.centerX).toBeCloseTo(extMaxX + marginX, 8);
+    expect(panned.centerY).toBeCloseTo(extMaxY + marginY, 8);
+  });
+
+  it("pan far in negative direction is clamped to extent - margin", () => {
+    const marginX = worldW * (1.5 - 1) / 2;
+    const marginY = worldH * (1.5 - 1) / 2;
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+
+    const panned = applyPan(cam, -1000, -1000, bounds);
+    expect(panned.centerX).toBeCloseTo(extMinX - marginX, 8);
+    expect(panned.centerY).toBeCloseTo(extMinY - marginY, 8);
+  });
+
+  it("pan with no bounds arg is unclamped (backward compat)", () => {
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+    const panned = applyPan(cam, 1000, 1000);
+    expect(panned.centerX).toBe(1000);
+    expect(panned.centerY).toBe(1000);
+  });
+
+  it("custom clampFactor = 1.0 constrains to exact extent (no margin)", () => {
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+    const panned = applyPan(cam, 1000, 1000, bounds, 1.0);
+    expect(panned.centerX).toBeCloseTo(extMaxX, 8);
+    expect(panned.centerY).toBeCloseTo(extMaxY, 8);
+  });
+
+  it("custom clampFactor = 2.0 gives larger margin", () => {
+    const marginX = worldW * (2.0 - 1) / 2;
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+    const panned = applyPan(cam, 1000, 0, bounds, 2.0);
+    expect(panned.centerX).toBeCloseTo(extMaxX + marginX, 8);
+  });
+
+  it("clamping is symmetric — same margin on both sides", () => {
+    const cam = { centerX: 0, centerY: 0, zoom: 1 };
+    const pannedRight = applyPan(cam, 1000, 0, bounds);
+    const pannedLeft = applyPan(cam, -1000, 0, bounds);
+
+    const centerX = (extMinX + extMaxX) / 2;
+    const rightMargin = pannedRight.centerX - centerX;
+    const leftMargin = centerX - pannedLeft.centerX;
+    expect(rightMargin).toBeCloseTo(leftMargin, 8);
+  });
+});
+
 describe("applyZoom", () => {
   it("anchor point stays fixed after zoom (anchor stability)", () => {
     const bounds = computeWindowBounds(1024, 768, 40);

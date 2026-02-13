@@ -92,16 +92,22 @@ export function computeWindowBounds(
   };
 }
 
+/** World-space bounding box of a window. */
+export interface WorldExtent {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+}
+
 /**
  * Compute the world-space bounding box of a window.
  * Returns { minX, minY, maxX, maxY } from the lattice corners.
+ *
+ * This is exported so callers (e.g., CameraController) can cache the
+ * extent rather than recomputing on every pan operation.
  */
-function windowWorldExtent(bounds: WindowBounds): {
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
-} {
+export function windowWorldExtent(bounds: WindowBounds): WorldExtent {
   const corners = [
     latticeToWorld(bounds.uMin, bounds.vMin),
     latticeToWorld(bounds.uMax + 1, bounds.vMin),
@@ -179,19 +185,60 @@ export function computeViewBox(
   };
 }
 
+const DEFAULT_CLAMP_FACTOR = 1.5;
+
 /**
  * Apply a pan delta (in world coordinates) to the camera.
+ *
+ * If `bounds` is provided, the resulting center is soft-clamped so it stays
+ * within `clampFactor × windowWorldExtent` (RU-DEV-D7). Default clampFactor
+ * is 1.5, giving a 25% margin on each side beyond the lattice extent.
+ *
+ * Omitting `bounds` preserves the original unclamped behavior (backward compat).
+ *
+ * Note: For high-frequency pan operations (e.g., drag gestures), prefer
+ * `applyPanWithExtent` which accepts a pre-computed WorldExtent to avoid
+ * recomputing the extent on every frame.
  */
 export function applyPan(
   camera: CameraState,
   dx: number,
   dy: number,
+  bounds?: WindowBounds,
+  clampFactor: number = DEFAULT_CLAMP_FACTOR,
 ): CameraState {
-  return {
-    centerX: camera.centerX + dx,
-    centerY: camera.centerY + dy,
-    zoom: camera.zoom,
-  };
+  if (bounds) {
+    return applyPanWithExtent(camera, dx, dy, windowWorldExtent(bounds), clampFactor);
+  }
+  return { centerX: camera.centerX + dx, centerY: camera.centerY + dy, zoom: camera.zoom };
+}
+
+/**
+ * Apply a pan delta with a pre-computed WorldExtent (avoids recomputing on every frame).
+ *
+ * Use this for high-frequency pan operations where the extent is cached.
+ * The resulting center is soft-clamped so it stays within
+ * `clampFactor × extent` (RU-DEV-D7). Default clampFactor is 1.5.
+ */
+export function applyPanWithExtent(
+  camera: CameraState,
+  dx: number,
+  dy: number,
+  extent: WorldExtent,
+  clampFactor: number = DEFAULT_CLAMP_FACTOR,
+): CameraState {
+  let cx = camera.centerX + dx;
+  let cy = camera.centerY + dy;
+
+  const worldW = extent.maxX - extent.minX;
+  const worldH = extent.maxY - extent.minY;
+  const marginX = (worldW * (clampFactor - 1)) / 2;
+  const marginY = (worldH * (clampFactor - 1)) / 2;
+
+  cx = Math.max(extent.minX - marginX, Math.min(extent.maxX + marginX, cx));
+  cy = Math.max(extent.minY - marginY, Math.min(extent.maxY + marginY, cy));
+
+  return { centerX: cx, centerY: cy, zoom: camera.zoom };
 }
 
 /**

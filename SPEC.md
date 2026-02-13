@@ -167,7 +167,7 @@ Harmony Core is the first completed subsystem. Other modules consume it through 
 | `Quality` | Chord quality (`"maj"`, `"min"`, `"dim"`, `"aug"`) |
 | `Extension` | Chord extension (`"6"`, `"7"`, `"maj7"`, `"add9"`, `"6/9"`) |
 | `Chord` | Parsed chord structure with pitch-class sets |
-| `Shape` | Decomposed chord on the lattice (triangles, dots, centroid) |
+| `Shape` | Decomposed chord on the lattice (triangles, dots, centroid, `root_vertex_index` nullable for dot-only shapes) |
 
 See ARCH_HARMONY_CORE.md Section 11 for full type definitions and function signatures.
 
@@ -283,9 +283,10 @@ Deliver playable harmonic instrument with progression visualization.
 
 1. Harmony Core lattice/indexing implementation
 2. SVG Tonnetz rendering and interaction
-3. Audio engine playback
-4. progression parsing and path visualization
-5. local persistence and URL sharing
+3. edge-proximity selection and union chord interaction
+4. Audio engine playback
+5. progression parsing and path visualization
+6. local persistence and URL sharing
 
 **Tests:**
 

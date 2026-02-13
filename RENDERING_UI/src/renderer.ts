@@ -119,6 +119,10 @@ export function renderGrid(
   // Pre-compute world positions for all nodes (avoids redundant latticeToWorld calls)
   const worldCache = buildWorldPointCache(indices);
 
+  // Build all elements into a DocumentFragment for batched DOM insertion
+  // (avoids ~4,200 individual appendChild calls triggering layout recalc)
+  const frag = document.createDocumentFragment();
+
   // --- Triangles ---
   for (const [tid, ref] of indices.triIdToRef) {
     const verts = triVertices(ref);
@@ -129,7 +133,7 @@ export function renderGrid(
       "stroke-width": TRI_STROKE_WIDTH,
       "data-id": tid as string,
     });
-    layerGroup.appendChild(poly);
+    frag.appendChild(poly);
   }
 
   // --- Edges (explicit, one <line> per unique edge) ---
@@ -148,7 +152,7 @@ export function renderGrid(
       "stroke-width": EDGE_STROKE_WIDTH,
       "data-id": eid as string,
     });
-    layerGroup.appendChild(line);
+    frag.appendChild(line);
   }
 
   // --- Nodes (circles + labels) ---
@@ -166,7 +170,7 @@ export function renderGrid(
       "stroke-width": NODE_STROKE_WIDTH,
       "data-id": nid as string,
     });
-    layerGroup.appendChild(circle);
+    frag.appendChild(circle);
 
     const label = svgEl("text", {
       x: w.x,
@@ -179,6 +183,9 @@ export function renderGrid(
       "data-id": `label-${nid as string}`,
     });
     label.textContent = PC_NAMES[pitchClass];
-    layerGroup.appendChild(label);
+    frag.appendChild(label);
   }
+
+  // Single DOM insertion for all elements
+  layerGroup.appendChild(frag);
 }

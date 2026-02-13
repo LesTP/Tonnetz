@@ -66,7 +66,7 @@ Future option:
 Status: Closed
 Decision: Rendering/UI owns all coordinate transforms.
 
-**RU-D10: Equilateral triangle geometry**
+**RU-D15: Equilateral triangle geometry**
 Status: Closed
 
 The Tonnetz lattice uses integer coordinates `(u, v)` from Harmony Core. The renderer transforms these to world coordinates using an equilateral triangle layout:
@@ -78,7 +78,7 @@ worldY(u, v) = v * (√3 / 2)
 
 This produces equilateral triangles with unit-length edges. The `v` axis is tilted 60° from the `u` axis, matching the standard Tonnetz visual convention.
 
-The inverse transform (for hit-testing in Phase 2):
+The inverse transform (used by hit-testing):
 
 ```
 v = worldY / (√3 / 2)
@@ -206,9 +206,11 @@ Progression paths must be rendered using **Shape centroid coordinates** supplied
 
 Renderer:
 
-* transforms centroid_uv to screen space
+* transforms `centroid_uv` to screen space
 * draws path segments between centroids
 * animates traversal during playback
+
+Note: Harmony Core exports `CentroidCoord` as a type alias for `NodeCoord` when the coordinate represents a fractional centroid position (not an integer lattice node). This is a documentation-only distinction — both types are structurally identical `{ u: number, v: number }`.
 
 ---
 
@@ -216,37 +218,63 @@ Renderer:
 
 Draft interface contract. Full type signatures will be specified after initial implementation (similar to Harmony Core's post-implementation API expansion). See RU-D9.
 
-### Render Commands
+### Implemented — Phase 1 & 2
+
+Actual exported API surface from `src/index.ts`:
+
+| Export | Type | Source | Description |
+|--------|------|--------|-------------|
+| `latticeToWorld(u, v)` | Function | `coords.ts` | Lattice→world equilateral transform |
+| `worldToLattice(x, y)` | Function | `coords.ts` | World→lattice inverse transform |
+| `screenToWorld(sx, sy, vbMinX, vbMinY, vbW, vbH, cW, cH)` | Function | `coords.ts` | Screen pixel→world coordinate conversion via viewBox (8-param legacy) |
+| `screenToWorld(sx, sy, viewBox, cW, cH)` | Function | `coords.ts` | Screen pixel→world conversion (5-param overload) |
+| `WorldPoint` | Type | `coords.ts` | `{ readonly x: number; readonly y: number }` |
+| `ViewBoxLike` | Type | `coords.ts` | `{ readonly minX, minY, width, height: number }` |
+| `LatticePoint` | Type | `coords.ts` | `{ readonly u: number; readonly v: number }` |
+| `computeWindowBounds(cW, cH, minTriPx)` | Function | `camera.ts` | Responsive window bounds (RU-D10) |
+| `computeInitialCamera(cW, cH, bounds)` | Function | `camera.ts` | Fit-to-viewport camera (RU-D11) |
+| `computeViewBox(camera, cW, cH, bounds)` | Function | `camera.ts` | Camera state→SVG viewBox |
+| `applyPan(camera, dx, dy, bounds?, clampFactor?)` | Function | `camera.ts` | Pan with optional boundary clamping (RU-DEV-D7) |
+| `applyPanWithExtent(camera, dx, dy, extent, clampFactor?)` | Function | `camera.ts` | Pan with pre-computed extent (avoids recomputation) |
+| `applyZoom(camera, factor, anchorX, anchorY)` | Function | `camera.ts` | Zoom with anchor stability |
+| `CameraState` | Type | `camera.ts` | `{ centerX, centerY, zoom }` |
+| `windowWorldExtent(bounds)` | Function | `camera.ts` | World-space bounding box of window |
+| `WorldExtent` | Type | `camera.ts` | `{ readonly minX, minY, maxX, maxY: number }` |
+| `ViewBox` | Type | `camera.ts` | `{ minX, minY, width, height }` |
+| `svgEl(tag, attrs?)` | Function | `svg-helpers.ts` | Create SVG-namespaced element |
+| `setAttrs(el, attrs)` | Function | `svg-helpers.ts` | Set multiple attributes |
+| `SVG_NS` | Const | `svg-helpers.ts` | SVG namespace string |
+| `createSvgScaffold(container)` | Function | `renderer.ts` | Root SVG + 5-layer `<g>` scaffold |
+| `renderGrid(layerGroup, indices)` | Function | `renderer.ts` | Static lattice grid rendering |
+| `LAYER_IDS` | Const | `renderer.ts` | Layer group ID strings |
+| `SvgScaffold` | Type | `renderer.ts` | Scaffold return type |
+| `LayerId` | Type | `renderer.ts` | Layer ID union type |
+| `createCameraController(svg, cW, cH, bounds)` | Function | `camera-controller.ts` | Sole viewBox writer (RU-DEV-D5) |
+| `CameraController` | Type | `camera-controller.ts` | `{ getCamera, getViewBox, panStart, panMove, panEnd, updateDimensions, reset, destroy }` |
+| `createResizeController(container, scaffold, onResize?)` | Function | `resize-controller.ts` | ResizeObserver + debounce + breakpoint |
+| `ResizeController` | Type | `resize-controller.ts` | `{ destroy }` |
+| `ResizeCallback` | Type | `resize-controller.ts` | Resize event payload type |
+| `hitTest(worldX, worldY, radius, indices)` | Function | `hit-test.ts` | Proximity-circle hit classification |
+| `computeProximityRadius(factor?)` | Function | `hit-test.ts` | Radius in world units |
+| `HitResult`, `HitTriangle`, `HitEdge`, `HitNone` | Types | `hit-test.ts` | Discriminated union result types |
+| `createGestureController(options)` | Function | `gesture-controller.ts` | Tap/drag disambiguation (UX-D3) |
+| `GestureController` | Type | `gesture-controller.ts` | `{ destroy }` |
+| `GestureControllerOptions`, `GestureCallbacks` | Types | `gesture-controller.ts` | Options and callback types |
+| `createInteractionController(options)` | Function | `interaction-controller.ts` | Orchestration: gesture→hit-test→selection events |
+| `InteractionController` | Type | `interaction-controller.ts` | `{ destroy }` |
+| `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types |
+
+### Planned — Phase 3+ (Draft)
 
 | Function | Description |
 |----------|-------------|
-| `initRenderer(container)` | Mount renderer into a DOM container element |
-| `setCamera(position, zoom)` | Set camera position (world coordinates) and zoom level |
-| `renderWindow(indices)` | Render the static lattice grid for the given window indices |
 | `renderShape(shape)` | Render a chord Shape (triangles, extensions, dots, root marker) |
 | `renderProgressionPath(shapes)` | Render centroid-connected path for a progression |
 | `highlightTriangle(tri)` | Apply highlight style to a triangle |
-| `highlightEdge(edgeId)` | Apply highlight style to a shared edge and both adjacent triangles |
+| `highlightEdge(edgeId)` | Apply highlight style to a shared edge and both adjacent triangles (sufficient for MVP union chord visualization; a dedicated `renderUnionShape` may be added if union chords need distinct visual treatment beyond edge+triangle highlighting) |
 | `renderDotCluster(pcs, position)` | Render dot markers for non-triangulated pitch classes |
 | `clearHighlights()` | Remove all highlight styles |
 | `clearProgression()` | Remove progression path and return to normal rendering |
-
-### Interaction Events
-
-| Function | Description |
-|----------|-------------|
-| `onTriangleSelect(callback)` | Register callback for triangle tap/click selection |
-| `onEdgeProximity(callback)` | Register callback for edge-proximity selection (union chord) |
-| `onPointerDown(callback)` | Register callback for pointer-down (immediate playback trigger) |
-| `onPointerUp(callback)` | Register callback for pointer-up (playback stop) |
-| `onDragScrub(callback)` | Register callback for drag-scrub triangle changes |
-
-### Lifecycle
-
-| Function | Description |
-|----------|-------------|
-| `resize()` | Recalculate layout and re-render (call on container resize, or use internal ResizeObserver) |
-| `destroy()` | Clean up event listeners and DOM elements |
 
 ---
 
@@ -287,7 +315,8 @@ Consistent with Harmony Core's zero-dependency approach.
 * RU-D7 UI state consumption (includes Progression Loaded → Idle transition)
 * RU-D8 Centroid-based path rendering
 * RU-D9 API signatures deferred to post-implementation (draft contract in §11)
-* RU-D10 Equilateral triangle geometry + responsive window sizing
+* RU-D10 Responsive window sizing
+* RU-D15 Equilateral triangle geometry
 * RU-D11 Fit-to-viewport scaling with minimum triangle size enforcement
 * RU-D12 Layered `<g>` groups from the start (5 layers per §2)
 * RU-D13 ViewBox-based camera (pan/zoom via viewBox manipulation)
@@ -315,7 +344,22 @@ before Rendering/UI is complete.
 ```
 
 ```
-RU-D10: Equilateral triangle geometry + responsive window sizing
+RU-D10: Responsive window sizing
+Date: 2026-02-13
+Status: Closed
+Priority: Critical
+Decision:
+Window size adapts to viewport: 24×24 (desktop), 18×18 (tablet), 12×12 (phone).
+Selection is based on minimum triangle screen size (~40px side length).
+Rationale:
+Responsive window sizing ensures triangles remain large enough for touch
+interaction on smaller screens.
+Revisit if: Performance testing shows SVG element count needs further reduction on
+low-end mobile devices.
+```
+
+```
+RU-D15: Equilateral triangle geometry
 Date: 2026-02-13
 Status: Closed
 Priority: Critical
@@ -323,14 +367,10 @@ Decision:
 Lattice-to-world transform uses equilateral layout:
   worldX(u, v) = u + v * 0.5
   worldY(u, v) = v * (√3 / 2)
-Window size adapts to viewport: 24×24 (desktop), 18×18 (tablet), 12×12 (phone).
-Selection is based on minimum triangle screen size (~40px side length).
 Rationale:
 Equilateral triangles are the standard Tonnetz visual convention. Musicians expect
-this layout. The affine transform is trivial. Responsive window sizing ensures
-triangles remain large enough for touch interaction on smaller screens.
-Revisit if: Performance testing shows SVG element count needs further reduction on
-low-end mobile devices.
+this layout. The affine transform is trivial.
+Revisit if: Never — foundational geometric convention.
 ```
 
 ```

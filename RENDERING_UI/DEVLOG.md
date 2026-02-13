@@ -10,7 +10,7 @@ Started: 2026-02-13
 **Date:** 2026-02-13
 **Scope:** Pre-implementation UX resolution
 
-Resolved 6 interaction ambiguities before writing any Rendering/UI code:
+Resolved 5 interaction ambiguities before writing any Rendering/UI code:
 
 - **UX-D1**: Proximity-circle hit-testing model — circle ~half triangle size; enclosed = triad, crosses shared edge = union chord, node overlap undefined for MVP
 - **UX-D2**: Adjacent triangle selection is a synonym for edge selection, not a separate interaction
@@ -214,7 +214,7 @@ Implemented HC-TASK-1 from the Pre-Phase 2 Task List:
 - `src/renderer.ts` — removed private `parseNodeId` and `parseEdgeId` helpers, replaced with imports from `"harmony-core"`.
 
 **Test results:**
-- HC: 168 tests passing (11 files) — up from 166 (8 new tests, 2 updated in api-surface)
+- HC: 168 tests passing (11 files) — up from 158 (8 new tests, 2 new in api-surface)
 - RU: 101 tests passing (6 files) — unchanged
 
 **Files modified (HC):** `src/coords.ts`, `src/edges.ts`, `src/index.ts`, `src/__tests__/coords.test.ts`, `src/__tests__/edges.test.ts`, `src/__tests__/api-surface.test.ts`
@@ -260,9 +260,422 @@ Implemented HC-TASK-1 from the Pre-Phase 2 Task List:
 
 | Metric | Count |
 |--------|-------|
-| Source files (RU) | 7 (`index.ts`, `coords.ts`, `camera.ts`, `svg-helpers.ts`, `renderer.ts`, `camera-controller.ts`, `resize-controller.ts`) |
-| Test files (RU) | 6 (`smoke`, `coords`, `camera`, `renderer`, `camera-controller`, `resize-controller`) |
-| Tests passing (RU) | 107 |
+| Source files (RU) | 10 (`index.ts`, `coords.ts`, `camera.ts`, `svg-helpers.ts`, `renderer.ts`, `camera-controller.ts`, `resize-controller.ts`, `hit-test.ts`, `gesture-controller.ts`, `interaction-controller.ts`) |
+| Test files (RU) | 9 (`smoke`, `coords`, `camera`, `renderer`, `camera-controller`, `resize-controller`, `hit-test`, `gesture-controller`, `interaction-controller`) |
+| Tests passing (RU) | 173 |
 | Tests passing (HC) | 168 |
 | Runtime dependencies | 0 (+ `harmony-core` local) |
 | Dev dependencies | 3 (`typescript`, `vitest`, `happy-dom`) |
+
+---
+
+## Entry 12 — Harmony Core Phase 7 Sync
+
+**Date:** 2026-02-13
+**Scope:** Documentation sync with Harmony Core Phase 7 (Code Review) updates
+
+Harmony Core completed Phase 7 with optimization, simplification, disambiguation, and edge case handling improvements. Key changes relevant to Rendering/UI:
+
+**API Addition:**
+- New type export: `CentroidCoord` — alias for `NodeCoord` when used as a fractional centroid/focus coordinate
+- Documentation-only distinction (both types are structurally identical `{ u: number, v: number }`)
+- Useful for Phase 3/4 path rendering where `Shape.centroid_uv` coordinates are consumed
+
+**Internal Optimizations (transparent to consumers):**
+- `buildWindowIndices` now computes vertices once per triangle (faster index build)
+- `getEdgeUnionPcs` avoids Set allocation overhead
+- `clusterCentroid` uses array-based deduplication instead of Map
+
+**Documentation Improvements:**
+- `NodeCoord` JSDoc clarifies dual semantics (integer lattice nodes vs. fractional centroids)
+- `Chord.chord_pcs` and `Chord.main_triad_pcs` ordering guarantees documented
+- `getTrianglePcs` sort guarantee documented
+- `ROOT_MAP` enharmonic limitations documented (Cb, Fb, E#, B#, double-accidentals omitted for MVP)
+
+**Bug Prevention:**
+- `parseChordSymbol("")` now throws clear error immediately instead of confusing failure
+
+**Documents updated:**
+- `ARCH_RENDERING_UI.md` — Section 10 (Path Rendering) updated with `CentroidCoord` note
+- `DEVPLAN.md` — Current Status updated with HC Phase 7 reference
+
+**No code changes required** — all HC changes are backward-compatible. Test counts unchanged (RU 107, HC 168).
+
+---
+
+## Entry 13 — Phase 2a: Proximity-Circle Hit-Test Math (Complete)
+
+**Date:** 2026-02-13
+**Scope:** Pure hit-test functions — triangle containment, edge proximity detection, proximity radius
+
+Created `src/hit-test.ts` with three exports:
+
+- **`hitTest(worldX, worldY, radius, indices): HitResult`** — main hit-testing function. Algorithm:
+  1. Convert world coords to fractional lattice coords via `worldToLattice`
+  2. Determine containing triangle via floor + fractional-offset trick: `fu + fv < 1` → Up, `>= 1` → Down (per DEVPLAN analysis)
+  3. If triangle is outside the window (`triIdToRef` miss) → return `{ type: "none" }`
+  4. Convert the triangle's 3 vertices to world coords, compute point-to-segment distance for each edge
+  5. If nearest edge is within `radius` AND is a shared interior edge (2 entries in `edgeToTris`) → return `{ type: "edge", edgeId, triIds }`
+  6. Otherwise → return `{ type: "triangle", triId }`
+  7. Node overlap (vertex shared by 3+ triangles) naturally falls back to containing-triangle hit (UX-D1 MVP behavior)
+
+- **`computeProximityRadius(factor?): number`** — returns `factor` (default 0.5) since edge length = 1 world unit. Radius is constant in world space; SVG viewBox handles apparent sizing at different zoom levels.
+
+- **Types:** `HitResult = HitTriangle | HitEdge | HitNone` — discriminated union on `type` field.
+
+**Design notes:**
+- Triangle containment uses the lattice regularity shortcut (no brute-force search). O(1) per hit.
+- Edge distance uses standard point-to-segment with clamped projection parameter.
+- Boundary edges (1 triangle in `edgeToTris`) are excluded from edge hits per UX-D1.
+- No DOM dependency — pure math, testable without happy-dom.
+
+**Issue encountered:** Initial centroid tests used `radius = 0.5` (the default), but the centroid of an equilateral triangle with edge length 1 is only `1/(2√3) ≈ 0.289` from each edge. At radius 0.5 the centroid point is close enough to trigger an edge hit. Fixed by using `radius = 0.2` for centroid-specific tests, which correctly exercises the "circle enclosed by triangle" path.
+
+**Files created:** `src/hit-test.ts`, `src/__tests__/hit-test.test.ts`
+**Files modified:** `src/index.ts` (barrel exports)
+**Tests:** 14 passing (7 test files total)
+**Total Rendering/UI tests:** 121 passing (was 107)
+
+---
+
+## Entry 14 — Phase 2b: Gesture Disambiguator (Complete)
+
+**Date:** 2026-02-13
+**Scope:** Tap/drag classification, pointer lifecycle events, shared screen→world utility
+
+### screenToWorld utility (W7 resolution)
+
+Extracted `screenToWorld(screenX, screenY, vbMinX, vbMinY, vbW, vbH, clientW, clientH)` into `coords.ts` as a shared utility. This was previously inlined in `camera-controller.ts` zoom handler (lines 119–122). The gesture controller and future interaction controller both need screen→world conversion — a shared function avoids duplication (DEVPLAN W7).
+
+Added 5 tests for `screenToWorld` in `coords.test.ts`: corner mapping, center mapping, identity viewBox, zoomed viewBox.
+
+### gesture-controller.ts
+
+Created `src/gesture-controller.ts` implementing `GestureController` interface:
+
+- **`createGestureController(options): GestureController`** — factory that attaches `pointerdown`/`pointermove`/`pointerup` listeners to the SVG element and classifies each interaction as tap or drag.
+
+**Pointer lifecycle:**
+1. `pointerdown` (primary button only) → record start position, call `setPointerCapture`, fire `onPointerDown(world)` immediately
+2. `pointermove` → accumulate Euclidean distance from start position. If distance ≥ threshold (default 5px):
+   - First time crossing → fire `onDragStart(world)`, enter drag mode
+   - Subsequent moves → fire `onDragMove(world)`
+   - Moves below threshold → no callback (still in classification phase)
+3. `pointerup`:
+   - If in drag mode → fire `onDragEnd(world)`
+   - If still below threshold → fire `onTap(world)` (classified as tap)
+   - Always fires `onPointerUp()` last
+
+**Design decisions:**
+- Distance is measured from the initial `pointerdown` position (not cumulative between moves). This means the user must move ≥ threshold **from the start** to trigger drag, not ≥ threshold in a single move delta.
+- `getViewBox()` callback is called at the time of each event to get the current viewBox for screen→world conversion. This ensures panning during a pointer sequence doesn't produce stale coordinates.
+- Only one pointer tracked at a time. Second `pointerdown` while first is active is ignored. Pointer ID is tracked to reject moves/ups from a different pointer (multi-touch safety).
+- `setPointerCapture` wrapped in try/catch for happy-dom compatibility.
+- All callbacks are optional — consumer provides only what they need.
+
+**Files created:** `src/gesture-controller.ts`, `src/__tests__/gesture-controller.test.ts`
+**Files modified:** `src/coords.ts` (added `screenToWorld`), `src/__tests__/coords.test.ts` (5 new tests), `src/index.ts` (barrel exports)
+**Tests:** 17 gesture-controller + 5 screenToWorld = 22 new tests
+**Total Rendering/UI tests:** 143 passing (was 121)
+
+---
+
+## Entry 15 — Phase 2c: Refactor Camera Pan to Use Gesture Controller (Complete)
+
+**Date:** 2026-02-13
+**Scope:** Remove internal pointer handlers from CameraController; expose panStart/panMove/panEnd API
+
+**Problem:** CameraController attached its own `pointerdown`/`pointermove`/`pointerup` listeners (lines 87–112, 131–134) and unconditionally entered pan mode on any primary pointerdown. This blocked lattice interaction — the Phase 1 deferred item "pan captures all pointerdowns." With the gesture controller (2b) now handling pointer classification, the camera controller must not attach its own pointer handlers.
+
+**Changes to `camera-controller.ts`:**
+- **Removed:** Internal `onPointerDown`, `onPointerMove`, `onPointerUp` handlers
+- **Removed:** Internal pan state variables (`isPanning`, `lastPointerX`, `lastPointerY`)
+- **Removed:** Three `addEventListener("pointer*")` calls in constructor
+- **Removed:** Three `removeEventListener("pointer*")` calls in `destroy()`
+- **Removed:** Import of `screenToWorld` (no longer needed — callers convert coordinates)
+- **Added:** `panStart()` — sets internal `isPanning` flag
+- **Added:** `panMove(worldDx, worldDy)` — applies world-coordinate pan delta; no-op if not panning
+- **Added:** `panEnd()` — clears `isPanning` flag
+- **Kept:** `onWheel` handler + its listener (wheel events are unambiguous, no gesture classification needed)
+- **Kept:** `getCamera()`, `getViewBox()`, `updateDimensions()`, `reset()`, `destroy()` — unchanged behavior
+
+The screen→world delta conversion responsibility now belongs to the interaction controller (2d), which receives world-coordinate drag deltas from the gesture controller and forwards them to `panMove()`.
+
+**Changes to `camera-controller.test.ts`:**
+- Rewrote all pan tests from event-dispatch (`new PointerEvent(...)`) to direct API calls (`ctrl.panStart()` / `ctrl.panMove(dx, dy)` / `ctrl.panEnd()`)
+- **Added:** "panMove without panStart does not pan" — verifies gating
+- **Added:** "panMove after panEnd does not pan" — verifies lifecycle
+- **Added:** "raw pointer events no longer trigger pan" — dispatches raw pointer events and verifies viewBox is unchanged (regression guard)
+- Zoom, reset, destroy, updateDimensions, viewBox sync tests adapted to new API where they touched pan behavior
+- Removed `setPointerCapture` mock (no longer needed)
+- Removed unused `vi` import
+- Total: 21 tests (was 20)
+
+**Files modified:** `src/camera-controller.ts`, `src/__tests__/camera-controller.test.ts`
+**Tests:** 21 passing (was 20; +1 new regression guard)
+**Total Rendering/UI tests:** 144 passing (was 143)
+
+---
+
+## Entry 16 — Phase 2d: Interaction Controller (Complete)
+
+**Date:** 2026-02-13
+**Scope:** Orchestration layer wiring gesture events to hit-testing and emitting high-level selection events
+
+**New file: `src/interaction-controller.ts`**
+
+`createInteractionController(options): InteractionController` — central orchestrator for pointer interaction on the Tonnetz lattice. Wires together the gesture controller (2b), camera controller (2c), and hit-test engine (2a).
+
+**Behavior:**
+- **Tap on triangle** → `hitTest` at tap position → `onTriangleSelect(triId, pcs)`
+- **Tap on shared edge** → `hitTest` at tap position → `onEdgeSelect(edgeId, triIds, pcs)`
+- **Drag from background** → `hitTest` at pointerDown origin returns `"none"` → camera pan via `panStart/panMove/panEnd`
+- **Drag from triangle** → `hitTest` at pointerDown origin returns triangle/edge → scrub mode: rAF-sampled `hitTest` on each `dragMove`, `onDragScrub(triId, pcs)` fires on triangle change only
+- **Edge selection suppressed during drag-scrub** (UX-D3)
+- **rAF throttling** for drag-scrub hit-tests (RU-D5) — `requestAnimationFrame` gates per-frame processing
+- **`onPointerDown`/`onPointerUp`** forwarded immediately for audio trigger/stop (UX-D4)
+- **`setIndices(newIndices)`** updates hit-test context when resize rebuilds the window
+
+**Key design decision (RU-DEV-D8):** The drag-start hit-test uses the stored `pointerDown` world position, not the position where the gesture controller's drag threshold was exceeded. Reason: the gesture controller fires `onDragStart` when the pointer moves ≥ threshold pixels from the initial position. In a zoomed-in viewBox, 5 screen pixels may correspond to a small world-space distance, but in a zoomed-out or 1:1 viewBox, the threshold-exceeded position can be far from the original press point. The user's intent (interact with triangle vs pan background) is determined by where they pressed, not where they moved to.
+
+**Test file: `src/__tests__/interaction-controller.test.ts` — 14 tests:**
+- Tap at triangle centroid → onTriangleSelect with correct triId and 3 pcs
+- Tap at triangle centroid → no edge events
+- Tap near shared edge → onEdgeSelect with correct edgeId, both triIds, 4 pcs
+- Tap near shared edge → no triangle events
+- Drag on background → camera panStart/panMove/panEnd called
+- Drag on background → no triangle/edge/scrub events
+- Drag starting on triangle → scrub mode (panStart NOT called)
+- Drag from one triangle to another → onDragScrub fires on triangle change
+- Drag staying on same triangle → no duplicate scrub events
+- Edge selection suppressed during drag-scrub (UX-D3)
+- onPointerDown fires immediately on pointerdown
+- onPointerUp fires on release
+- setIndices updates hit-test context
+- After destroy, pointer events do not fire callbacks
+
+**Testing note:** Tests use a zoomed-in viewBox (4×3 world units mapped to 800×600 screen pixels) so that unit-edge triangles span ~200 screen pixels. This ensures pointer movements between adjacent triangles (~1 world unit = ~200 screen pixels) comfortably exceed the 5px drag threshold. A helper `worldToScreen()` converts world coordinates to screen coordinates for `PointerEvent.clientX/clientY`.
+
+**Barrel export:** Added `createInteractionController`, `InteractionController`, `InteractionControllerOptions`, `InteractionCallbacks` to `src/index.ts`.
+
+**Files added:** `src/interaction-controller.ts`, `src/__tests__/interaction-controller.test.ts`
+**Files modified:** `src/index.ts`
+**Tests:** 14 new, 158 total RU tests passing
+**Running totals:** 10 source files, 9 test files, 158 RU tests, 168 HC tests
+
+---
+
+## Entry 17 — Phase 2e: Pan Boundary Clamping (Complete)
+
+**Date:** 2026-02-13
+**Scope:** Soft-clamp camera center so the user cannot pan into empty space (RU-DEV-D7)
+
+### Changes to `camera.ts` — `applyPan` signature extended
+
+Before:
+```typescript
+export function applyPan(camera: CameraState, dx: number, dy: number): CameraState
+```
+
+After:
+```typescript
+export function applyPan(
+  camera: CameraState, dx: number, dy: number,
+  bounds?: WindowBounds, clampFactor?: number
+): CameraState
+```
+
+**Algorithm:** When `bounds` is provided, compute the world-space bounding box via the existing `windowWorldExtent()` helper. Derive a margin on each side: `margin = extent × (clampFactor - 1) / 2`. Clamp `centerX` and `centerY` to `[extMin - margin, extMax + margin]`.
+
+- Default `clampFactor = 1.5` → 25% margin beyond lattice extent on each side
+- `clampFactor = 1.0` → exact lattice boundary (no margin)
+- `clampFactor = 2.0` → 50% margin
+- Omitting `bounds` entirely → unclamped (backward compat, no API break)
+
+### Changes to `camera-controller.ts`
+
+Single-line change: `panMove` now passes `cBounds` to `applyPan`:
+```typescript
+camera = applyPan(camera, worldDx, worldDy, cBounds);
+```
+
+This automatically clamps all user pans to 1.5× the lattice extent. When `updateDimensions()` is called with new bounds, subsequent pans clamp to the updated extent.
+
+### Tests added
+
+**`camera.test.ts` — 7 new tests (new describe block "applyPan — boundary clamping (RU-DEV-D7)"):**
+- Pan within bounds is not clamped
+- Pan far beyond extent is clamped to extent + margin (default factor 1.5)
+- Pan far in negative direction is clamped to extent - margin
+- Pan with no bounds arg is unclamped (backward compat)
+- Custom clampFactor = 1.0 constrains to exact extent (no margin)
+- Custom clampFactor = 2.0 gives larger margin
+- Clamping is symmetric — same margin on both sides
+
+**`camera-controller.test.ts` — 2 new tests (new describe block "CameraController — pan boundary clamping"):**
+- panMove clamps camera center — cannot pan far beyond lattice extent
+- Small panMove within lattice is not clamped
+
+**Files modified:** `src/camera.ts`, `src/camera-controller.ts`, `src/__tests__/camera.test.ts`, `src/__tests__/camera-controller.test.ts`
+**Tests:** 9 new, 167 total RU tests passing (was 158)
+**Running totals:** 10 source files, 9 test files, 167 RU tests, 168 HC tests
+
+---
+
+## Entry 18 — Phase 2f: Post-Review Cleanup & Final Exports (Complete)
+
+**Date:** 2026-02-13
+**Scope:** Code review of all Phase 2 source files, test gap filling, documentation updates
+
+### Review Findings & Fixes
+
+**Finding 1 (Code — gesture-controller.ts): Missing `pointercancel` handler**
+If the browser cancels a pointer (e.g., system gesture on touch), the gesture controller remained in `isDown=true` state, blocking all subsequent interactions.
+**Fix:** Added `onPointerCancel` handler that fires `onPointerUp` (silent release — no tap or dragEnd), resets state, and enables the next pointer sequence. Added `addEventListener`/`removeEventListener` for `"pointercancel"` in constructor and `destroy()`.
+
+**Finding 2 (Code — interaction-controller.ts): `pointerDownWorld` not cleared on tap release**
+`pointerDownWorld` was set in `onPointerDown` but only cleared in `onDragEnd`. For taps (no drag), the stale value persisted. Not a live bug (read only in `onDragStart` which can't fire for taps), but a latent state hygiene issue.
+**Fix:** Clear `pointerDownWorld = null` in `onPointerUp`, which fires for all releases (tap or drag end).
+
+**Finding 3 (Code — camera-controller.ts): Inline screen→world in `onWheel`**
+The zoom handler still computed `worldX = viewBox.minX + (sx / rect.width) * viewBox.width` inline, duplicating the shared `screenToWorld` utility from `coords.ts` (DEVPLAN W7).
+**Fix:** Replaced inline conversion with `screenToWorld(sx, sy, viewBox.minX, viewBox.minY, viewBox.width, viewBox.height, rect.width, rect.height)`. Added import of `screenToWorld` from `coords.js`.
+
+**Finding 4 (Test — interaction-controller.test.ts): Stale JSDoc comment**
+Mock camera controller JSDoc said "world coords map 1:1 to screen pixels" — stale from the original 1:1 viewBox. Tests now use a zoomed viewBox (4×3 world units in 800×600 px).
+**Fix:** Updated JSDoc to describe the zoomed viewBox.
+
+**Finding 5 (Test — interaction-controller.test.ts): No test for tap on empty background**
+Tap on triangle and edge were tested, but not tap on empty background (should produce no selection events).
+**Fix:** Added 2 tests: "tap on empty background fires no triangle/edge/scrub events" and "tap still fires onPointerDown/onPointerUp".
+
+**Finding 6 (Test — hit-test.test.ts): Down triangle shared edge not tested**
+All existing edge-hit tests used Up triangle edges.
+**Fix:** Added "midpoint of shared edge touching a Down triangle → edge hit" test using the D(0,0) edge (1,0)–(1,1) shared with U(1,0).
+
+**Finding 7 (Test — gesture-controller.test.ts): No `pointercancel` tests**
+New handler needed test coverage.
+**Fix:** Added 3 tests: "pointercancel fires onPointerUp but not tap/dragEnd", "pointercancel during drag fires onPointerUp but not dragEnd", "after pointercancel, new pointer sequence works normally".
+
+**Finding 8 (Doc — ARCH_RENDERING_UI.md §11): API table outdated**
+The draft interface used callback-registration style (`onTriangleSelect(callback)`) but the actual implementation uses options-object pattern. Render commands table didn't reflect the actual module structure.
+**Fix:** Rewrote §11 with two subsections: "Implemented — Phase 1 & 2" (complete API table with 35 exports) and "Planned — Phase 3+" (draft for future rendering functions).
+
+### Summary
+
+| Change | Files |
+|--------|-------|
+| `pointercancel` handler + cleanup | `gesture-controller.ts` |
+| `pointerDownWorld` hygiene | `interaction-controller.ts` |
+| `screenToWorld` shared utility | `camera-controller.ts` |
+| Stale JSDoc | `interaction-controller.test.ts` |
+| Tap on background tests | `interaction-controller.test.ts` |
+| Down triangle edge test | `hit-test.test.ts` |
+| `pointercancel` tests | `gesture-controller.test.ts` |
+| API table rewrite | `ARCH_RENDERING_UI.md §11` |
+
+**Tests:** 6 new, 173 total RU tests passing (was 167)
+**Running totals:** 10 source files, 9 test files, 173 RU tests, 168 HC tests
+
+---
+
+## Phase 2 Complete ✅
+
+Phase 2 delivered a complete pointer interaction layer for the Tonnetz lattice:
+
+| Step | Scope | Tests Added | Running Total |
+|------|-------|-------------|---------------|
+| 2a | Hit-test math | 14 | 121 |
+| 2b | Gesture disambiguator | 22 (17 + 5 screenToWorld) | 143 |
+| 2c | Camera pan refactor | 1 | 144 |
+| 2d | Interaction controller | 14 | 158 |
+| 2e | Pan boundary clamping | 9 | 167 |
+| 2f | Post-review cleanup | 6 | 173 |
+| **Total** | **Phase 2** | **66** | **173** |
+
+**Key deliverables:**
+- Proximity-circle hit-testing (triangle, edge, none)
+- Tap/drag disambiguation (5px threshold)
+- Drag-scrub mode (triangle-to-triangle, rAF-throttled, edge-suppressed)
+- Camera pan from background drag, zoom from wheel
+- Pan boundary clamping (soft-clamp to 1.5× lattice extent)
+- Full pointer lifecycle (pointerdown/pointerup/pointercancel)
+- 10 source files, 9 test files, 173 tests, 0 validation errors
+
+---
+
+## Entry 19 — Phase 2 Code Review: Optimization, Simplification, Disambiguation
+
+**Date:** 2026-02-13
+
+Thorough code review of all 10 source files and 9 test files (~4,100 lines). Identified and implemented 7 improvements across 3 categories.
+
+### Phase 1: Optimizations
+
+**1a. Cache `windowWorldExtent` in camera-controller.ts**
+- **Problem:** Every `panMove(dx, dy)` call triggered `applyPan → windowWorldExtent(bounds)`, allocating 4 `WorldPoint` objects and iterating corners ~60+ times/second during drag gestures.
+- **Fix:**
+  - Exported `windowWorldExtent()` and `WorldExtent` type from `camera.ts`
+  - Added `applyPanWithExtent()` that accepts pre-computed extent
+  - `camera-controller.ts` caches extent in `cachedExtent`, updated only in `updateDimensions()` and `reset()`
+  - `panMove()` uses cached extent, avoiding recomputation on every frame
+
+**1b. Batch DOM insertions in `renderGrid` with `DocumentFragment`**
+- **Problem:** `renderGrid` called `layerGroup.appendChild()` individually for every element (~4,200 individual DOM insertions for a 24×24 window), each potentially triggering layout recalculation.
+- **Fix:** Build all elements into a `DocumentFragment`, then append in a single DOM operation. One-line conceptual change, significant performance improvement.
+
+### Phase 2: Simplifications
+
+**2a. Fix `computeProximityRadius` JSDoc**
+- **Problem:** JSDoc mentioned zoom scaling, but the implementation doesn't scale with zoom (and per DEVPLAN W5, it shouldn't — SVG viewBox handles apparent size). The function is intentionally trivial.
+- **Fix:** Updated JSDoc to document that the function is intentionally a pass-through, exists as a named semantic entry point and future extension hook.
+
+**2b. Move `edgePairs` to module scope in `hit-test.ts`**
+- **Problem:** `edgePairs` was a `const` array literal `[[0,1],[1,2],[2,0]]` allocated on every `hitTest` call.
+- **Fix:** Moved to module-level `const EDGE_PAIRS` to avoid per-call allocation.
+
+**2c. Simplify `screenToWorld` signature in `coords.ts`**
+- **Problem:** `screenToWorld` took 8 scalar parameters. Every call site destructured a `ViewBox` and rect into 8 positional args — error-prone and hard to read.
+- **Fix:** Added function overloads:
+  - New 5-param overload accepts `ViewBoxLike` object + client dimensions (cleaner API)
+  - Original 8-param overload preserved for backward compatibility
+  - Added `ViewBoxLike` interface to avoid circular import with `camera.ts`
+- Updated `gesture-controller.ts` and `camera-controller.ts` to use the cleaner overload.
+
+### Phase 3: Disambiguations
+
+**3a. Rename `_world` parameter in `interaction-controller.ts`**
+- **Problem:** `onDragStart(_world: WorldPoint)` used underscore prefix (conventionally "unused") but the parameter WAS used for the pan branch (`lastDragWorld = _world`).
+- **Fix:** Renamed to `dragStartWorld` in `onDragStart` (parameter is used) and `_dragEndWorld` in `onDragEnd` (truly unused).
+
+**3c. Replace `indices: WindowIndices` with `getIndices: () => WindowIndices`**
+- **Problem:** When `ResizeController` rebuilt `WindowIndices` after a breakpoint crossing, the `InteractionController` wasn't automatically updated — consumer had to manually call `setIndices()`. Easy to forget, API didn't enforce the invariant.
+- **Fix:**
+  - Changed `InteractionControllerOptions.indices` to `getIndices: () => WindowIndices`
+  - `InteractionController` calls `getIndices()` on every hit-test, ensuring indices are always fresh
+  - Removed `setIndices()` from public API (no longer needed)
+  - Simplification: removes mutable state, eliminates stale-indices bug class entirely
+  - Updated all 16 tests in `interaction-controller.test.ts`
+  - Renamed test suite from "setIndices" to "getIndices dynamic updates"
+
+### Summary
+
+| Category | Items | Files Modified |
+|----------|-------|----------------|
+| Optimizations | 2 | camera.ts, camera-controller.ts, renderer.ts |
+| Simplifications | 3 | hit-test.ts, coords.ts, gesture-controller.ts, camera-controller.ts |
+| Disambiguations | 2 | interaction-controller.ts |
+
+**Test count:** 173 passing (unchanged)
+**Validation errors:** 0
+
+### API Changes
+
+| Before | After |
+|--------|-------|
+| `InteractionControllerOptions.indices: WindowIndices` | `InteractionControllerOptions.getIndices: () => WindowIndices` |
+| `InteractionController.setIndices(indices)` | *(removed — no longer needed)* |
+| `screenToWorld(sx, sy, vbMinX, vbMinY, vbW, vbH, cW, cH)` | Also: `screenToWorld(sx, sy, viewBox, cW, cH)` (new overload) |
+| *(internal)* `applyPan` with bounds | Also: `applyPanWithExtent(camera, dx, dy, extent)` (new export) |
+| *(internal)* `windowWorldExtent` | Now exported |
+| *(new)* | `WorldExtent` type, `ViewBoxLike` type |

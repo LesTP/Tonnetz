@@ -2,7 +2,7 @@
  * Rendering/UI — Tonnetz SVG rendering and interaction module.
  * Public API surface per ARCH_RENDERING_UI.md Section 11.
  */
-export { latticeToWorld, worldToLattice } from "./coords.js";
+export { latticeToWorld, worldToLattice, screenToWorld } from "./coords.js";
 export type { WorldPoint, LatticePoint } from "./coords.js";
 
 export {
@@ -32,3 +32,32 @@ export {
   createResizeController,
 } from "./resize-controller.js";
 export type { ResizeController, ResizeCallback } from "./resize-controller.js";
+
+export {
+  hitTest,
+  computeProximityRadius,
+} from "./hit-test.js";
+export type {
+  HitResult,
+  HitTriangle,
+  HitEdge,
+  HitNone,
+} from "./hit-test.js";
+
+export {
+  createGestureController,
+} from "./gesture-controller.js";
+export type {
+  GestureController,
+  GestureControllerOptions,
+  GestureCallbacks,
+} from "./gesture-controller.js";
+
+export {
+  createInteractionController,
+} from "./interaction-controller.js";
+export type {
+  InteractionController,
+  InteractionControllerOptions,
+  InteractionCallbacks,
+} from "./interaction-controller.js";

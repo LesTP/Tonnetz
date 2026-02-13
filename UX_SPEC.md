@@ -19,7 +19,7 @@ Serves as the authoritative cross-module UX reference.
 All pointer/touch interactions are classified by movement:
 
 * **Tap/click** — pointer down + pointer up with movement below drag threshold (~5px or platform default). Eligible for triangle selection and edge-proximity selection.
-* **Drag** — pointer down + movement exceeds drag threshold. Always enters scrub or pan mode. Edge-proximity selection is suppressed during drag.
+* **Drag** — pointer down + movement exceeds drag threshold. Always enters scrub or pan mode (drag starting on a triangle = scrub, drag starting on background = pan). Edge-proximity selection is suppressed during drag.
 * **Press-hold** — pointer down, chord plays immediately and sounds for the duration of the hold. There is no distinct sustain mode; "sustain" is simply the natural result of holding the pointer down. (UX-D4)
 
 ### Camera navigation
@@ -39,7 +39,7 @@ All pointer/touch interactions are classified by movement:
 
 ### Hit-Testing Model (UX-D1)
 
-Interaction hit-testing uses a **proximity circle** centered on the pointer position. The circle radius is approximately half the triangle size.
+Interaction hit-testing uses a **proximity circle** centered on the pointer position. The circle radius is approximately half the triangle edge length.
 
 * If the circle is **entirely enclosed** by a single triangle → that triangle's triad is selected
 * If the circle **crosses a shared edge** between two triangles → union chord of both triangles (4 pitch classes) is selected
@@ -100,8 +100,10 @@ State transitions:
 
 * Idle → Chord Selected (triangle or edge-proximity interaction)
 * Idle → Progression Loaded (paste/import)
+* Chord Selected → Progression Loaded (paste/import dismisses current selection)
 * Progression Loaded → Playback Running (play)
 * Playback Running → Progression Loaded (stop)
+* Playback Running → Playback Running (tap/click is ignored during active playback; user must stop first) (UX-D6)
 * Progression Loaded → Idle Exploration (clear button) (UX-D5)
 * Chord Selected → Idle Exploration (tap empty space or timeout)
 
@@ -189,7 +191,7 @@ Date: 2026-02-13
 Status: Closed
 Priority: Critical
 Decision:
-Hit-testing uses a proximity circle (~half triangle size) centered on the pointer.
+Hit-testing uses a proximity circle (~half triangle edge length) centered on the pointer.
 Circle enclosed by one triangle → triad. Circle crosses shared edge → union chord.
 Boundary edges excluded. Node overlap (3+ triangles) undefined for MVP.
 Rationale:
@@ -258,4 +260,20 @@ Rationale:
 Explicit, always discoverable, works on both desktop and mobile.
 Keyboard shortcut (Escape) may be added later as a convenience.
 Revisit if: User testing shows a need for additional dismissal gestures.
+```
+
+```
+UX-D6: Interaction suppressed during active playback
+Date: 2026-02-13
+Status: Closed
+Priority: Important
+Decision:
+Tap/click interactions on the lattice are suppressed while scheduled playback is
+running. The user must stop playback before selecting new chords or edges.
+Drag interactions (pan/zoom) remain available during playback.
+Rationale:
+Prevents conflicting audio triggers (interactive vs scheduled). Keeps the
+playback state machine simple. Pan/zoom is harmless during playback and useful
+for following a long progression path.
+Revisit if: Users request the ability to interrupt playback by tapping a chord.
 ```

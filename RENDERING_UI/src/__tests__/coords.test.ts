@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { latticeToWorld, worldToLattice } from "../coords.js";
+import { latticeToWorld, worldToLattice, screenToWorld } from "../coords.js";
 
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
 const SQRT3 = Math.sqrt(3);
@@ -134,4 +134,37 @@ describe("round-trip worldToLattice → latticeToWorld", () => {
       expect(back.y).toBeCloseTo(y, 10);
     });
   }
+});
+
+describe("screenToWorld", () => {
+  it("maps top-left corner to viewBox origin", () => {
+    const w = screenToWorld(0, 0, 10, 20, 80, 60, 800, 600);
+    expect(w.x).toBeCloseTo(10, 10);
+    expect(w.y).toBeCloseTo(20, 10);
+  });
+
+  it("maps bottom-right corner to viewBox max", () => {
+    const w = screenToWorld(800, 600, 10, 20, 80, 60, 800, 600);
+    expect(w.x).toBeCloseTo(90, 10);  // 10 + 80
+    expect(w.y).toBeCloseTo(80, 10);  // 20 + 60
+  });
+
+  it("maps center of screen to center of viewBox", () => {
+    const w = screenToWorld(400, 300, 10, 20, 80, 60, 800, 600);
+    expect(w.x).toBeCloseTo(50, 10);  // 10 + 40
+    expect(w.y).toBeCloseTo(50, 10);  // 20 + 30
+  });
+
+  it("identity viewBox maps 1:1 with screen pixels", () => {
+    const w = screenToWorld(123, 456, 0, 0, 800, 600, 800, 600);
+    expect(w.x).toBeCloseTo(123, 10);
+    expect(w.y).toBeCloseTo(456, 10);
+  });
+
+  it("zoomed-in viewBox scales correctly", () => {
+    // viewBox is 2×2, centered at origin, on a 400×400 screen
+    const w = screenToWorld(200, 200, -1, -1, 2, 2, 400, 400);
+    expect(w.x).toBeCloseTo(0, 10);  // center → 0
+    expect(w.y).toBeCloseTo(0, 10);  // center → 0
+  });
 });
