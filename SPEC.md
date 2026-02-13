@@ -36,8 +36,7 @@ Develop an interactive Tonnetz-based harmonic exploration application that allow
 
 * interactive Tonnetz lattice
 * triangle selection → triad playback
-* edge selection → union chord playback (two adjacent triangles, typically 4 pitch classes)
-* adjacent triangle selection → extended chord playback
+* edge-proximity selection → union chord playback (two adjacent triangles, 4 pitch classes; see UX-D1, UX-D2)
 * paste chord progression → render path + playback
 * supported chord types:
 
@@ -104,6 +103,57 @@ Subsystem responsibilities:
   * a module-specific DEVLOG
 * SPEC, UX_SPEC, and architecture documents together form the **shared source of truth**.
 * A **master integration track** coordinates subsystem integration milestones and manages interface-level changes across modules.
+
+---
+
+# Harmony Core API Overview
+
+Harmony Core is the first completed subsystem. Other modules consume it through the public API exported from `HARMONY_CORE/src/index.ts`. Full signatures and implementation details are in ARCH_HARMONY_CORE.md Section 11.
+
+## Coordinate System & ID Construction
+
+| Function | Description |
+|----------|-------------|
+| `pc(u, v)` | Pitch class at lattice node (0–11) |
+| `nodeId(u, v)` | Canonical node ID string |
+| `triId(tri)` | Canonical triangle ID string |
+| `triVertices(tri)` | Three vertex coordinates of a triangle |
+| `getTrianglePcs(tri)` | Three pitch classes of a triangle |
+| `edgeId(a, b)` | Canonical edge ID from two node coordinates |
+
+## Window Indexing
+
+| Function | Description |
+|----------|-------------|
+| `buildWindowIndices(bounds)` | Precompute index maps for a rectangular lattice window |
+| `getAdjacentTriangles(tri, indices)` | Edge-sharing neighbor triangles |
+| `getEdgeUnionPcs(edgeId, indices)` | Union pitch classes of two triangles sharing an edge (4 pcs) |
+
+## Chord Parsing
+
+| Function | Description |
+|----------|-------------|
+| `parseChordSymbol(text)` | Text → structured chord (root, quality, extension) |
+| `computeChordPcs(rootPc, quality, extension)` | Compute pitch-class sets from parsed components |
+
+## Placement & Decomposition
+
+| Function | Description |
+|----------|-------------|
+| `placeMainTriad(chord, focus, indices)` | Nearest-triangle placement relative to focus coordinate |
+| `decomposeChordToShape(chord, mainTri, focus, indices)` | Full Shape with main triangle, extensions, dots, centroid |
+
+## Progression Mapping
+
+| Function | Description |
+|----------|-------------|
+| `mapProgressionToShapes(chords, initialFocus, indices)` | Chain-focus progression → sequence of Shapes |
+
+## Key Types
+
+`NodeCoord`, `NodeId`, `TriId`, `EdgeId`, `Orientation`, `TriRef`, `WindowBounds`, `WindowIndices`, `Quality`, `Extension`, `Chord`, `Shape`
+
+See ARCH_HARMONY_CORE.md Section 11 for full type definitions and function signatures.
 
 ---
 

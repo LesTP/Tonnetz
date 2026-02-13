@@ -69,6 +69,9 @@ Scheduled mode:
 * events scheduled via shared transport timebase
 * synchronized with renderer animation
 
+**Shared Transport Timebase:**
+The shared transport timebase is `AudioContext.currentTime` — the Web Audio API's monotonically increasing high-resolution clock. All scheduled playback events (Audio Engine) and synchronized animation frames (Rendering/UI) reference this single clock. The Audio Engine owns the `AudioContext` instance; Rendering/UI queries it for animation synchronization.
+
 Mode switching must be deterministic.
 
 ---
