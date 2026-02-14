@@ -983,3 +983,96 @@ Reorganized Phase 4 to improve modularity and remove circular dependencies.
 
 **Phase 4:** ✅ COMPLETE
 **Next:** Phase 5 — Layout Integration
+
+---
+
+## Entry 23 — Phase 5: Layout Integration
+
+Date: 2026-02-13
+
+### Summary
+
+Implemented Phase 5: Layout Integration including UI state controller, control panel, toolbar, and layout manager.
+
+### Work Completed
+
+**Step 5a: UI State Controller** (`src/ui-state.ts`)
+- Pure state machine managing 4 UI states: idle, chord-selected, progression-loaded, playback-running
+- State transitions per UX_SPEC §5
+- Event subscription via `onStateChange()`
+- 36 tests
+
+**Step 5b: Control Panel** (`src/control-panel.ts`)
+- Progression input textarea
+- Load, Play, Stop, Clear buttons
+- Button state management based on progression/playback state
+- Clear button integration (UX-D5)
+- 25 tests
+
+**Step 5c: Toolbar** (`src/toolbar.ts`)
+- Reset View button
+- Show/hide functionality
+- 8 tests
+
+**Step 5d: Layout Manager** (`src/layout-manager.ts`)
+- Three-zone layout structure (toolbar, canvas, control panel)
+- Container getters for each zone
+- Control panel toggle (collapse/expand)
+- ResizeObserver for canvas size changes
+- Responsive CSS (mobile: stacked layout)
+- 13 tests
+
+**Step 5e: Integration Wiring**
+- Skipped as separate module — integration will be demonstrated in the application layer
+- All components have callback-based APIs ready for wiring
+
+### API Summary
+
+| Export | Source | Description |
+|--------|--------|-------------|
+| `createUIStateController()` | ui-state.ts | Create UI state machine |
+| `UIState` | ui-state.ts | State type union |
+| `UIStateController` | ui-state.ts | Controller interface |
+| `createControlPanel(options)` | control-panel.ts | Create control panel |
+| `ControlPanel` | control-panel.ts | Control panel interface |
+| `createToolbar(options)` | toolbar.ts | Create toolbar |
+| `Toolbar` | toolbar.ts | Toolbar interface |
+| `createLayoutManager(options)` | layout-manager.ts | Create layout manager |
+| `LayoutManager` | layout-manager.ts | Layout manager interface |
+
+### Files Added
+
+| File | Description |
+|------|-------------|
+| `src/ui-state.ts` | UI state controller |
+| `src/control-panel.ts` | Control panel component |
+| `src/toolbar.ts` | Toolbar component |
+| `src/layout-manager.ts` | Layout manager |
+| `src/__tests__/ui-state.test.ts` | 36 tests |
+| `src/__tests__/control-panel.test.ts` | 25 tests |
+| `src/__tests__/toolbar.test.ts` | 8 tests |
+| `src/__tests__/layout-manager.test.ts` | 13 tests |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `src/index.ts` | Export Phase 5 modules |
+| DEVPLAN.md | Added Phase 5 detailed plan |
+
+### Test Summary
+
+| Phase | Tests Added | Running Total |
+|-------|-------------|---------------|
+| Phase 1 | 107 | 107 |
+| Phase 2 | 66 | 173 |
+| Phase 3 | 34 | 207 |
+| Phase 4 | 25 | 232 |
+| Phase 5 | 82 | 314 |
+
+**Running totals:** 17 source files, 16 test files, 314 RU tests, 168 HC tests
+
+### Status
+
+**Phase 5:** ✅ COMPLETE
+**Next:** Phase 6 — Public API Assembly & Integration Tests

@@ -93,3 +93,49 @@ export type {
   PathHandle,
   PathRenderOptions,
 } from "./path-renderer.js";
+
+// Phase 5: UI State
+export {
+  createUIStateController,
+} from "./ui-state.js";
+export type {
+  UIState,
+  UIStateController,
+  UIStateChangeEvent,
+  UIStateChangeCallback,
+} from "./ui-state.js";
+
+// Phase 5: Control Panel
+export {
+  createControlPanel,
+} from "./control-panel.js";
+export type {
+  ControlPanel,
+  ControlPanelOptions,
+} from "./control-panel.js";
+
+// Phase 5: Toolbar
+export {
+  createToolbar,
+} from "./toolbar.js";
+export type {
+  Toolbar,
+  ToolbarOptions,
+} from "./toolbar.js";
+
+// Phase 5: Layout Manager
+export {
+  createLayoutManager,
+} from "./layout-manager.js";
+export type {
+  LayoutManager,
+  LayoutManagerOptions,
+} from "./layout-manager.js";
+
+// Internal CSS utilities (exported for testing)
+export {
+  injectCSS,
+  isStyleInjected,
+  clearInjectedStyles,
+  HIDDEN_CLASS,
+} from "./css-utils.js";

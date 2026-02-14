@@ -36,13 +36,13 @@ SVG-based rendering and interaction subsystem for the Tonnetz Interactive Harmon
 
 ## Current Status
 
-**Phase:** 4 — Path Rendering ✅ COMPLETE
+**Phase:** 5 — Layout Integration ✅ COMPLETE
 **Blocked/Broken:** Nothing
-**Test count:** RU 232 passing (12 test files, 13 source files), HC 168 passing
+**Test count:** RU 314 passing (16 test files, 17 source files), HC 168 passing
 
 **Harmony Core Dependency:** Phase 7 (Code Review) complete. New `CentroidCoord` type alias exported for centroid handling. See HARMONY_CORE/DEVLOG.md Entry Phase 7. **No HC changes required — all needed APIs are already exported.**
 
-**Next Phase:** 5 — Layout Integration
+**Next Phase:** 6 — Public API Assembly & Integration Tests
 
 ---
 
@@ -485,3 +485,205 @@ Depends on Layout integration (Phase 5).
 |------|-----------|---------------|-------|
 | 4a | path-renderer.ts | `renderProgressionPath`, `clearProgression`, `PathHandle` | 25 |
 | **Total** | **13 source files, 12 test files** | | **232** |
+
+---
+
+## Phase 5: Layout Integration
+
+**Objective:** Implement UI layout zones (Central Canvas, Control Panel, Toolbar), UI state machine, clear button integration, and responsive layout behavior.
+
+**Key specs:** UX_SPEC §4 (Layout Zones), §5 (UI State Model), ARCH §8 (Layout Integration), ARCH §9 (UI State Consumption), UX-D5 (Clear button).
+
+### Pre-Implementation Analysis
+
+#### Layout Zones (from UX_SPEC §4)
+
+| Zone | Function | Components |
+|------|----------|------------|
+| Central Canvas | Tonnetz lattice, interaction surface | SVG container (existing) |
+| Control Panel | Progression input, playback controls, tempo | Text input, Play/Stop/Loop buttons, Clear button, tempo slider |
+| Toolbar | View controls, overlay toggles | Reset view button, optional overlay toggles |
+
+#### UI State Machine (from UX_SPEC §5)
+
+```
+States:
+- Idle Exploration — user freely explores lattice
+- Chord Selected — chord cluster highlighted and playable
+- Progression Loaded — progression path displayed
+- Playback Running — scheduled playback active (deferred to Audio Engine)
+
+Transitions:
+- Idle → Chord Selected (triangle/edge interaction)
+- Idle → Progression Loaded (paste/import)
+- Chord Selected → Progression Loaded (paste/import)
+- Chord Selected → Idle Exploration (tap empty space or timeout)
+- Progression Loaded → Idle Exploration (clear button) ← KEY FEATURE
+- Progression Loaded → Playback Running (play) — deferred
+- Playback Running → Progression Loaded (stop) — deferred
+```
+
+#### Implementation Strategy
+
+Phase 5 focuses on **DOM-based UI components** separate from the SVG canvas. The rendering module (SVG) already exists; this phase adds:
+
+1. **UI State Controller** — Pure state machine logic
+2. **Control Panel** — HTML/CSS component for progression input and controls
+3. **Toolbar** — HTML/CSS component for view controls
+4. **Layout Manager** — Coordinates zones, handles responsive behavior
+
+All UI components render to standard HTML elements (not SVG). The canvas container resizes when panels expand/collapse.
+
+### 5a: UI State Controller
+
+`src/ui-state.ts` — Pure state machine for UI states.
+
+```ts
+type UIState = 'idle' | 'chord-selected' | 'progression-loaded' | 'playback-running';
+
+interface UIStateController {
+  getState(): UIState;
+  // State transitions
+  selectChord(shape: Shape): void;
+  clearSelection(): void;
+  loadProgression(shapes: Shape[]): void;
+  clearProgression(): void;
+  // Deferred (Audio Engine)
+  startPlayback(): void;
+  stopPlayback(): void;
+  // Event subscription
+  onStateChange(callback: (state: UIState, prev: UIState) => void): () => void;
+}
+```
+
+**Test plan:**
+- [ ] Initial state is 'idle'
+- [ ] selectChord transitions idle → chord-selected
+- [ ] loadProgression transitions idle → progression-loaded
+- [ ] loadProgression transitions chord-selected → progression-loaded
+- [ ] clearProgression transitions progression-loaded → idle
+- [ ] clearSelection transitions chord-selected → idle
+- [ ] State change callbacks fire with correct arguments
+- [ ] Invalid transitions are no-ops (e.g., clearProgression when idle)
+
+### 5b: Control Panel Component
+
+`src/control-panel.ts` — HTML-based control panel.
+
+Components:
+- **Progression input** — textarea for pasting chord progressions (e.g., "Dm7 | G7 | Cmaj7")
+- **Load button** — parse and load progression
+- **Playback controls** — Play, Stop, Loop toggle (Play/Stop wired when Audio Engine exists)
+- **Clear button** — dismiss progression, return to idle (UX-D5)
+- **Tempo control** — BPM input/slider (deferred to Audio Engine)
+
+```ts
+interface ControlPanelOptions {
+  container: HTMLElement;
+  onLoadProgression: (text: string) => void;
+  onClear: () => void;
+  onPlay?: () => void;   // deferred
+  onStop?: () => void;   // deferred
+}
+
+interface ControlPanel {
+  show(): void;
+  hide(): void;
+  setProgressionLoaded(loaded: boolean): void;  // enable/disable clear button
+  destroy(): void;
+}
+```
+
+**Test plan:**
+- [ ] Control panel renders in container
+- [ ] Progression input accepts text
+- [ ] Load button fires onLoadProgression with input text
+- [ ] Clear button fires onClear
+- [ ] Clear button disabled when no progression loaded
+- [ ] Clear button enabled when progression loaded
+- [ ] Panel can be shown/hidden
+
+### 5c: Toolbar Component
+
+`src/toolbar.ts` — HTML-based toolbar.
+
+Components:
+- **Reset View button** — reset camera to initial state
+- **Overlay toggles** — future (roman numerals, heatmaps)
+
+```ts
+interface ToolbarOptions {
+  container: HTMLElement;
+  onResetView: () => void;
+}
+
+interface Toolbar {
+  destroy(): void;
+}
+```
+
+**Test plan:**
+- [ ] Toolbar renders in container
+- [ ] Reset View button fires onResetView
+- [ ] Overlay toggles (future) — placeholder only
+
+### 5d: Layout Manager
+
+`src/layout-manager.ts` — Coordinates layout zones and responsive behavior.
+
+Responsibilities:
+- Create root layout structure (canvas container, control panel, toolbar)
+- Handle panel collapse/expand
+- Trigger canvas resize when layout changes
+- Responsive breakpoints (mobile: collapsible panels)
+
+```ts
+interface LayoutManagerOptions {
+  root: HTMLElement;
+  onCanvasResize: (width: number, height: number) => void;
+}
+
+interface LayoutManager {
+  getCanvasContainer(): HTMLElement;
+  getControlPanelContainer(): HTMLElement;
+  getToolbarContainer(): HTMLElement;
+  toggleControlPanel(visible: boolean): void;
+  destroy(): void;
+}
+```
+
+**Test plan:**
+- [ ] Layout manager creates zone containers
+- [ ] Canvas container fills available space
+- [ ] toggleControlPanel changes panel visibility
+- [ ] onCanvasResize fires when panel toggled
+- [ ] Responsive behavior (mobile collapse) — manual test or media query mock
+
+### 5e: Integration Wiring
+
+Wire UI state controller to rendering and control panel:
+
+- `loadProgression` → parse chords (HC), map to shapes (HC), render path (RU), update state
+- `clearProgression` → clear path (RU), update state, update control panel
+- `selectChord` → render shape highlight (RU), update state
+- `clearSelection` → clear highlight (RU), update state
+
+This step may be demonstrated via integration tests rather than a separate module.
+
+### 5f: Review & Cleanup
+
+Review pass, update barrel exports, update ARCH §11 API table, update DEVLOG.
+
+---
+
+## Phase 5 Summary
+
+| Step | Key Files | Key Functions | Tests |
+|------|-----------|---------------|-------|
+| 5a | ui-state.ts | `createUIStateController` | 36 |
+| 5b | control-panel.ts | `createControlPanel` | 25 |
+| 5c | toolbar.ts | `createToolbar` | 8 |
+| 5d | layout-manager.ts | `createLayoutManager` | 13 |
+| 5e | (integration) | Skipped — wiring in app layer | — |
+| 5f | — | Review, exports, docs | — |
+| **Total** | **17 source files, 16 test files** | | **314** |
