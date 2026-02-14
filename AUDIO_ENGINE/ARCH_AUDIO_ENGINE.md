@@ -14,10 +14,45 @@ Audio Engine converts harmonic objects into audible output, performs voicing and
 ## 2. Core Decisions
 
 AE-D1 MIDI internal representation — Closed
-AE-D2 Default synthesis model — Open
+AE-D2 Default synthesis model — Closed
 AE-D3 Voice-leading sophistication (Level 1) — Closed
 AE-D4 Drag-trigger debounce — Tentative
 AE-D5 Default chord-blending sound profile — Closed
+
+---
+
+## 2b. Synthesis Model (AE-D2)
+
+Detuned dual-oscillator pad with low-pass filter. Per-voice signal chain:
+
+```
+OscillatorNode (triangle, +2 cents)  ──┐
+                                       ├──► GainNode (mix) ──► BiquadFilterNode (LP) ──► GainNode (ADSR) ──► master GainNode
+OscillatorNode (sine, −2 cents)     ──┘
+```
+
+### Default Parameters
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Oscillator 1 type | `"triangle"` | Warm odd-harmonic content |
+| Oscillator 2 type | `"sine"` | Adds fundamental body |
+| Detune | ±2–4 cents | Chorusing; exact value tuned during implementation |
+| Mix ratio | 0.5 / 0.5 | Equal blend; adjustable |
+| LP filter cutoff | ~2000 Hz | Softens upper harmonics |
+| LP filter Q | ~1.0 | Gentle rolloff, no resonant peak |
+| Attack | ~50 ms | Fast enough for interaction responsiveness |
+| Decay | ~200 ms | Settles to sustain level |
+| Sustain | ~0.7 | Sustained pad level |
+| Release | ~500 ms | Overlapping tails for chord blending (AE-D5) |
+
+### Voice-Count Normalization
+
+Master gain scaled by `1 / sqrt(voiceCount)` to prevent clipping with 3–4 simultaneous notes while maintaining perceived loudness.
+
+### Node Budget
+
+5 Web Audio nodes per voice × 4 voices = 20 nodes for a seventh chord. Well within browser limits.
 
 ---
 
