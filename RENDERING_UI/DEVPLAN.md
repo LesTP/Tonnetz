@@ -1,8 +1,8 @@
 # DEVPLAN — Rendering/UI
 
 Module: Rendering/UI
-Version: 0.8
-Date: 2026-02-13
+Version: 0.9
+Date: 2026-02-14
 Architecture reference: ARCH_RENDERING_UI.md (Draft 0.5)
 
 ---
@@ -36,13 +36,29 @@ SVG-based rendering and interaction subsystem for the Tonnetz Interactive Harmon
 
 ## Current Status
 
-**Phase:** 5 — Layout Integration ✅ COMPLETE
-**Blocked/Broken:** Nothing
-**Test count:** RU 314 passing (16 test files, 17 source files), HC 168 passing
+**Module Status:** ✅ **MVP COMPLETE**
+**Date:** 2026-02-14
+**Test count:** 324 RU tests passing (17 test files, 17 source files), 168 HC tests passing
 
-**Harmony Core Dependency:** Phase 7 (Code Review) complete. New `CentroidCoord` type alias exported for centroid handling. See HARMONY_CORE/DEVLOG.md Entry Phase 7. **No HC changes required — all needed APIs are already exported.**
+All phases through Phase 6 (Public API Assembly) are complete. The module is functionally complete for all Rendering/UI responsibilities that do not depend on Audio Engine.
 
-**Next Phase:** 6 — Public API Assembly & Integration Tests
+### Blocking Items (Deferred to Cross-Module Integration)
+
+| Item | Description | Blocked By | API Ready? |
+|------|-------------|------------|------------|
+| **Phase 4b: Playback Animation** | Subscribe to `AudioTransport.onChordChange()`, call `PathHandle.setActiveChord()` | Audio Engine | ✅ Yes — `PathHandle.setActiveChord()` implemented |
+| **Transport Sync** | rAF loop with `AudioTransport.getTime()` for smooth path progress | Audio Engine | ✅ Yes — wiring only |
+| **Error Handling Implementation** | Add try/catch patterns per RU-D16 (ARCH §15) | None — can be added incrementally | N/A |
+
+### Integration Readiness
+
+The following APIs are implemented and tested, ready for Audio Engine integration:
+- `PathHandle.setActiveChord(index)` — highlight active chord during playback
+- `PathHandle.getChordCount()` — progression length for transport scheduling
+- `UIStateController.startPlayback()` / `stopPlayback()` — state transitions
+- `ControlPanel` play/stop button callbacks
+
+When Audio Engine implements `AudioTransport`, integration is trivial event subscription wiring.
 
 ---
 
@@ -66,7 +82,7 @@ Resolved 5 UX ambiguities (UX-D1 through UX-D5). Updated UX_SPEC.md, ARCH_RENDER
 
 ### 1c: Camera & Viewport Math ✅
 
-`src/camera.ts` — `CameraState`, `computeWindowBounds`, `computeInitialCamera`, `computeViewBox`, `applyPan`, `applyZoom`. ViewBox-based camera with zoom anchor stability, zoom clamped to [0.25, 8]. **19 tests.**
+`src/camera.ts` — `CameraState`, `computeWindowBounds`, `computeInitialCamera`, `computeViewBox`, `applyPan`, `applyZoom`. ViewBox-based camera with zoom anchor stability, zoom clamped to [0.25, 4] (RU-DEV-D9). **19 tests.**
 
 ### 1d: SVG Scaffold & Grid Rendering ✅
 
@@ -165,6 +181,18 @@ Status: Closed | Priority: High
 Decision: The interaction controller stores the world position from onPointerDown and uses it for the hit-test in onDragStart, rather than the position where the gesture controller's drag threshold was exceeded. The user's intent (triangle scrub vs background pan) is determined by where they pressed, not where the pointer was when it crossed the 5px threshold.
 ```
 
+```
+RU-DEV-D9: Max zoom level 4x
+Status: Closed | Priority: Normal
+Decision: Zoom clamped to [0.25, 4] instead of [0.25, 8]. At 4x zoom, triangles are ~160px per side (comfortable interaction). At 8x, triangles become ~320px and users lose lattice context.
+```
+
+```
+RU-DEV-D10: Empty progression = no-op
+Status: Closed | Priority: Normal
+Decision: Calling loadProgression([]) or renderProgressionPath with an empty shapes array is a no-op — UI stays in current state (idle or chord-selected). Path renderer handles gracefully (empty polyline, zero markers). No state transition to progression-loaded for empty arrays.
+```
+
 ---
 
 ## Phase 2: Interaction Layer ✅
@@ -221,7 +249,7 @@ Code review identified 7 improvements (see DEVLOG Entry 19):
 | 3 | Shape rendering — triangle fills, extension fills, dot clusters, root marker | Phase 2 | ✅ Complete |
 | 4 | Progression path rendering — centroid path, `setActiveChord` API | Phase 3 | ✅ Complete |
 | 5 | Layout integration — control panel (incl. clear button), toolbar, responsive resize | Phase 4 | Ready |
-| 6 | Public API assembly, type signatures, integration tests | Phase 5 | Pending |
+| 6 | Public API assembly, type signatures, integration tests | Phase 5 | ✅ Complete |
 | — | **Deferred: Audio Integration** | Audio Engine | Blocked |
 
 ### Deferred Work (Audio Integration)
@@ -529,3 +557,72 @@ Extracted shared `css-utils.ts` (`injectCSS`, `HIDDEN_CLASS`). Simplified `selec
 | 5e | (integration) | Skipped — wiring in app layer | — |
 | 5f | — | Review, exports, docs | — |
 | **Total** | **17 source files, 16 test files** | | **314** |
+
+---
+
+## Phase 6: Public API Assembly & Integration Tests ✅
+
+**Objective:** Finalize barrel exports, add missing type exports, create cross-module integration tests verifying end-to-end workflows.
+
+### 6a: Barrel Export Review ✅
+
+Reviewed `src/index.ts`. Added missing exports:
+- `applyPanWithExtent` (function) — pan with pre-computed extent
+- `windowWorldExtent` (function) — compute world extent from bounds
+- `WorldExtent` (type) — world bounding box type
+
+### 6b: Integration Test Suite ✅
+
+`src/__tests__/integration.test.ts` — Cross-module workflow tests.
+
+| Test Category | Coverage |
+|---------------|----------|
+| Progression Workflow | Parse chords (HC) → decompose to shapes (HC) → render path (RU) → clear |
+| Shape Rendering | Parse chord → place → decompose → render shape → clear |
+| Interaction → Highlight | Hit-test world position → highlight shape → clear |
+| Layout + UI State | Create layout → wire control panel → load progression → clear button |
+| UI State Transitions | idle → chord-selected → idle, progression overrides selection |
+| Coordinate Consistency | Lattice→world transform validity, window bounds → grid rendering |
+| Full Pipeline | Grid + shape + highlight + path rendered in all layers |
+
+**10 integration tests added.**
+
+---
+
+## Phase 6 Summary
+
+| Step | Key Files | Key Functions | Tests |
+|------|-----------|---------------|---------|
+| 6a | index.ts | Barrel export updates | — |
+| 6b | integration.test.ts | Cross-module workflow tests | 10 |
+| **Total** | **17 source files, 17 test files** | | **324** |
+
+---
+
+## Future Optimizations
+
+Items deferred from MVP, to be revisited if performance issues arise:
+
+### Shape Caching
+
+**Issue:** `renderShape()` creates new SVG elements on each call. During rapid scrub or repeated selection, this creates DOM churn.
+
+**Potential optimization:** Shape cache keyed by `TriId[]` + `dot_pcs[]`. Reuse existing SVG elements when re-rendering the same shape. Track cache size and evict LRU entries.
+
+**Trigger:** Profile if scrub interaction shows dropped frames or high GC pressure.
+
+### Canvas Hybrid Rendering
+
+**Issue:** Desktop window (24×24 anchors) renders ~1,152 triangles + ~625 nodes as SVG elements. May become a bottleneck during rapid zoom/pan on mid-range devices.
+
+**Potential optimization:** Render `layer-grid` (static lattice) to Canvas. Keep interactive layers (`layer-chords`, `layer-dots`, `layer-path`, `layer-interaction`) as SVG for easy hit-testing and manipulation.
+
+**Trigger:** Profile if zoom/pan shows frame drops on target devices. Consider Canvas only if SVG element count exceeds ~2,000.
+
+### Window Indices Incremental Update
+
+**Issue:** `buildWindowIndices()` rebuilds all indices when crossing responsive breakpoints. For small window changes, this is wasteful.
+
+**Potential optimization:** Incremental index update — add/remove only the changed rows/columns. Requires tracking previous bounds.
+
+**Trigger:** Not expected to be an issue since breakpoint changes are infrequent. Defer unless profiling shows rebuild time >50ms.

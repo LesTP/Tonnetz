@@ -1076,3 +1076,143 @@ Implemented Phase 5: Layout Integration including UI state controller, control p
 
 **Phase 5:** ✅ COMPLETE
 **Next:** Phase 6 — Public API Assembly & Integration Tests
+
+---
+
+## Entry 24 — Phase 6: Public API Assembly & Integration Tests
+
+Date: 2026-02-14
+
+### Summary
+
+Completed Phase 6: finalized barrel exports, added missing type exports, and created comprehensive cross-module integration tests verifying end-to-end workflows.
+
+### Changes
+
+#### 6a: Barrel Export Updates
+
+Added missing exports to `src/index.ts`:
+
+| Export | Type | Description |
+|--------|------|-------------|
+| `applyPanWithExtent` | Function | Pan with pre-computed extent (avoids recomputation per frame) |
+| `windowWorldExtent` | Function | Compute world bounding box from window bounds |
+| `WorldExtent` | Type | World extent type `{ minX, minY, maxX, maxY }` |
+
+#### 6b: Integration Test Suite
+
+Created `src/__tests__/integration.test.ts` with 10 cross-module workflow tests:
+
+| Test Category | Tests | Description |
+|---------------|-------|-------------|
+| Progression Workflow | 2 | HC parse → decompose → RU render path → clear |
+| Interaction → Highlight | 2 | Hit-test → highlight shape → clear |
+| Layout + UI State | 3 | Layout + control panel + state machine integration |
+| Coordinate Consistency | 2 | Lattice→world transforms, window bounds → grid |
+| Full Pipeline | 1 | Grid + shape + highlight + path in all layers |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| src/index.ts | Added `applyPanWithExtent`, `windowWorldExtent`, `WorldExtent` exports |
+| src/__tests__/integration.test.ts | New file — 10 integration tests |
+| DEVPLAN.md | Added Phase 6 summary and status |
+
+### Test Summary
+
+| Phase | Tests Added | Running Total |
+|-------|-------------|---------------|
+| Phase 1 | 107 | 107 |
+| Phase 2 | 66 | 173 |
+| Phase 3 | 34 | 207 |
+| Phase 4 | 25 | 232 |
+| Phase 5 | 82 | 314 |
+| Phase 6 | 10 | 324 |
+
+**Running totals:** 17 source files, 17 test files, 324 RU tests, 168 HC tests
+
+### Status
+
+**Phase 6:** ✅ COMPLETE
+**Next:** Deferred — Audio Engine integration (blocked until Audio Engine implemented)
+
+---
+
+## Entry 23 — MVP Complete
+
+**Date:** 2026-02-14
+
+### Module Closure
+
+Rendering/UI module is now marked **MVP COMPLETE**. All phases through Phase 6 have been implemented and tested.
+
+### Final Metrics
+
+| Metric | Value |
+|--------|-------|
+| Source files | 17 |
+| Test files | 17 |
+| RU tests passing | 324 |
+| HC tests passing | 168 |
+| Phases completed | 6 (0–6) |
+| Design decisions | 10 (RU-DEV-D1 through RU-DEV-D10) |
+
+### Implemented Capabilities
+
+| Category | Features |
+|----------|----------|
+| **Coordinate Transforms** | Lattice↔World↔Screen, equilateral triangle geometry |
+| **Camera** | ViewBox-based pan/zoom, boundary clamping, zoom anchor stability |
+| **Grid Rendering** | Static lattice with triangles, edges, nodes, pitch-class labels |
+| **Shape Rendering** | Triangle fills, extension fills, dot clusters, root markers |
+| **Path Rendering** | Centroid-connected polyline, active chord markers |
+| **Hit Testing** | Proximity-circle model, triangle/edge/none classification |
+| **Interaction** | Tap/drag disambiguation, scrub mode, pan mode |
+| **UI State** | State machine (idle, chord-selected, progression-loaded, playback-running) |
+| **Layout** | Three-zone layout (toolbar, canvas, control panel), responsive resize |
+| **Components** | Control panel with Load/Play/Stop/Clear, toolbar with Reset View |
+
+### Blocking Items (Deferred)
+
+| Item | Blocked By | Notes |
+|------|------------|-------|
+| **Phase 4b: Playback Animation** | Audio Engine | `PathHandle.setActiveChord()` ready |
+| **Transport Sync** | Audio Engine | rAF + `AudioTransport.getTime()` pattern documented |
+| **Error Handling Implementation** | None | RU-D16 documented in ARCH §15, can add incrementally |
+
+### Integration Readiness
+
+The following APIs are ready for Audio Engine integration:
+
+```ts
+// Playback animation
+PathHandle.setActiveChord(index)  // ✅ Implemented
+PathHandle.getChordCount()        // ✅ Implemented
+
+// UI state transitions
+UIStateController.startPlayback() // ✅ Implemented
+UIStateController.stopPlayback()  // ✅ Implemented
+
+// Control panel callbacks
+ControlPanelOptions.onPlay()      // ✅ Implemented
+ControlPanelOptions.onStop()      // ✅ Implemented
+```
+
+When Audio Engine implements `AudioTransport`, integration is trivial:
+1. Subscribe to `transport.onChordChange()` → call `pathHandle.setActiveChord()`
+2. Wire control panel callbacks to `transport.play()` / `transport.stop()`
+
+### Documentation Updates
+
+| Document | Updates |
+|----------|---------|
+| DEVPLAN.md | Current Status → MVP COMPLETE, blocking items table, integration readiness |
+| ARCH_RENDERING_UI.md | RU-D16 error handling strategy (§15), decision summary updated |
+| UX_SPEC.md | Theming architecture added to Future UX Extensions |
+
+### Closure Notes
+
+The module is fully functional for all Rendering/UI responsibilities that do not depend on Audio Engine. The architecture supports future Audio Engine integration without code changes — only event subscription wiring is needed.
+
+Future optimizations (shape caching, Canvas hybrid, indices incremental update) are documented in DEVPLAN but not implemented, pending performance profiling on target devices.

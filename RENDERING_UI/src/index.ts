@@ -10,9 +10,11 @@ export {
   computeInitialCamera,
   computeViewBox,
   applyPan,
+  applyPanWithExtent,
   applyZoom,
+  windowWorldExtent,
 } from "./camera.js";
-export type { CameraState, ViewBox } from "./camera.js";
+export type { CameraState, ViewBox, WorldExtent } from "./camera.js";
 
 export { svgEl, setAttrs, SVG_NS } from "./svg-helpers.js";
 

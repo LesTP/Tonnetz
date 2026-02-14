@@ -366,10 +366,104 @@ Consistent with Harmony Core's zero-dependency approach.
 * RU-D12 Layered `<g>` groups from the start (5 layers per §2)
 * RU-D13 ViewBox-based camera (pan/zoom via viewBox manipulation)
 * RU-D14 Zero runtime dependencies (native DOM API + thin SVG helpers)
+* RU-D16 Defensive error handling (console warnings, no API changes)
 
 ---
 
-## 15. Module Decision Log
+## 15. Error Handling Strategy
+
+**RU-D16: Defensive error handling without API changes**
+Status: Closed
+
+Rendering functions use defensive try/catch patterns to prevent rendering failures from crashing the application. Errors are logged to the console with contextual information but do not change function signatures or return types.
+
+### Guiding Principles
+
+1. **Fail gracefully** — A rendering error should not crash the app or leave the UI in an inconsistent state.
+2. **Log with context** — Console warnings include the function name and relevant parameters to aid debugging.
+3. **No API changes** — Functions maintain their existing signatures. Callers do not need to handle errors explicitly.
+4. **Preserve partial state** — If a function partially completes before an error, clean up any partially-rendered elements.
+
+### Implementation Pattern
+
+Rendering functions wrap critical sections in try/catch:
+
+```ts
+function renderShape(layerChords, layerDots, shape, indices, options?) {
+  const elements: SVGElement[] = [];
+  try {
+    // Render main triangle
+    const mainEl = renderMainTriangle(shape, indices);
+    elements.push(mainEl);
+    layerChords.appendChild(mainEl);
+
+    // Render extension triangles
+    for (const ext of shape.ext_tris) {
+      const extEl = renderExtTriangle(ext, indices);
+      elements.push(extEl);
+      layerChords.appendChild(extEl);
+    }
+
+    // ... continue rendering
+
+    return { clear: () => elements.forEach(el => el.remove()) };
+  } catch (err) {
+    // Clean up any partially-rendered elements
+    elements.forEach(el => el.remove());
+    console.warn('[renderShape] Rendering failed:', err, { shape });
+    // Return a no-op handle
+    return { clear: () => {} };
+  }
+}
+```
+
+### Functions with Error Handling
+
+| Function | Error Behavior |
+|----------|----------------|
+| `renderGrid` | Logs warning, returns without rendering. Grid layer remains empty. |
+| `renderShape` | Logs warning, cleans up partial elements, returns no-op handle. |
+| `renderProgressionPath` | Logs warning, cleans up partial elements, returns no-op handle. |
+| `highlightTriangle` | Logs warning, returns no-op handle. |
+| `highlightShape` | Logs warning, returns no-op handle. |
+| `createLayoutManager` | Logs warning if DOM structure fails. Returns manager with degraded behavior. |
+| `createControlPanel` | Logs warning if DOM structure fails. Returns panel with no-op methods. |
+| `createToolbar` | Logs warning if DOM structure fails. Returns toolbar with no-op methods. |
+
+### Error Categories
+
+| Category | Example | Handling |
+|----------|---------|----------|
+| Invalid input | `null` shape, missing indices | Log warning, return no-op/empty result |
+| DOM failure | `appendChild` throws (detached node) | Log warning, clean up, return no-op |
+| Coordinate error | `NaN` from transform (rare) | Log warning, skip element |
+
+### Console Warning Format
+
+Warnings use a consistent format for easy filtering:
+
+```
+[functionName] Brief description: <error message>
+  { contextual data }
+```
+
+Example:
+```
+[renderShape] Rendering failed: Cannot read property 'main_tri' of undefined
+  { shape: undefined }
+```
+
+### Testing Error Handling
+
+Error handling is tested by:
+- Passing invalid inputs (null, undefined, empty arrays)
+- Verifying console warnings are emitted (via `vi.spyOn(console, 'warn')`)
+- Verifying no-op handles are returned
+- Verifying no partial DOM pollution
+
+---
+
+## 16. Module Decision Log
 
 ```
 RU-D9: API type signatures deferred to post-implementation

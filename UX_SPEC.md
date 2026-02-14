@@ -193,6 +193,7 @@ UX introduces the following interface expectations:
 * harmonic heatmaps
 * guided harmonic navigation
 * node-proximity interaction (three-triangle overlap at node — currently undefined)
+* theming architecture — customizable color palette for triangle fills, dots, path, highlights, grid (target: module assembly phase)
 
 ---
 

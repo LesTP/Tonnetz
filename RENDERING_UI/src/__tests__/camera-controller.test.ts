@@ -189,7 +189,7 @@ describe("CameraController — zoom", () => {
       }));
     }
     const cam = ctx.ctrl.getCamera();
-    expect(cam.zoom).toBeLessThanOrEqual(8);
+    expect(cam.zoom).toBeLessThanOrEqual(4);
   });
 
   it("zoom is clamped at minimum (repeated zoom-out)", () => {

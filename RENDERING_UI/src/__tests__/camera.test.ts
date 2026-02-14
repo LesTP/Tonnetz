@@ -298,10 +298,10 @@ describe("applyZoom", () => {
     expect(zoomed.zoom).toBe(2);
   });
 
-  it("clamps zoom at maximum (8)", () => {
+  it("clamps zoom at maximum (4)", () => {
     const cam = { centerX: 0, centerY: 0, zoom: 7 };
     const zoomed = applyZoom(cam, 2, 0, 0);
-    expect(zoomed.zoom).toBe(8);
+    expect(zoomed.zoom).toBe(4);
   });
 
   it("clamps zoom at minimum (0.25)", () => {
