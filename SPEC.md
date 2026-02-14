@@ -173,6 +173,86 @@ See ARCH_HARMONY_CORE.md Section 11 for full type definitions and function signa
 
 ---
 
+# Rendering/UI API Overview
+
+Rendering/UI handles SVG rendering, interaction, and layout. Other modules consume it through the public API exported from `RENDERING_UI/src/index.ts`. Full signatures and implementation details are in ARCH_RENDERING_UI.md Section 11.
+
+## Coordinate Transforms
+
+| Function | Description |
+|----------|-------------|
+| `latticeToWorld(u, v)` | Lattice→world equilateral transform |
+| `worldToLattice(x, y)` | World→lattice inverse transform |
+| `screenToWorld(...)` | Screen pixel→world coordinate via viewBox |
+
+## Camera & Viewport
+
+| Function | Description |
+|----------|-------------|
+| `computeWindowBounds(cW, cH, minTriPx)` | Responsive window bounds |
+| `computeInitialCamera(cW, cH, bounds)` | Fit-to-viewport camera state |
+| `computeViewBox(camera, cW, cH, bounds)` | Camera state→SVG viewBox |
+| `applyPan(camera, dx, dy, bounds?, clampFactor?)` | Pan with optional boundary clamping |
+| `applyZoom(camera, factor, anchorX, anchorY)` | Zoom with anchor stability |
+| `createCameraController(svg, cW, cH, bounds)` | Sole viewBox writer controller |
+
+## SVG Rendering
+
+| Function | Description |
+|----------|-------------|
+| `createSvgScaffold(container)` | Root SVG + 5-layer `<g>` scaffold |
+| `renderGrid(layerGroup, indices)` | Static lattice grid rendering |
+| `renderShape(layerChords, layerDots, shape, indices, options?)` | Render Shape to chord/dot layers |
+| `renderProgressionPath(layerPath, shapes, options?)` | Render centroid-connected path |
+
+## Interaction
+
+| Function | Description |
+|----------|-------------|
+| `hitTest(worldX, worldY, radius, indices)` | Proximity-circle hit classification |
+| `createGestureController(options)` | Tap/drag disambiguation |
+| `createInteractionController(options)` | Orchestration: gesture→hit-test→selection events |
+
+## Highlighting
+
+| Function | Description |
+|----------|-------------|
+| `highlightTriangle(layer, triId, indices, style?)` | Highlight single triangle |
+| `highlightShape(layer, shape, indices, style?)` | Highlight entire Shape |
+| `clearHighlight(handle)` | Clear single highlight |
+| `clearAllHighlights(layer)` | Clear all highlights from layer |
+
+## UI Components
+
+| Function | Description |
+|----------|-------------|
+| `createUIStateController()` | UI state machine (idle, chord-selected, progression-loaded, playback-running) |
+| `createLayoutManager(options)` | Three-zone layout (toolbar, canvas, control panel) |
+| `createControlPanel(options)` | HTML control panel (progression input, playback buttons) |
+| `createToolbar(options)` | HTML toolbar (Reset View button) |
+
+## Key Types
+
+| Type | Description |
+|------|-------------|
+| `WorldPoint` | World coordinate `{ x, y }` |
+| `LatticePoint` | Lattice coordinate `{ u, v }` |
+| `CameraState` | Camera state `{ centerX, centerY, zoom }` |
+| `ViewBox` | SVG viewBox `{ minX, minY, width, height }` |
+| `HitResult` | Discriminated union: `HitTriangle \| HitEdge \| HitNone` |
+| `ShapeHandle` | Handle for clearing rendered shapes |
+| `PathHandle` | Handle for progression path (`clear`, `setActiveChord`, `getChordCount`) |
+| `HighlightHandle` | Handle for clearing highlights |
+| `UIState` | State union: `"idle" \| "chord-selected" \| "progression-loaded" \| "playback-running"` |
+| `UIStateController` | Controller interface with state transitions and event subscription |
+| `LayoutManager` | Layout interface (container getters, toggleControlPanel) |
+| `ControlPanel` | Control panel interface (show/hide, state setters) |
+| `Toolbar` | Toolbar interface (show/hide/destroy) |
+
+See ARCH_RENDERING_UI.md Section 11 for full type definitions and function signatures.
+
+---
+
 # Decisions
 
 ### Decision Log

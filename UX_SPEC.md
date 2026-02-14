@@ -137,30 +137,43 @@ See HC-D11 in ARCH_HARMONY_CORE.md.
 
 UX introduces the following interface expectations:
 
-Harmony Core:
+### Harmony Core
 
-* `Shape` includes:
+| Requirement | API | Status |
+|-------------|-----|--------|
+| Shape centroid for path rendering | `Shape.centroid_uv` | ✅ Implemented |
+| Root vertex identification | `Shape.root_vertex_index` (nullable for dot-only) | ✅ Implemented |
+| Edge union pitch classes | `getEdgeUnionPcs(edgeId, indices)` | ✅ Implemented |
 
-  * `root_vertex_index` (nullable for dot-only shapes)
-  * `centroid_uv`
-* `getEdgeUnionPcs(edgeId, indices)` computes union pitch-class set for edge selection
+### Rendering/UI
 
-Rendering/UI:
+| Requirement | API | Status |
+|-------------|-----|--------|
+| Centroid path rendering | `renderProgressionPath(layer, shapes, options)` | ✅ Implemented |
+| Progression path clearing | `clearProgression(handle)` | ✅ Implemented |
+| Active chord highlight | `PathHandle.setActiveChord(index)` | ✅ Implemented |
+| Proximity-circle hit testing | `hitTest(worldX, worldY, radius, indices)` | ✅ Implemented |
+| Triangle/edge hit classification | `HitResult` (discriminated union: HitTriangle \| HitEdge \| HitNone) | ✅ Implemented |
+| UI state machine | `createUIStateController()` | ✅ Implemented |
+| Clear button integration | `UIStateController.clearProgression()` + `ControlPanel` | ✅ Implemented |
+| Layout zones | `createLayoutManager(options)` | ✅ Implemented |
+| Control panel | `createControlPanel(options)` | ✅ Implemented |
+| Toolbar | `createToolbar(options)` | ✅ Implemented |
 
-* supports centroid path rendering
-* exposes triangle and edge hit identifiers via proximity-circle model (UX-D1)
-* edge hit detection based on pointer proximity circle crossing shared interior edges (boundary edges excluded)
-* supports clear-progression control (UX-D5)
+### Audio Engine
 
-Audio:
+| Requirement | API | Status |
+|-------------|-----|--------|
+| Immediate playback mode | — | 🔲 Pending |
+| Scheduled playback mode | `AudioTransport` interface | 🔲 Pending |
+| Chord change events | `AudioTransport.onChordChange()` | 🔲 Pending |
+| 4-note edge-proximity playback | — | 🔲 Pending |
 
-* supports immediate playback and scheduled playback modes
-* edge-proximity selection triggers 4-note playback (union of two triads)
-* immediate mode: chord sounds on pointer-down, stops on pointer-up
+### Persistence
 
-Persistence:
-
-* supports progression structures compatible with playback scheduling
+| Requirement | API | Status |
+|-------------|-----|--------|
+| Progression serialization | — | 🔲 Pending |
 
 ---
 

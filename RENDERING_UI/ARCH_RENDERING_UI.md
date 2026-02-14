@@ -276,6 +276,27 @@ Actual exported API surface from `src/index.ts`:
 | Playback animation integration | Subscribe to AudioTransport for chord changes (deferred until Audio Engine) |
 | Clear button wiring | Wire to Control Panel UI (deferred until Layout integration) |
 
+### Implemented — Phase 5
+
+| Export | Type | Source | Description |
+|--------|------|--------|-------------|
+| `createUIStateController()` | Function | `ui-state.ts` | UI state machine (idle, chord-selected, progression-loaded, playback-running) |
+| `UIState` | Type | `ui-state.ts` | State union type |
+| `UIStateController` | Type | `ui-state.ts` | Controller interface with state transitions and event subscription |
+| `UIStateChangeEvent` | Type | `ui-state.ts` | Event payload (state, prevState, selectedShape, progression) |
+| `UIStateChangeCallback` | Type | `ui-state.ts` | Callback type for state changes |
+| `createControlPanel(options)` | Function | `control-panel.ts` | HTML control panel (progression input, Load/Play/Stop/Clear buttons) |
+| `ControlPanel` | Type | `control-panel.ts` | Panel interface (show/hide, setProgressionLoaded, setPlaybackRunning) |
+| `ControlPanelOptions` | Type | `control-panel.ts` | Options (container, callbacks) |
+| `createToolbar(options)` | Function | `toolbar.ts` | HTML toolbar (Reset View button) |
+| `Toolbar` | Type | `toolbar.ts` | Toolbar interface (show/hide/destroy) |
+| `ToolbarOptions` | Type | `toolbar.ts` | Options (container, onResetView) |
+| `createLayoutManager(options)` | Function | `layout-manager.ts` | Three-zone layout (toolbar, canvas, control panel) |
+| `LayoutManager` | Type | `layout-manager.ts` | Layout interface (getContainers, toggleControlPanel) |
+| `LayoutManagerOptions` | Type | `layout-manager.ts` | Options (root, onCanvasResize) |
+| `injectCSS(id, css)` | Function | `css-utils.ts` | Deduplicated style injection (internal utility, exported for testing) |
+| `HIDDEN_CLASS` | Const | `css-utils.ts` | Shared hidden class name (`"tonnetz-hidden"`) |
+
 ### Implemented — Phase 4a
 
 | Export | Type | Source | Description |
