@@ -507,3 +507,71 @@ tsc --noEmit: clean (0 errors)
 ### Next Steps
 
 Phase 3: Cross-Module Integration. Validate AudioTransport contract with Rendering/UI, wire `onChordChange` → `PathHandle.setActiveChord()`, end-to-end playback testing.
+
+---
+
+## Entry 8 — Phase 3: Cross-Module Integration (Complete)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Implemented Phase 3: cross-module type compatibility tests, `shapesToChordEvents()` conversion utility, and end-to-end integration smoke tests. 15 new tests, 158 total passing.
+
+### Contract Validation Results
+
+All cross-module contracts validated:
+- `AudioTransport` 14-method interface: ✅ all match RU expectations
+- `Shape.covered_pcs` (HC) → `playShape()` (AE): ✅ Set flows through correctly
+- `getTrianglePcs()` (HC) → `playPitchClasses()` (AE): ✅ `number[]` compatible with `readonly number[]`
+- `getEdgeUnionPcs()` (HC) → `playPitchClasses()` (AE): ✅ null guard + 4-pc array
+- `ChordEvent.shape` reference preserved through scheduler → `onChordChange` events: ✅
+
+### Files Created
+
+| File | Purpose | Tests |
+|------|---------|-------|
+| `src/conversion.ts` | `shapesToChordEvents(shapes, beatsPerChord?)` — Shape[] → ChordEvent[] | — |
+| `src/__tests__/cross-module.test.ts` | Phase 3a: type compatibility (7 tests) | 7 |
+| `src/__tests__/conversion.test.ts` | Phase 3b: conversion utility (5 tests) | 5 |
+| `src/__tests__/integration-e2e.test.ts` | Phase 3c: end-to-end smoke tests (3 tests) | 3 |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/index.ts` | Added `shapesToChordEvents` export |
+
+### Decision Made
+
+AE-D9 (Closed): Interactive playback wires to `playPitchClasses(state, pcs)` — tap plays exactly the pitch classes from hit-test (3 for triangle, 4 for edge union). `playShape()` reserved for progression playback where full Shapes exist.
+
+### Test Results
+
+```
+✓ src/__tests__/smoke.test.ts (2 tests)
+✓ src/__tests__/audio-context.test.ts (28 tests)
+✓ src/__tests__/voicing.test.ts (30 tests)
+✓ src/__tests__/synth.test.ts (18 tests)
+✓ src/__tests__/immediate-playback.test.ts (25 tests)
+✓ src/__tests__/scheduler.test.ts (40 tests)
+✓ src/__tests__/cross-module.test.ts (7 tests)
+✓ src/__tests__/conversion.test.ts (5 tests)
+✓ src/__tests__/integration-e2e.test.ts (3 tests)
+Tests: 158 passed (158)
+tsc --noEmit: clean (0 errors)
+```
+
+### Phase 3 Summary
+
+| Sub-phase | Scope | Tests | Status |
+|-----------|-------|-------|--------|
+| 3a | Cross-module type compatibility | 7 new | ✅ |
+| 3b | shapesToChordEvents() utility | 5 new | ✅ |
+| 3c | End-to-end integration smoke | 3 new | ✅ |
+| **Total** | **1 new + 1 modified source files** | **15 new (158 total)** | **✅** |
+
+### Next Steps
+
+Phase 4: Review & Polish. Code review, latency profiling, ARCH/SPEC doc updates.

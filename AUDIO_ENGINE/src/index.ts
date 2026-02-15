@@ -56,3 +56,6 @@ export type {
   SchedulerState,
   CreateSchedulerOptions,
 } from "./scheduler.js";
+
+// Shape[] → ChordEvent[] conversion (Phase 3)
+export { shapesToChordEvents } from "./conversion.js";

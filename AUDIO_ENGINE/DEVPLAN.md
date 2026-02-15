@@ -36,10 +36,10 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 
 ## Current Status
 
-**Phase:** Phase 3 — Cross-Module Integration (discuss complete, ready for code)
-**Focus:** 3a (contract tests), 3b (Shape→ChordEvent utility), 3c (integration smoke test)
+**Phase:** Phase 3 — Cross-Module Integration ✅
+**Focus:** Phase 4 (Review & Polish) next
 **Blocked/Broken:** None
-**Test count:** 143 passing (6 test files, 7 source files)
+**Test count:** 158 passing (9 test files, 8 source files)
 
 ---
 
