@@ -128,6 +128,114 @@ Date: 2026-02-15
 
 ---
 
+## Entry 4 — Phase 2a: saveProgression / loadProgression
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Created `src/progressions.ts`: `saveProgression()`, `loadProgression()`
+  - Key format: `tonnetz:prog:<uuid>`
+  - Auto-generates UUID + `created_at` on new records
+  - Updates `updated_at` on every save
+  - Stamps `schema_version` to `CURRENT_SCHEMA_VERSION`
+  - Corrupted JSON returns `null` (no throw)
+- Created `src/__tests__/progressions.test.ts`
+- Updated `src/index.ts` barrel: exports `saveProgression`, `loadProgression`
+
+**Tests passed:**
+- [x] Save then load returns identical record
+- [x] Load non-existent id returns null
+- [x] Save generates UUID if id is missing
+- [x] Save sets created_at on new records
+- [x] Save updates updated_at on existing records
+- [x] Corrupted JSON returns null (not throw)
+- [x] schema_version is included in stored JSON
+
+**Test totals:** 44 tests across 4 files
+
+**Issues encountered:**
+- Initial test used `vi.advanceTimersByTime()` without fake timers — caused error. Removed timer dependency; test verifies `updated_at >= original` and structural invariants instead.
+
+**Decisions made:**
+- None
+
+---
+
+## Entry 5 — Phase 2b: listProgressions / deleteProgression
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Added `listProgressions(backend)` to `src/progressions.ts`: enumerates `tonnetz:prog:*` keys, parses records, sorts by `updated_at` descending; skips corrupted records silently
+- Added `deleteProgression(backend, id)` to `src/progressions.ts`: removes by key; no-op if not found
+- Updated `src/index.ts` barrel: exports all 4 CRUD functions
+- Added 7 tests to `src/__tests__/progressions.test.ts`
+
+**Tests passed:**
+- [x] List empty storage → empty array
+- [x] List after saves returns all records sorted by updated_at desc
+- [x] Skips corrupted records without crashing
+- [x] Ignores non-progression keys
+- [x] Delete removes the record
+- [x] Delete non-existent id is a no-op (no throw)
+- [x] List after delete omits deleted record
+
+**Test totals:** 51 tests across 4 files
+
+**Issues encountered:**
+- None
+
+**Decisions made:**
+- None
+
+---
+
+## Entry 6 — Phase 2 Completion Tests
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Added 4 phase-level completion tests to `src/__tests__/progressions.test.ts`
+
+**Tests passed:**
+- [x] Full CRUD round-trip: save → list → load → update → list → delete → list
+- [x] Corrupted records are skipped in list (not crash)
+- [x] All operations work with memory backend (no localStorage required)
+- [x] Multiple progressions: save 5 → list → delete 2 → list (3 remain)
+
+**Test totals:** 55 tests across 4 files
+
+**Issues encountered:**
+- None
+
+---
+
+## Phase 2 Completion
+
+Date: 2026-02-15
+
+**Phase tests passed:**
+- [x] Full CRUD round-trip: save → list → load → update → list → delete → list
+- [x] All operations work with memory backend
+- [x] Corrupted records are skipped in list (not crash)
+
+**Test totals:** 55 tests across 4 files (1 smoke + 12 types + 24 storage + 18 progressions)
+
+**Review notes:**
+- `saveProgression` input type uses `Partial<ProgressionRecord> & Pick<...required fields>` — callers must provide title, tempo, grid, chords; id and timestamps are optional
+- `listProgressions` filters on `tonnetz:prog:` prefix — ignores settings and non-Tonnetz keys
+- `listProgressions` sorts by ISO timestamp string comparison (lexicographic = chronological for ISO 8601)
+- `deleteProgression` delegates to `backend.removeItem()` — no-op semantics inherited from StorageBackend contract
+- All functions take `StorageBackend` as first argument — pure, backend-agnostic
+
+**Doc sync:**
+- DEVPLAN: Current Status updated to Phase 2 complete
+
+---
+
 ## Template
 
 Each entry follows this format:

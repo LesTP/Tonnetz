@@ -34,8 +34,8 @@ Client-side persistence subsystem for the Tonnetz Interactive Harmonic Explorer.
 
 ## Current Status
 
-**Phase:** 1c — Storage abstraction (complete)
-**Focus:** Phase 1 complete; types, storage backend, barrel exports all tested
+**Phase:** 2 — Progression CRUD (complete)
+**Focus:** Phase 2 complete; save, load, list, delete all tested with full CRUD round-trip
 **Blocked/Broken:** Nothing
 
 ---

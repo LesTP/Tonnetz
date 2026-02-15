@@ -26,3 +26,11 @@ export {
   createLocalStorageBackend,
   StorageError,
 } from "./storage.js";
+
+// Progressions
+export {
+  saveProgression,
+  loadProgression,
+  listProgressions,
+  deleteProgression,
+} from "./progressions.js";
