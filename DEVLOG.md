@@ -789,6 +789,49 @@ The `tsc --noUnusedLocals --noUnusedParameters` pass surfaced 4 warnings in the 
 
 These should be resolved in the RU module's own maintenance pass. They do not affect integration module correctness or build output (TypeScript compiles cleanly under standard `--strict` flags; these only surface with the stricter `--noUnusedLocals` / `--noUnusedParameters` checks).
 
+**Update (2026-02-15):** All 4 warnings resolved — see Entry 15 below.
+
+---
+
+## Entry 15 — Rendering/UI Module Cleanup (Complete)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Resolved all 4 unused-variable/import warnings in the RENDERING_UI subsystem identified during Entry 14's `tsc --noUnusedLocals --noUnusedParameters` pass.
+
+### Fixes Applied
+
+| File | Fix | Category |
+|------|-----|----------|
+| `RENDERING_UI/src/camera.ts` | Prefixed `containerWidth` → `_containerWidth` in `computeInitialCamera()` params | Unused parameter (public API signature preserved) |
+| `RENDERING_UI/src/camera.ts` | Prefixed `containerHeight` → `_containerHeight` in `computeInitialCamera()` params | Unused parameter (public API signature preserved) |
+| `RENDERING_UI/src/path-renderer.ts` | Removed `currentActiveIndex` variable entirely — was written to but never read | Dead variable (write-only state tracking) |
+| `RENDERING_UI/src/renderer.ts` | Removed `setAttrs` from `import { svgEl, setAttrs }` | Dead import |
+
+### Design Notes
+
+- **`computeInitialCamera` params**: The `containerWidth` and `containerHeight` parameters are part of the public API contract (ARCH_RENDERING_UI.md §2, SPEC.md §Rendering/UI API Overview). The current implementation only uses `bounds` via `windowWorldExtent()`. Underscore-prefixing preserves the API signature while silencing the unused-parameter warning. If a future revision needs container dimensions for aspect-ratio-aware initial camera positioning, the params are ready.
+
+- **`currentActiveIndex` removal**: The variable tracked which chord index was active in the `renderProgressionPath` closure, but no code path ever read it back. The active chord state is already maintained visually via the `activeMarker` SVG element's position and visibility. No functional change.
+
+- **`setAttrs` removal**: The helper was imported alongside `svgEl` but all attribute-setting in `renderer.ts` uses inline `svgEl()` attribute objects. No call sites exist.
+
+### Test Results
+
+```
+RENDERING_UI: 344 passed (344) — 18 test files, 0 failures
+```
+
+All tests pass with zero regressions.
+
+### Next Steps
+
+- Phase 7c: Optional polish (keyboard shortcuts, debug logging)
+- INT-D8: Tempo control UI decision (deferred to visual testing)
+
 ---
 
 ## Entry 13 — Phase 7a: Integration Flow Tests (Complete)
@@ -857,5 +900,201 @@ Test Files  7 passed (7)
 
 - Phase 7b: Code review and cleanup
 - Phase 7c: Optional polish (keyboard shortcuts, debug logging)
+
+---
+
+## Entry 16 — TypeScript Project References (TS6059 Elimination)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Implemented TypeScript project references across all 5 modules to eliminate the TS6059 `rootDir` errors that surfaced when running `tsc --noEmit` from subsystems with cross-module `paths` mappings.
+
+### Problem
+
+Each subsystem's `tsconfig.json` used `paths` to resolve cross-module imports (e.g., `"harmony-core" → "../HARMONY_CORE/src/index.ts"`). When `tsc` followed these paths, it pulled the referenced subsystem's **source `.ts` files** into the current compilation. Since those files live outside the declared `rootDir` (`./src`), TypeScript emitted TS6059 for every imported source file:
+
+```
+error TS6059: File '.../HARMONY_CORE/src/types.ts' is not under 'rootDir' '.../RENDERING_UI/src'
+```
+
+This was cosmetic (Vitest and Vite use their own alias resolution and never hit this), but it polluted typecheck output and would break CI `typecheck` scripts that check for zero errors.
+
+### Solution: Project References
+
+TypeScript **project references** (`composite` + `references`) tell `tsc -b` to:
+1. Build each referenced project first, producing `.d.ts` declarations in `dist/`
+2. When type-checking the consuming project, resolve imports to those `.d.ts` files instead of raw `.ts` source
+
+Both `paths` (for module name resolution) and `references` (for build-order and declaration resolution) are needed together.
+
+### Changes Applied
+
+#### tsconfig.json updates
+
+| File | Changes |
+|------|---------|
+| `HARMONY_CORE/tsconfig.json` | Added `composite: true`, `declarationMap: true`, `exclude: ["src/**/*.test.ts"]` |
+| `PERSISTENCE_DATA/tsconfig.json` | Added `composite: true`, `declarationMap: true`, `exclude: ["src/**/*.test.ts"]` |
+| `AUDIO_ENGINE/tsconfig.json` | Added `composite: true`, `declarationMap: true`, `exclude: ["src/**/*.test.ts"]`, `references: [{ path: "../HARMONY_CORE" }]` |
+| `RENDERING_UI/tsconfig.json` | Added `composite: true`, `declarationMap: true`, `exclude: ["src/**/*.test.ts"]`, `references: [{ path: "../HARMONY_CORE" }, { path: "../AUDIO_ENGINE" }]` |
+| `INTEGRATION/tsconfig.json` | Added `references: [HC, RU, AE, PD]`; retained `paths` + `noEmit: true` (non-composite app entry point) |
+| `tsconfig.json` (root, **new**) | Solution-level orchestrator: `"files": [], "references": [HC, PD, AE, RU, INT]` |
+
+#### package.json updates
+
+| File | Changes |
+|------|---------|
+| All 4 subsystem `package.json` | `exports` updated from `./src/index.ts` to `{ import: "./dist/index.js", types: "./dist/index.d.ts" }`. Added `"build": "tsc -b"` script. |
+
+#### vitest.config.ts / vite.config.ts
+
+**No changes** — Vitest and Vite resolve cross-module imports via their own `resolve.alias` configurations (pointing to source `.ts` files). These are independent from TypeScript's module resolution and are unaffected by the project references change. This dual-resolution approach means:
+- `tsc -b` uses `.d.ts` declarations for type-checking (clean, no TS6059)
+- Vitest/Vite use source `.ts` directly for fast transforms (no build step needed for tests)
+
+### Dependency Graph (Build Order)
+
+```
+tsc -b (from root tsconfig.json)
+  │
+  ├── HARMONY_CORE      (leaf — no references)
+  ├── PERSISTENCE_DATA   (leaf — no references)
+  │
+  ├── AUDIO_ENGINE       (references: HC)
+  │
+  ├── RENDERING_UI       (references: HC, AE)
+  │
+  └── INTEGRATION        (references: HC, RU, AE, PD — noEmit, non-composite)
+```
+
+### Design Notes
+
+- **`composite: true` requires `exclude` for test files** — composite projects must have all included files be part of the build. Test files import from vitest (not a production dependency) and would cause errors. Excluding `src/**/*.test.ts` keeps the composite build clean while vitest runs tests via its own resolution.
+
+- **`declarationMap: true`** — enables go-to-definition from consuming projects to jump to the original `.ts` source rather than the `.d.ts` file, preserving the IDE navigation experience.
+
+- **INTEGRATION is non-composite** — it's the application entry point, not a library consumed by other projects. It uses `noEmit: true` for typecheck-only and Vite for bundling. Adding `composite` would be unnecessary and conflict with `noEmit`.
+
+- **Root `tsconfig.json` uses `"files": []`** — the root config is a solution file only. It has no source files of its own; it exists solely to orchestrate `tsc -b` across all subsystems in the correct dependency order.
+
+- **`paths` retained alongside `references`** — with `moduleResolution: "bundler"`, `paths` provides the resolution mapping (telling tsc where `"harmony-core"` lives), while `references` provides the build-order directive (telling tsc to use built `.d.ts` output, not raw source). Both are required.
+
+### Verification
+
+```
+tsc -b (from root):     0 errors (was: ~30+ TS6059 errors)
+tsc -b (from HC):       0 errors
+tsc -b (from AE):       0 errors
+tsc -b (from RU):       0 errors  (was: 9 TS6059 errors)
+tsc -b (from INT):      0 errors
+```
+
+All test suites pass with zero regressions:
+
+```
+Harmony Core:      168 passed
+Persistence/Data:  108 passed
+Audio Engine:      172 passed
+Rendering/UI:      344 passed
+Integration:       131 passed
+Total:             923 passed
+```
+
+### Usage
+
+```bash
+# Full workspace typecheck + build (from project root):
+cd HARMONY_CORE && npx tsc -b ..
+
+# Single subsystem typecheck + build (builds dependencies first):
+cd RENDERING_UI && npx tsc -b
+
+# Incremental rebuild (only rebuilds changed files):
+cd HARMONY_CORE && npx tsc -b    # fast — uses .tsbuildinfo
+
+# Clean rebuild:
+cd HARMONY_CORE && npx tsc -b --clean ..
+```
+
+---
+
+## Entry 17 — Phase 7c: Optional Polish (Complete)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Implemented keyboard shortcuts and structured debug logging. Reviewed the playback rendering path for performance — no unnecessary re-renders found.
+
+### Files Created
+
+| File | Description |
+|------|-------------|
+| `INTEGRATION/src/keyboard-shortcuts.ts` | Global keyboard shortcut handler (Escape = clear, Space = play/stop) |
+| `INTEGRATION/src/__tests__/keyboard-shortcuts.test.ts` | 13 tests covering all states, text input suppression, destroy cleanup |
+| `INTEGRATION/src/logger.ts` | Structured dev-only logger (`import.meta.env.DEV` gated, tree-shaken in production) |
+| `INTEGRATION/src/vite-env.d.ts` | Vite client type reference for `import.meta.env` support in `tsc -b` |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `INTEGRATION/src/main.ts` | Wired `createKeyboardShortcuts()` (Step 12b), `keyboardShortcuts.destroy()` in teardown, replaced raw `console.log`/`console.warn` with `log.info`/`log.warn` |
+| `INTEGRATION/src/index.ts` | Added barrel exports for `createKeyboardShortcuts`, `KeyboardShortcutOptions`, `log` |
+
+### Keyboard Shortcuts
+
+| Key | State | Action |
+|-----|-------|--------|
+| Escape | `progression-loaded` or `playback-running` | Clear progression (same as Clear button) |
+| Space | `progression-loaded` | Play (same as Play button) |
+| Space | `playback-running` | Stop (same as Stop button) |
+| Any key | `idle` or `chord-selected` | No action |
+| Any key | Text input focused (textarea, input, contentEditable) | Suppressed — no shortcut fires |
+
+Shortcuts are wired in `main.ts` Step 12b, destroyed in `destroyApp()`, and use the same `handleClear`/`handlePlay`/`handleStop` callbacks as the control panel buttons — no duplicated logic.
+
+### Debug Logger
+
+```typescript
+import { log } from "./logger.js";
+log.info("startup", "App ready", { state: "idle" });
+log.warn("pipeline", "Invalid chord", { symbol: "Xaug7" });
+log.error("audio", "Init failed", error);
+```
+
+- **Dev mode** (`vite dev`): full structured output via `console.info`/`warn`/`error`
+- **Production build** (`vite build`): all log calls are no-ops, tree-shaken by Vite/Rollup
+- Format: `[Tonnetz:<tag>] <message>` followed by optional data args
+- Three existing `console.log`/`console.warn` calls in `main.ts` replaced with `log.info`/`log.warn`
+
+### Performance Review
+
+Traced the playback rendering path during `playback-running` state:
+
+1. **`onChordChange` → `setActiveChord(index)`** — 2–3 `setAttribute` calls on a single pre-existing SVG `<circle>` (cx, cy, visibility). World coordinates pre-computed at render time. No element creation, no DOM tree mutation.
+2. **`onStateChange` → `uiState.startPlayback()`** — State machine transition only. No DOM.
+3. **`onStateChange` → `controlPanel.setPlaybackRunning()`** — Toggles `disabled` on 3 buttons.
+
+**No unnecessary re-renders found.** No `rAF` loops, no grid re-rendering, no shape re-rendering. The playback path is already minimal.
+
+### Test Results
+
+```
+Integration: 144 passed (144) — 8 test files, 0 failures
+  (was 131, +13 keyboard shortcut tests)
+tsc -b: 0 errors
+```
+
+### Phase 7c Status: Complete
+
+All three items delivered:
+- ✅ Keyboard shortcuts (Escape, Space)
+- ✅ Structured debug logging
+- ✅ Performance review (clean — no changes needed)
 
 ---

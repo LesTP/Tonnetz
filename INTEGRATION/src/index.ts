@@ -64,6 +64,13 @@ export type {
   SaveProgressionArgs,
 } from "./persistence-wiring.js";
 
+// Keyboard shortcuts (Phase 7c)
+export { createKeyboardShortcuts } from "./keyboard-shortcuts.js";
+export type { KeyboardShortcutOptions } from "./keyboard-shortcuts.js";
+
+// Debug logger (Phase 7c)
+export { log } from "./logger.js";
+
 // Application assembly (Phase 6) — destroyApp from main.ts
 // Note: destroyApp is exported from main.ts directly (side-effecting entry point).
 // It is not re-exported here to avoid triggering app initialization on import.

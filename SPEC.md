@@ -435,7 +435,7 @@ All items must be verified before starting integration module development.
 - [x] `parseChordSymbol()` handles all MVP chord grammar (HC-D4)
 - [x] `mapProgressionToShapes()` implements chain focus (HC-D11)
 - [x] `getEdgeUnionPcs()` returns `number[] | null` (boundary edge = null)
-- [x] All tests passing (158 tests)
+- [x] All tests passing (168 tests)
 - [x] No runtime dependencies on UI, audio, or storage
 
 ### Rendering/UI
@@ -459,7 +459,7 @@ All items must be verified before starting integration module development.
 - [x] `AudioTransport.onChordChange()` / `onStateChange()` fire correctly
 - [x] `shapesToChordEvents()` converts `Shape[]` → `ChordEvent[]`
 - [x] Voice-leading (`voiceLead`) threads across sequential chords
-- [x] All tests passing (157 tests)
+- [x] All tests passing (172 tests)
 - [x] No runtime dependencies on UI or storage
 
 ### Persistence/Data
@@ -468,7 +468,7 @@ All items must be verified before starting integration module development.
 - [x] `encodeShareUrl()` / `decodeShareUrl()` produce valid URL-fragment payloads
 - [x] `loadSettings()` / `saveSettings()` round-trip correctly
 - [x] Schema version field present in all stored records
-- [x] All tests passing (105 tests)
+- [x] All tests passing (108 tests)
 - [x] No runtime dependencies on UI, audio, or harmony logic
 
 ### Cross-Module Compatibility

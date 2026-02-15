@@ -148,9 +148,6 @@ export function renderProgressionPath(
   // Single DOM insertion
   layerPath.appendChild(frag);
 
-  // Track current active index
-  let currentActiveIndex = -1;
-
   return {
     clear(): void {
       for (const el of elements) {
@@ -158,14 +155,12 @@ export function renderProgressionPath(
       }
       elements.length = 0;
       centroidMarkers.length = 0;
-      currentActiveIndex = -1;
     },
 
     setActiveChord(index: number): void {
       if (index < 0 || index >= worldCentroids.length) {
         // Hide active marker
         activeMarker.setAttribute("visibility", "hidden");
-        currentActiveIndex = -1;
         return;
       }
 
@@ -174,7 +169,6 @@ export function renderProgressionPath(
       activeMarker.setAttribute("cx", String(w.x));
       activeMarker.setAttribute("cy", String(w.y));
       activeMarker.setAttribute("visibility", "visible");
-      currentActiveIndex = index;
     },
 
     getChordCount(): number {

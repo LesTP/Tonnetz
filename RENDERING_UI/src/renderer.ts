@@ -5,7 +5,7 @@ import type {
 import { triVertices, pc, nodeId, parseNodeId, parseEdgeId } from "harmony-core";
 import type { WorldPoint } from "./coords.js";
 import { latticeToWorld } from "./coords.js";
-import { svgEl, setAttrs } from "./svg-helpers.js";
+import { svgEl } from "./svg-helpers.js";
 
 /** Pitch-class name lookup table (index 0–11). */
 const PC_NAMES: readonly string[] = [

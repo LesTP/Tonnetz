@@ -133,8 +133,8 @@ export function windowWorldExtent(bounds: WindowBounds): WorldExtent {
  * Compute the initial camera that centers the window in the viewport (RU-D11).
  */
 export function computeInitialCamera(
-  containerWidth: number,
-  containerHeight: number,
+  _containerWidth: number,
+  _containerHeight: number,
   bounds: WindowBounds,
 ): CameraState {
   const ext = windowWorldExtent(bounds);

@@ -53,6 +53,8 @@ import {
   checkUrlHash,
   DEFAULT_GRID,
 } from "./persistence-wiring.js";
+import { createKeyboardShortcuts } from "./keyboard-shortcuts.js";
+import { log } from "./logger.js";
 import type { GridValue } from "persistence-data";
 
 // ── Application State ───────────────────────────────────────────────
@@ -158,7 +160,7 @@ function loadProgressionFromChords(chords: string[]): boolean {
   });
 
   if (!result.ok) {
-    console.warn("[Tonnetz] Progression load failed:", result.error);
+    log.warn("pipeline", "Progression load failed", result.error);
     return false;
   }
 
@@ -266,6 +268,15 @@ const interactionCtrl: InteractionController = createInteractionController({
   callbacks: interactionCallbacks,
 });
 
+// ── Step 12b: Keyboard Shortcuts ────────────────────────────────────
+
+const keyboardShortcuts = createKeyboardShortcuts({
+  uiState,
+  onClear: handleClear,
+  onPlay: handlePlay,
+  onStop: handleStop,
+});
+
 // ── Step 13: Check URL Hash ─────────────────────────────────────────
 // Auto-load shared progression from URL fragment (SPEC §Startup Sequence step 5).
 
@@ -280,7 +291,7 @@ if (urlCheck.found) {
 
 // ── Step 14: Ready ──────────────────────────────────────────────────
 
-console.log("[Tonnetz] Application ready —", uiState.getState());
+log.info("startup", "Application ready", { state: uiState.getState() });
 
 // ── Phase 6b: destroyApp() ──────────────────────────────────────────
 
@@ -313,6 +324,9 @@ export function destroyApp(): void {
     currentPathHandle = null;
   }
 
+  // Destroy keyboard shortcuts
+  keyboardShortcuts.destroy();
+
   // Destroy controllers (order: interaction first, camera, resize, UI components, layout last)
   interactionCtrl.destroy();
   camera!.destroy();
@@ -324,5 +338,5 @@ export function destroyApp(): void {
   // Clear DOM
   appEl.innerHTML = "";
 
-  console.log("[Tonnetz] Application destroyed");
+  log.info("startup", "Application destroyed");
 }

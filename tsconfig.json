@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./HARMONY_CORE" },
+    { "path": "./PERSISTENCE_DATA" },
+    { "path": "./AUDIO_ENGINE" },
+    { "path": "./RENDERING_UI" },
+    { "path": "./INTEGRATION" }
+  ]
+}

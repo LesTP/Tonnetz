@@ -39,8 +39,8 @@ Top-level orchestrator for the Tonnetz Interactive Harmonic Explorer. Wires all 
 
 ## Current Status
 
-**Phase:** 7b — Code Review & Cleanup (Complete)
-**Focus:** Phase 7c: Optional Polish
+**Phase:** 7c — Optional Polish (Complete)
+**Focus:** All phases complete. MVP integration module done.
 **Blocked/Broken:** INT-D8 (tempo control UI) deferred to UI testing phase — not blocking implementation
 
 ---
@@ -51,12 +51,12 @@ All items from SPEC §Integration Readiness Checklist are verified ✅.
 
 | Subsystem | Tests | Status | Key APIs Consumed |
 |-----------|-------|--------|-------------------|
-| Harmony Core | 158 | ✅ Complete | `parseChordSymbol`, `mapProgressionToShapes`, `buildWindowIndices`, `getTrianglePcs`, `getEdgeUnionPcs` |
+| Harmony Core | 168 | ✅ Complete | `parseChordSymbol`, `mapProgressionToShapes`, `buildWindowIndices`, `getTrianglePcs`, `getEdgeUnionPcs` |
 | Rendering/UI | 344 | ✅ Complete | `createSvgScaffold`, `renderGrid`, `createCameraController`, `createInteractionController`, `renderShape`, `renderProgressionPath`, `highlightShape`, `createUIStateController`, `createControlPanel`, `createToolbar`, `createLayoutManager`, `hitTest`, `computeProximityRadius` |
 | Audio Engine | 172 | ✅ Complete | `initAudio`, `createImmediatePlayback`, `playPitchClasses`, `stopAll`, `shapesToChordEvents` (uniform duration only), `AudioTransport` (14 methods) |
-| Persistence/Data | 105 | ✅ Complete | `loadSettings`, `saveSettings`, `saveProgression`, `loadProgression`, `listProgressions`, `deleteProgression`, `encodeShareUrl`, `decodeShareUrl`, `createLocalStorageBackend` |
+| Persistence/Data | 108 | ✅ Complete | `loadSettings`, `saveSettings`, `saveProgression`, `loadProgression`, `listProgressions`, `deleteProgression`, `encodeShareUrl`, `decodeShareUrl`, `createLocalStorageBackend` |
 
-Total subsystem tests: **779**
+Total subsystem tests: **792**
 
 ---
 

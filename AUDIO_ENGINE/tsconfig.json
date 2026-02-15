@@ -12,10 +12,14 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    "composite": true,
     "paths": {
       "harmony-core": ["../HARMONY_CORE/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"],
+  "references": [
+    { "path": "../HARMONY_CORE" }
+  ]
 }
