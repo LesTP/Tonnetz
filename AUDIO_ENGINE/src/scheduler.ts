@@ -84,6 +84,8 @@ export interface SchedulerState {
   readonly masterGain: GainNode;
   /** Chord change callback (delegated from transport). */
   readonly onChordChange: (event: ChordChangeEvent) => void;
+  /** Called when the progression ends naturally (all chords have played). */
+  readonly onComplete: (() => void) | null;
   /** Whether the scheduler has been stopped. */
   stopped: boolean;
 }
@@ -98,6 +100,8 @@ export interface CreateSchedulerOptions {
   beatOffset?: number;
   prevVoicing?: number[];
   onChordChange: (event: ChordChangeEvent) => void;
+  /** Called when the progression ends naturally (all chords have played). */
+  onComplete?: () => void;
 }
 
 /**
@@ -123,6 +127,19 @@ export function createScheduler(opts: CreateSchedulerOptions): SchedulerState {
     changeFired: false,
   }));
 
+  // When resuming from a beat offset, mark chords that are already
+  // fully past as changeFired+scheduled so the tick loop won't
+  // re-fire their onChordChange or re-schedule their voices.
+  if (beatOffset > 0) {
+    const now = ctx.currentTime;
+    for (const slot of chords) {
+      if (slot.endTime <= now) {
+        slot.changeFired = true;
+        slot.scheduled = true;
+      }
+    }
+  }
+
   return {
     ctx,
     destination: opts.destination,
@@ -136,6 +153,7 @@ export function createScheduler(opts: CreateSchedulerOptions): SchedulerState {
     timerHandle: null,
     masterGain,
     onChordChange,
+    onComplete: opts.onComplete ?? null,
     stopped: false,
   };
 }
@@ -215,6 +233,9 @@ function tick(state: SchedulerState): void {
     const lastSlot = state.chords[state.chords.length - 1];
     if (now >= lastSlot.endTime) {
       stopScheduler(state);
+      if (state.onComplete) {
+        state.onComplete();
+      }
     }
   }
 }

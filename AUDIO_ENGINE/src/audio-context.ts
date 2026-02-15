@@ -131,7 +131,10 @@ export async function initAudio(
       if (scheduledEvents.length === 0) return;
       if (playing) return;
       playing = true;
-      currentChordIndex = 0;
+      // Only reset chord index on fresh start; preserve on resume from pause
+      if (pausedBeatOffset === 0) {
+        currentChordIndex = 0;
+      }
 
       // Create and start the scheduler
       scheduler = createScheduler({
@@ -142,6 +145,14 @@ export async function initAudio(
         beatOffset: pausedBeatOffset,
         prevVoicing,
         onChordChange: emitChordChange,
+        onComplete() {
+          // Progression ended naturally — transition transport state
+          playing = false;
+          currentChordIndex = -1;
+          pausedBeatOffset = 0;
+          scheduler = null;
+          emitStateChange();
+        },
       });
       startScheduler(scheduler);
 
@@ -154,6 +165,7 @@ export async function initAudio(
       currentChordIndex = -1;
       pausedBeatOffset = 0;
       cleanupScheduler();
+      prevVoicing = [];
       emitStateChange();
     },
 
@@ -174,6 +186,7 @@ export async function initAudio(
       currentChordIndex = -1;
       pausedBeatOffset = 0;
       cleanupScheduler();
+      prevVoicing = [];
       scheduledEvents = [];
       if (wasPlaying) {
         emitStateChange();

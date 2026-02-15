@@ -19,6 +19,9 @@ AE-D3 Voice-leading sophistication (Level 1) — Closed
 AE-D4 Drag-trigger debounce — Closed
 AE-D5 Default chord-blending sound profile — Closed
 AE-D9 Interactive playback wiring (triangle → playPitchClasses, not playShape) — Closed
+AE-D10 Scheduler auto-stop must notify transport — Closed
+AE-D11 Preserve currentChordIndex across pause/resume — Closed
+AE-D12 Reset voice-leading state on stop — Closed
 
 ---
 
@@ -515,15 +518,15 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 | Test File | Tests | Covers |
 |-----------|-------|--------|
 | `smoke.test.ts` | 1 | Barrel export resolves with expected public API |
-| `audio-context.test.ts` | 28 | initAudio, transport state machine, play/stop/pause/cancel, event subscriptions, tempo, suspended context |
+| `audio-context.test.ts` | 39 | initAudio, transport state machine, play/stop/pause/cancel, event subscriptions, tempo, suspended context, natural completion (AE-D10), pause/resume chord index (AE-D11), voice-leading reset on stop (AE-D12) |
 | `voicing.test.ts` | 30 | nearestMidiNote, voiceInRegister, voiceLead, edge cases, musical progressions |
 | `synth.test.ts` | 18 | midiToFreq, createVoice signal chain, velocity scaling, release/stop idempotency |
 | `immediate-playback.test.ts` | 25 | createImmediatePlayback, playPitchClasses, playShape, stopAll, voice-count normalization, duration, velocity |
-| `scheduler.test.ts` | 40 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration |
+| `scheduler.test.ts` | 44 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration, onComplete callback (AE-D10) |
 | `cross-module.test.ts` | 7 | HC Shape → playShape, HC getTrianglePcs → playPitchClasses, HC getEdgeUnionPcs → playPitchClasses, ChordEvent scheduling, onChordChange subscribers |
 | `conversion.test.ts` | 5 | shapesToChordEvents: empty, single, multiple, custom beatsPerChord, reference preservation |
 | `integration-e2e.test.ts` | 3 | ii–V–I pipeline (HC→AE→events), triangle tap → 3 voices, edge union → 4 voices |
-| **Total** | **157** | |
+| **Total** | **172** | |
 
 ### Latency Analysis (Static)
 
@@ -537,7 +540,67 @@ Interaction → audio onset critical path:
 
 ---
 
-## 8. Future Extensions
+## 8. Bug Fix Decisions
+
+```
+AE-D10: Scheduler auto-stop must notify transport
+Date: 2026-02-15
+Status: Closed
+Priority: Important
+Bug:
+When a progression played to completion, the scheduler's tick() called
+stopScheduler() internally but never notified the transport closure.
+transport.isPlaying() remained true, and no onStateChange event fired.
+Rendering/UI would never learn that playback ended.
+Fix:
+Added an onComplete callback to CreateSchedulerOptions. The scheduler calls
+onComplete() after stopScheduler() when the last chord's endTime is reached.
+The transport's play() provides an onComplete that sets playing=false,
+resets currentChordIndex to -1, clears pausedBeatOffset, nullifies the
+scheduler, and fires emitStateChange().
+Files: scheduler.ts, audio-context.ts
+```
+
+```
+AE-D11: Preserve currentChordIndex across pause/resume
+Date: 2026-02-15
+Status: Closed
+Priority: Important
+Bug:
+play() unconditionally set currentChordIndex = 0. After pause() and resume,
+getCurrentChordIndex() briefly returned 0 instead of the paused chord index,
+creating a transient inconsistency until the scheduler tick fired the correct
+onChordChange event. Additionally, the scheduler would re-fire onChordChange
+for chords that were already played before the pause.
+Fix:
+(1) In play(), currentChordIndex is only reset to 0 when pausedBeatOffset === 0
+(fresh start). On resume, the paused value is preserved.
+(2) In createScheduler(), when beatOffset > 0, chords whose endTime is already
+past are pre-marked as changeFired=true and scheduled=true so tick() won't
+re-fire their events.
+Files: audio-context.ts, scheduler.ts
+```
+
+```
+AE-D12: Reset voice-leading state on stop
+Date: 2026-02-15
+Status: Closed
+Priority: Minor
+Bug:
+stop() called cleanupScheduler() which saved prevVoicing from the scheduler,
+but never cleared it. A subsequent play() would voice-lead the first chord
+from the last voicing of the previous run instead of starting fresh with
+voiceInRegister().
+Fix:
+Added prevVoicing = [] in stop() and cancelSchedule() after cleanupScheduler().
+pause() intentionally preserves prevVoicing for voice-leading continuity on
+resume.
+Files: audio-context.ts
+```
+
+---
+
+## 8b. Future Extensions
 
 * sampled instruments
 * richer synthesis

@@ -356,6 +356,103 @@ describe("startScheduler", () => {
   });
 });
 
+// ── onComplete callback ──────────────────────────────────────────────
+
+describe("onComplete callback", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("fires when the progression ends naturally", () => {
+    const mock = new MockAudioContext();
+    mock._currentTime = 0;
+    const onComplete = vi.fn();
+    const state = createScheduler({
+      ctx: mock as unknown as AudioContext,
+      destination: mock.destination as unknown as AudioNode,
+      events: makeProgression(), // 3 chords, 2 beats each, 6 beats total
+      bpm: 120,
+      onChordChange: () => {},
+      onComplete,
+    });
+
+    startScheduler(state);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    // Advance past the end of the last chord (beat 6 → t=3.0 at 120BPM)
+    mock._currentTime = 3.05;
+    vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fire before the last chord ends", () => {
+    const mock = new MockAudioContext();
+    mock._currentTime = 0;
+    const onComplete = vi.fn();
+    const state = createScheduler({
+      ctx: mock as unknown as AudioContext,
+      destination: mock.destination as unknown as AudioNode,
+      events: makeProgression(),
+      bpm: 120,
+      onChordChange: () => {},
+      onComplete,
+    });
+
+    startScheduler(state);
+    // Advance to middle of the last chord (t=2.5, last chord ends at t=3.0)
+    mock._currentTime = 2.5;
+    vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
+
+    expect(onComplete).not.toHaveBeenCalled();
+    stopScheduler(state);
+  });
+
+  it("fires only once even with multiple ticks past end", () => {
+    const mock = new MockAudioContext();
+    mock._currentTime = 0;
+    const onComplete = vi.fn();
+    const state = createScheduler({
+      ctx: mock as unknown as AudioContext,
+      destination: mock.destination as unknown as AudioNode,
+      events: makeProgression(),
+      bpm: 120,
+      onChordChange: () => {},
+      onComplete,
+    });
+
+    startScheduler(state);
+    mock._currentTime = 3.05;
+    vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
+    // stopScheduler was called inside tick, so further ticks are no-ops
+    vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
+    vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not required (no crash when omitted)", () => {
+    const mock = new MockAudioContext();
+    mock._currentTime = 0;
+    const state = createScheduler({
+      ctx: mock as unknown as AudioContext,
+      destination: mock.destination as unknown as AudioNode,
+      events: makeProgression(),
+      bpm: 120,
+      onChordChange: () => {},
+      // onComplete intentionally omitted
+    });
+
+    startScheduler(state);
+    mock._currentTime = 3.05;
+    expect(() => vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS)).not.toThrow();
+  });
+});
+
 // ── stopScheduler ────────────────────────────────────────────────────
 
 describe("stopScheduler", () => {
