@@ -9,11 +9,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "harmony-core": "file:../HARMONY_CORE"
-  },
   "devDependencies": {
-    "audio-engine": "file:../AUDIO_ENGINE",
     "happy-dom": "^17.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

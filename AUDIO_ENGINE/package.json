@@ -15,9 +15,6 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "harmony-core": "file:../HARMONY_CORE"
-  },
   "devDependencies": {
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
