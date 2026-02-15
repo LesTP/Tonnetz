@@ -39,8 +39,8 @@ Top-level orchestrator for the Tonnetz Interactive Harmonic Explorer. Wires all 
 
 ## Current Status
 
-**Phase:** 1b — Build Configuration (Complete)
-**Focus:** Phase 2: Grid-to-beat bridging & progression pipeline
+**Phase:** 6 — Application Assembly (Complete)
+**Focus:** Phase 7: Polish & Review
 **Blocked/Broken:** INT-D8 (tempo control UI) deferred to UI testing phase — not blocking implementation
 
 ---
