@@ -14,6 +14,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   generateId,
 } from "./types.js";
+import { migrateProgression } from "./migration.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -92,7 +93,16 @@ export function loadProgression(
   if (raw === null) return null;
 
   try {
-    return JSON.parse(raw) as ProgressionRecord;
+    const parsed: Record<string, unknown> = JSON.parse(raw);
+    const record = migrateProgression(parsed);
+    if (record === null) return null;
+
+    // Re-save if migration changed the schema version
+    if (parsed.schema_version !== record.schema_version) {
+      backend.setItem(progKey(id), JSON.stringify(record));
+    }
+
+    return record;
   } catch {
     return null;
   }
@@ -120,7 +130,16 @@ export function listProgressions(
     if (raw === null) continue;
 
     try {
-      results.push(JSON.parse(raw) as ProgressionRecord);
+      const parsed: Record<string, unknown> = JSON.parse(raw);
+      const record = migrateProgression(parsed);
+      if (record === null) continue; // Unmigrateable (future version) — skip
+
+      // Re-save if migration changed the schema version
+      if (parsed.schema_version !== record.schema_version) {
+        backend.setItem(key, JSON.stringify(record));
+      }
+
+      results.push(record);
     } catch {
       // Corrupted record — skip silently
     }

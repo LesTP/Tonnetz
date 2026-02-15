@@ -38,5 +38,9 @@ export {
 // Sharing
 export { encodeShareUrl, decodeShareUrl } from "./sharing.js";
 
+// Migration
+export { migrateProgression } from "./migration.js";
+export type { MigrationFn } from "./migration.js";
+
 // Settings
 export { loadSettings, saveSettings } from "./settings.js";
