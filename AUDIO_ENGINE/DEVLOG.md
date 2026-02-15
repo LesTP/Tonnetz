@@ -5,7 +5,7 @@ Started: 2026-02-14
 
 ---
 
-## Entry 1 — Phase 0: Pre-Implementation Setup (In Progress)
+## Entry 1 — Phase 0: Pre-Implementation Setup (Complete)
 
 **Date:** 2026-02-14
 **Mode:** Discuss
@@ -393,3 +393,117 @@ All Phase 1 sub-tasks complete:
 ### Next Steps
 
 Phase 2: Scheduled Playback & Transport. Wire transport controls to actual audio scheduling (lookahead buffer, beat→time conversion, chord change events during real playback).
+
+---
+
+## Entry 7 — Phase 2: Scheduled Playback & Transport (Complete)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Implemented the full scheduled playback engine: beat→time conversion, lookahead-based scheduler, chord change event firing, and wired transport controls (play/stop/pause/cancel) to the scheduler. 40 new tests, 143 total passing. Phase 2 complete.
+
+### Architecture
+
+Phase 2 adds one new module (`scheduler.ts`) and upgrades the existing `audio-context.ts` transport to drive it:
+
+```
+ChordEvent[] (with startBeat, durationBeats, Shape)
+    ↓
+createScheduler(opts)
+    ↓  (pre-computes wall-clock times from beats + BPM)
+SchedulerState { chords: ScheduledChord[], timerHandle, ... }
+    ↓
+startScheduler(state)
+    ↓  (setInterval @ 25ms, lookahead window 100ms)
+tick() → scheduleChordVoices() → createVoice() (from synth.ts)
+       → fire onChordChange() callbacks
+       → auto-stop when progression ends
+```
+
+**Key design decisions:**
+
+| Decision | Rationale |
+|----------|-----------|
+| Lookahead pattern (25ms/100ms) | Industry-standard Web Audio scheduling pattern. Timer fires every 25ms, looks 100ms ahead, schedules voices at precise `AudioContext.currentTime` offsets. Prevents gaps without CPU-spinning. |
+| Pre-computed wall-clock times | On `createScheduler()`, each chord's `startTime`/`endTime` is computed once via `beatsToSeconds()`. Avoids per-tick floating-point accumulation drift. |
+| Beat offset for resume | `pauseScheduler()` returns the current beat position. On resume, `createScheduler()` shifts the playback origin backward so remaining chords land at the correct future times. |
+| Voicing built into scheduler | `scheduleChordVoices()` calls `voiceLead()`/`voiceInRegister()` directly. No separate module needed — keeps the scheduler self-contained. Voice-leading state (`prevVoicing`) threads through sequential chord scheduling. |
+| Separate master gain per scheduler | Each `createScheduler()` creates its own master gain → destination. Stop/cancel disconnects it cleanly. |
+
+### Files Created
+
+| File | Purpose | Tests |
+|------|---------|-------|
+| `src/scheduler.ts` | `beatsToSeconds`, `secondsToBeats`, `createScheduler`, `startScheduler`, `stopScheduler`, `pauseScheduler`, `getCurrentBeat`, constants | — |
+| `src/__tests__/scheduler.test.ts` | 40 tests across 9 describe blocks | 40 |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/audio-context.ts` | `play()` now creates + starts scheduler, `stop()`/`pause()`/`cancelSchedule()` delegate to scheduler control. Added `pausedBeatOffset` and `prevVoicing` for resume continuity. |
+| `src/__tests__/audio-context.test.ts` | Updated `stubShape` from empty object to proper `{ covered_pcs: new Set([0, 4, 7]) }` — now that `play()` actually triggers the scheduler (which reads `covered_pcs`), the stub must be realistic. |
+| `src/index.ts` | Added scheduler exports (8 functions/constants + 3 types). |
+
+### Implementation Details
+
+**scheduler.ts:**
+- `beatsToSeconds(beats, bpm)`: `(beats / bpm) * 60` — pure function
+- `secondsToBeats(seconds, bpm)`: `(seconds / 60) * bpm` — inverse
+- `createScheduler(opts)`: pre-computes `ScheduledChord[]` with `startTime`/`endTime` wall-clock values. Origin = `ctx.currentTime - beatsToSeconds(beatOffset, bpm)`.
+- `startScheduler(state)`: immediate tick + `setInterval(tick, 25ms)`
+- `tick(state)`: (1) schedule voices in lookahead window, (2) fire chord change events, (3) auto-stop at end
+- `scheduleChordVoices(state, idx)`: extracts pcs → voices with voice-leading → `createVoice()` at `slot.startTime` → `voice.release(slot.endTime)` → gain normalization
+- `stopScheduler(state)`: hard-stop all voices, clear interval, disconnect master gain
+- `pauseScheduler(state)`: release (not hard-stop) voices for smooth tails, return current beat
+- `getCurrentBeat(state)`: live beat position from elapsed time
+
+**audio-context.ts changes:**
+- `play()`: creates `SchedulerState` with current events, BPM, beat offset, voicing; starts scheduler
+- `stop()`: resets beat offset to 0, calls `cleanupScheduler()` (which calls `stopScheduler`)
+- `pause()`: calls `pauseScheduler()`, saves returned beat offset + voicing for resume
+- `cancelSchedule()`: calls `cleanupScheduler()`, clears event array
+- New `emitChordChange()`: delegates chord change events from scheduler to transport's `onChordChange` subscribers
+
+### Test Results
+
+```
+✓ src/__tests__/smoke.test.ts (2 tests)
+✓ src/__tests__/audio-context.test.ts (28 tests)
+✓ src/__tests__/voicing.test.ts (30 tests)
+✓ src/__tests__/synth.test.ts (18 tests)
+✓ src/__tests__/immediate-playback.test.ts (25 tests)
+✓ src/__tests__/scheduler.test.ts (40 tests)
+Tests: 143 passed (143)
+tsc --noEmit: clean (0 errors)
+```
+
+### Test Coverage Breakdown (scheduler.test.ts)
+
+| Describe Block | Tests | Covers |
+|---------------|-------|--------|
+| beatsToSeconds | 6 | Tempo scaling, fractional beats, high tempos, zero |
+| secondsToBeats | 3 | Inverse conversion, round-trip consistency |
+| createScheduler | 5 | Wall-clock computation, master gain, beat offset, tempo comparison |
+| startScheduler | 7 | Lookahead window, chord change firing, sequential scheduling, voice-leading |
+| stopScheduler | 3 | Timer clearing, voice cleanup, tick prevention |
+| pauseScheduler | 3 | Beat position return, timer clearing, voicing preservation |
+| getCurrentBeat | 2 | Origin position, time advancement |
+| transport integration | 7 | End-to-end: play, stop, pause/resume, cancel, chord changes, tempo |
+| scheduler constants | 3 | Positive values, lookahead > interval gap-free constraint |
+
+### Phase 2 Summary
+
+| Sub-phase | Scope | Tests | Status |
+|-----------|-------|-------|--------|
+| 2a | Transport wiring | 28 (existing) | ✅ |
+| 2b | Scheduler engine | 40 (new) | ✅ |
+| 2c | Voicing integration | included in 2b | ✅ |
+| **Total** | **1 new + 2 modified source files** | **40 new (143 total)** | **✅** |
+
+### Next Steps
+
+Phase 3: Cross-Module Integration. Validate AudioTransport contract with Rendering/UI, wire `onChordChange` → `PathHandle.setActiveChord()`, end-to-end playback testing.

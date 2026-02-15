@@ -16,8 +16,9 @@ Audio Engine converts harmonic objects into audible output, performs voicing and
 AE-D1 MIDI internal representation — Closed
 AE-D2 Default synthesis model — Closed
 AE-D3 Voice-leading sophistication (Level 1) — Closed
-AE-D4 Drag-trigger debounce — Tentative
+AE-D4 Drag-trigger debounce — Closed
 AE-D5 Default chord-blending sound profile — Closed
+AE-D9 Interactive playback wiring (triangle → playPitchClasses, not playShape) — Closed
 
 ---
 
@@ -58,15 +59,54 @@ Master gain scaled by `1 / sqrt(voiceCount)` to prevent clipping with 3–4 simu
 
 ## 3. Voicing Model
 
-Input:
+Converts a pitch-class set (from `Shape.covered_pcs`) into concrete MIDI note numbers, applying voice-leading when a previous voicing is available.
 
-* pitch-class set from Shape
+### Exported Functions
 
-Process:
+| Function | Purpose |
+|----------|---------|
+| `nearestMidiNote(target, pc)` | Core primitive: MIDI note with pitch class `pc` closest to `target` |
+| `voiceInRegister(pcs, register?)` | Initial placement (no previous voicing) |
+| `voiceLead(prevVoicing, newPcs, register?)` | Greedy minimal-motion voice-leading (AE-D3) |
 
-1. choose octave placements around target register
-2. apply greedy minimal-motion mapping
-3. output MIDI note list
+### `nearestMidiNote(target, pc)`
+
+Given a MIDI note `target` and a pitch class `pc` (0–11), returns the MIDI note with that pitch class closest to `target`.
+
+```
+diff = ((pc - target % 12) % 12 + 12) % 12
+candidateUp   = target + diff
+candidateDown = target + diff - 12
+result = closer of the two (tritone ties prefer upward)
+clamped to [0, 127]
+```
+
+### `voiceInRegister(pcs, register?)`
+
+Initial placement when no previous voicing exists. Maps each pitch class to `nearestMidiNote(register, pc)`. Default register: 60 (middle C). Produces compact voicings clustered around the register.
+
+### `voiceLead(prevVoicing, newPcs, register?)`
+
+Greedy minimal-motion algorithm (AE-D3):
+
+1. For every `(prevNote, newPc)` combination, compute `nearestMidiNote(prevNote, newPc)` and the absolute distance
+2. Pick the pair with minimum distance, assign it, remove both from their pools
+3. Repeat until one pool is exhausted
+4. If new pitch classes remain (e.g., triad → 7th chord): place near centroid of previous voicing via `nearestMidiNote(centroid, pc)`
+5. If previous notes remain (e.g., 7th chord → triad): excess ignored
+6. Empty `prevVoicing`: falls back to `voiceInRegister`
+
+Output order: `result[i]` always corresponds to `newPcs[i]` — preserves caller's pitch-class ordering.
+
+### Musical Properties
+
+| Progression | Total Motion | Behavior |
+|-------------|-------------|----------|
+| C → F major | 3 semitones | Smooth |
+| C → Am (relative minor) | 2 semitones | Common tones preserved |
+| C → E major (chromatic mediant) | 2 semitones | Efficient |
+| ii–V–I (Dm7 → G7 → Cmaj7) | ≤12 per step | Smooth |
+| C → Db (chromatic) | ≤2 per voice | Semitone motion |
 
 ---
 
@@ -83,6 +123,8 @@ Audio playback responds to UI states:
 | Chord Selected     | immediate chord playback |
 | Progression Loaded | ready state              |
 | Playback Running   | scheduled playback       |
+
+Note: Audio Engine is stateless with respect to UI state. It does not query or depend on the UI state controller. The integration module (see SPEC.md §Integration Module) checks UI state before invoking Audio Engine APIs — e.g., suppressing `playShape()` calls during Playback Running state (UX-D6).
 
 ---
 
@@ -108,6 +150,81 @@ Scheduled mode:
 The shared transport timebase is `AudioContext.currentTime` — the Web Audio API's monotonically increasing high-resolution clock. All scheduled playback events (Audio Engine) and synchronized animation frames (Rendering/UI) reference this single clock. The Audio Engine owns the `AudioContext` instance; Rendering/UI queries it for animation synchronization.
 
 Mode switching must be deterministic.
+
+### 5b. Scheduler Architecture
+
+The scheduler implements the industry-standard Web Audio lookahead pattern for gap-free scheduled playback.
+
+#### Data Flow
+
+```
+ChordEvent[] (startBeat, durationBeats, Shape)
+    ↓
+createScheduler(opts)       — pre-computes wall-clock times from beats + BPM
+    ↓
+SchedulerState { chords: ScheduledChord[], timerHandle, ... }
+    ↓
+startScheduler(state)       — setInterval @ 25ms, lookahead window 100ms
+    ↓
+tick()  → scheduleChordVoices()  → createVoice() (from synth.ts)
+        → fire onChordChange() callbacks
+        → auto-stop when progression ends
+```
+
+#### Lookahead Pattern
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `SCHEDULER_INTERVAL` | 25 ms | Timer fires every 25ms |
+| `SCHEDULER_LOOKAHEAD` | 100 ms | Looks 100ms ahead of current time |
+
+Constraint: `LOOKAHEAD > INTERVAL` ensures gap-free coverage — each tick's lookahead window overlaps the next tick's start.
+
+#### Pre-Computed Wall-Clock Times
+
+On `createScheduler()`, each chord's beat-relative timing is converted to absolute wall-clock times once:
+
+```
+origin = AudioContext.currentTime - beatsToSeconds(beatOffset, bpm)
+slot.startTime = origin + beatsToSeconds(chord.startBeat, bpm)
+slot.endTime   = origin + beatsToSeconds(chord.startBeat + chord.durationBeats, bpm)
+```
+
+Pre-computation avoids per-tick floating-point accumulation drift.
+
+#### Beat↔Time Conversion
+
+```
+beatsToSeconds(beats, bpm)  = (beats / bpm) × 60
+secondsToBeats(seconds, bpm) = (seconds / 60) × bpm
+```
+
+#### Pause/Resume via Beat Offset
+
+`pauseScheduler()` captures the current beat position. On resume, `createScheduler()` receives this beat offset and shifts the playback origin backward so remaining chords land at the correct future wall-clock times. Previous voicing state is also preserved for voice-leading continuity across pause/resume.
+
+#### Per-Chord Scheduling
+
+`scheduleChordVoices()` for each chord in the lookahead window:
+1. Extract pitch classes from `chord.shape.covered_pcs`
+2. Apply voice-leading (`voiceLead` or `voiceInRegister` for first chord)
+3. Create voices via `createVoice()` at `slot.startTime`
+4. Schedule release at `slot.endTime`
+5. Normalize master gain by `1 / √(voiceCount)`
+
+Voice-leading state (`prevVoicing`) threads through sequential chord scheduling.
+
+#### Exported Functions
+
+| Function | Purpose |
+|----------|---------|
+| `beatsToSeconds(beats, bpm)` | Pure conversion |
+| `secondsToBeats(seconds, bpm)` | Inverse conversion |
+| `createScheduler(opts)` | Build SchedulerState with pre-computed times |
+| `startScheduler(state)` | Begin lookahead loop |
+| `stopScheduler(state)` | Hard-stop all voices, clear timer |
+| `pauseScheduler(state)` | Release voices smoothly, return current beat |
+| `getCurrentBeat(state)` | Live beat position from elapsed time |
 
 ---
 
@@ -262,7 +379,7 @@ interface AudioTransport {
 
 ### 6.2 Immediate Playback API
 
-Functions for immediate (non-scheduled) chord playback triggered by user interaction.
+Immediate (non-scheduled) chord playback triggered by user interaction. Uses a stateful pattern: `createImmediatePlayback()` returns an `ImmediatePlaybackState` that manages the master gain node, active voice tracking, and previous voicing for voice-leading continuity. All playback functions require this state as their first argument.
 
 ```ts
 /**
@@ -278,34 +395,73 @@ interface PlayOptions {
 }
 
 /**
+ * Opaque state object for immediate playback.
+ * Manages master gain, active voices, and previous voicing for voice-leading.
+ * Created once per session via createImmediatePlayback().
+ */
+interface ImmediatePlaybackState { /* opaque */ }
+
+/**
  * Initialize the audio system. Must be called after user gesture
  * (browser autoplay policy).
  */
-function initAudio(): Promise<AudioTransport>;
+function initAudio(options?: InitAudioOptions): Promise<AudioTransport>;
+
+/**
+ * Create immediate playback state. Call once after initAudio().
+ * Connects a master gain node to the AudioContext destination.
+ * @param transport - AudioTransport returned by initAudio()
+ */
+function createImmediatePlayback(transport: AudioTransport): ImmediatePlaybackState;
 
 /**
  * Play a Shape immediately (interactive mode).
- * @param shape - Shape from Harmony Core
+ * Releases previous voices, applies voice-leading from prior voicing,
+ * and normalizes gain by 1/sqrt(voiceCount).
+ * @param state - ImmediatePlaybackState from createImmediatePlayback()
+ * @param shape - Shape from Harmony Core (extracts shape.covered_pcs)
  * @param options - Playback options
  */
-function playShape(shape: Shape, options?: PlayOptions): void;
+function playShape(state: ImmediatePlaybackState, shape: Shape, options?: PlayOptions): void;
 
 /**
  * Play a pitch-class set immediately (interactive mode).
+ * Same voice-leading and gain normalization as playShape.
+ * @param state - ImmediatePlaybackState from createImmediatePlayback()
  * @param pcs - Array of pitch classes (0–11)
  * @param options - Playback options
  */
-function playPitchClasses(pcs: readonly number[], options?: PlayOptions): void;
+function playPitchClasses(state: ImmediatePlaybackState, pcs: readonly number[], options?: PlayOptions): void;
 
 /**
  * Stop all currently sounding notes (immediate mode).
+ * Hard-stops all voices, clears voicing state, resets master gain.
+ * @param state - ImmediatePlaybackState from createImmediatePlayback()
  */
-function stopAll(): void;
+function stopAll(state: ImmediatePlaybackState): void;
 ```
 
-### 6.3 Cross-Module Usage Pattern
+### 6.3 Cross-Module Usage Patterns
 
-**Rendering/UI consumes AudioTransport for playback animation:**
+**Immediate playback (integration module wires interaction → audio):**
+
+```ts
+// In integration module — wires Rendering/UI interaction to Audio Engine
+const transport = await initAudio();
+const playback = createImmediatePlayback(transport);
+
+// InteractionController emits selection callbacks
+createInteractionController({
+  // ... other options ...
+  callbacks: {
+    onTriangleSelect: (triId, shape) => playShape(playback, shape),
+    onEdgeSelect: (edgeId, pcs) => playPitchClasses(playback, pcs),
+    onSelectionClear: () => stopAll(playback),
+  }
+});
+```
+
+**Scheduled playback animation (Rendering/UI consumes AudioTransport):**
 
 ```ts
 // In Rendering/UI playback animation module

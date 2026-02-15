@@ -36,10 +36,10 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 
 ## Current Status
 
-**Phase:** 1d — Immediate Playback ✅
-**Focus:** Phase 2 (Scheduled Playback & Transport) next
+**Phase:** Phase 3 — Cross-Module Integration (discuss complete, ready for code)
+**Focus:** 3a (contract tests), 3b (Shape→ChordEvent utility), 3c (integration smoke test)
 **Blocked/Broken:** None
-**Test count:** 103 passing (5 test files, 6 source files)
+**Test count:** 143 passing (6 test files, 7 source files)
 
 ---
 
@@ -50,7 +50,7 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 ### Open Items
 
 - [x] AE-D2: Choose default synthesis model → **Closed** (detuned dual-oscillator pad + LP filter)
-- [ ] AE-D4: Confirm drag-trigger debounce timing (tentative — resolve during Phase 1d testing)
+- [x] AE-D4: Confirm drag-trigger debounce timing → **Closed** (unnecessary — retrigger-on-triangle-change already handles this)
 - [x] Confirm Harmony Core dependency setup → `"harmony-core": "file:../HARMONY_CORE"`
 - [x] Confirm test framework → Vitest 3.x (consistent with HC and RU)
 
@@ -62,118 +62,19 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 
 ### 1a: Project Scaffolding ✅
 
-`package.json`, `tsconfig.json`, `vitest.config.ts`, `src/index.ts`. HC as local path dependency.
-
-**Files created:**
-- `package.json` — `type: "module"`, HC via `file:../HARMONY_CORE`, Vitest 3.x, TypeScript 5.x
-- `tsconfig.json` — ES2022 target, bundler resolution, strict mode (identical to RU/HC)
-- `vitest.config.ts` — `src/**/*.test.ts` glob
-- `src/index.ts` — barrel stub re-exporting HC `Shape` and `Chord` types
-- `src/__tests__/smoke.test.ts` — 2 smoke tests
-
-**Tests:** 2 passing
-- [x] Smoke test: module imports resolve
-- [x] Smoke test: TypeScript compiles (`tsc --noEmit` clean)
+Scaffolding, HC dependency, Vitest. 2 tests. See DEVLOG Entry 3.
 
 ### 1b: AudioContext Initialization ✅
 
-`src/audio-context.ts` — `initAudio(options?)` → `AudioTransport`.
-
-**Mocking strategy (AE-DEV-D1):** Dependency injection via `InitAudioOptions.AudioContextClass`. Tests inject `MockAudioContext`; production uses `globalThis.AudioContext`. Lightweight manual mock in `src/__tests__/web-audio-mock.ts` — no npm dependencies, full control over Web Audio surface. Mock covers `currentTime`, `state`, `resume()`, `createGain()`, `createOscillator()`, `createBiquadFilter()` — extended as needed in later phases.
-
-**Files created:**
-- `src/types.ts` — All ARCH §6 interfaces: `TransportState`, `ChordEvent`, `PlaybackStateChange`, `ChordChangeEvent`, `AudioTransport`, `PlayOptions`, `InitAudioOptions`
-- `src/audio-context.ts` — `initAudio()` factory: creates AudioContext, resumes if suspended, returns AudioTransport with full interface
-- `src/__tests__/web-audio-mock.ts` — `MockAudioContext`, `MockSuspendedAudioContext`, mock audio nodes
-- `src/__tests__/audio-context.test.ts` — 28 tests
-
-**Implementation notes:**
-- Time/state queries delegate directly to AudioContext
-- Transport control methods (play/stop/pause/schedule) implemented with state machine logic and event emission
-- Event subscriptions use `Set<callback>` with unsubscribe-via-delete pattern
-- `setTempo()` rejects zero/negative values
-- `play()` no-op without scheduled events or if already playing
-- `stop()` / `pause()` no-op if not playing
-- `cancelSchedule()` only emits state change if was playing
-
-**Tests:** 28 passing
-- [x] `initAudio()` returns AudioTransport (all 14 methods present)
-- [x] `getTime()` returns a number ≥ 0
-- [x] `getTime()` reflects AudioContext.currentTime
-- [x] `getContext()` returns AudioContext instance
-- [x] `isPlaying()` returns false initially
-- [x] `getTempo()` returns default 120 BPM
-- [x] `getTempo()` returns custom initial tempo
-- [x] `getCurrentChordIndex()` returns -1 initially
-- [x] Resumes suspended AudioContext
-- [x] Does not call resume on already running context
-- [x] `getState()` returns correct initial snapshot
-- [x] `getState()` reflects totalChords after scheduleProgression
-- [x] `setTempo()` updates tempo
-- [x] `setTempo()` ignores zero/negative
-- [x] `play()` no-op without progression
-- [x] `play()` starts with progression
-- [x] `play()` no-op if already playing
-- [x] `stop()` resets to beginning
-- [x] `stop()` no-op if not playing
-- [x] `pause()` preserves chord index
-- [x] `cancelSchedule()` clears and stops
-- [x] `cancelSchedule()` silent if not playing
-- [x] `onStateChange` fires on play
-- [x] `onStateChange` fires on stop
-- [x] Unsubscribe removes listener
-- [x] Multiple subscribers all receive events
-- [x] `onChordChange` returns unsubscribe
-- [x] State change timestamp reflects AudioContext.currentTime
+`initAudio()` → `AudioTransport`, full transport state machine, Web Audio mocking via DI (AE-DEV-D1). 28 tests. See DEVLOG Entry 4.
 
 ### 1c: Voicing Model ✅
 
-`src/voicing.ts` — Convert pitch-class sets to MIDI note arrays.
-
-**Exported functions:**
-- `nearestMidiNote(target, pc)` — MIDI note with given pc closest to target; tritone ties prefer upward; clamped [0, 127]
-- `voiceInRegister(pcs, register?)` — place pcs around target register (default: 60); no voice-leading
-- `voiceLead(prevVoicing, newPcs, register?)` — greedy minimal-motion voice-leading (AE-D3)
-
-**Algorithm (voiceLead):**
-1. Build all (prev note, new pc) pairs with distances via `nearestMidiNote`
-2. Greedy: pick minimum-distance pair, assign, remove both, repeat
-3. If more new pcs than prev notes: remaining placed near centroid of prev voicing
-4. If more prev notes than new pcs: excess prev notes ignored
-5. Empty prevVoicing: falls back to `voiceInRegister`
-
-**Files created:**
-- `src/voicing.ts` — 3 exported functions
-- `src/__tests__/voicing.test.ts` — 30 tests across 6 describe blocks
-
-**Tests:** 30 passing
-- [x] `nearestMidiNote`: identity, upward nearest, downward nearest, tritone tie, low range, MIDI clamping (0/127), negative mod
-- [x] `voiceInRegister`: C major, F major, default register, register shift, empty, single pc, 7th chord, MIDI range, order preservation
-- [x] `voiceLead`: C→F (motion=3), C→Am (common tones), common tones (zero motion), chromatic mediant (motion=2)
-- [x] Edge cases: empty pcs, empty prev, single pc, triad→7th (4th note near centroid), 7th→triad (excess ignored), identical chords
-- [x] Musical: ii–V–I smooth motion (≤12 per step), C→Db chromatic (≤2 per voice)
-- [x] Register parameter as fallback for empty prevVoicing
+`nearestMidiNote`, `voiceInRegister`, `voiceLead` — greedy minimal-motion voice-leading (AE-D3). 30 tests. See DEVLOG Entry 5.
 
 ### 1d: Immediate Playback ✅
 
-`src/synth.ts` — Per-voice AE-D2 signal chain. `src/immediate-playback.ts` — `playShape()`, `playPitchClasses()`, `stopAll()`.
-
-**Architecture split:**
-- `synth.ts` — low-level per-voice signal chain (`createVoice`, `midiToFreq`, `VoiceHandle`, `SYNTH_DEFAULTS`)
-- `immediate-playback.ts` — high-level API managing voice sets, voice-leading integration, master gain normalization
-
-**Files created:**
-- `src/synth.ts` — 4 exports: `SYNTH_DEFAULTS`, `midiToFreq`, `VoiceHandle`, `createVoice`
-- `src/immediate-playback.ts` — 5 exports: `ImmediatePlaybackState`, `createImmediatePlayback`, `playPitchClasses`, `playShape`, `stopAll`
-- `src/__tests__/synth.test.ts` — 18 tests
-- `src/__tests__/immediate-playback.test.ts` — 25 tests
-
-**Tests:** 43 new (103 total)
-- [x] `playShape()` creates audio nodes
-- [x] `playPitchClasses()` creates audio nodes
-- [x] `stopAll()` silences all active notes
-- [x] Duration option schedules release after specified time
-- [x] Velocity option affects gain
+`synth.ts` (per-voice AE-D2 signal chain) + `immediate-playback.ts` (`createImmediatePlayback`, `playShape`, `playPitchClasses`, `stopAll`). 43 tests. See DEVLOG Entry 6.
 
 ---
 
@@ -181,72 +82,136 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 
 **Objective:** Implement progression scheduling, transport controls, and event subscriptions.
 
-### 2a: Transport State Machine
+### 2a: Transport State Machine ✅
 
-`src/transport.ts` — Transport state management (stopped, playing, paused).
+Transport state management implemented in `src/audio-context.ts` (Phase 1b), now wired to the scheduler engine.
 
-- `scheduleProgression(events)` — store chord events
-- `play()` / `stop()` / `pause()` / `cancelSchedule()`
-- `setTempo(bpm)` — update tempo
-- State change event emission
+**Tests:** (validated in audio-context.test.ts, 28 tests)
+- [x] State transitions: stopped → playing → paused → playing → stopped
+- [x] `scheduleProgression()` stores events
+- [x] `play()` no-op without scheduled progression
+- [x] `cancelSchedule()` clears progression and stops
+- [x] `setTempo()` updates tempo value
+- [x] `onStateChange()` fires on transitions
+- [x] Unsubscribe function works
 
-**Tests:**
-- [ ] State transitions: stopped → playing → paused → playing → stopped
-- [ ] `scheduleProgression()` stores events
-- [ ] `play()` no-op without scheduled progression
-- [ ] `cancelSchedule()` clears progression and stops
-- [ ] `setTempo()` updates tempo value
-- [ ] `onStateChange()` fires on transitions
-- [ ] Unsubscribe function works
+### 2b: Scheduled Playback Engine ✅
 
-### 2b: Scheduled Playback Engine
+`src/scheduler.ts` — Lookahead-based scheduler with beat→time conversion.
 
-`src/scheduler.ts` — Schedule chord events relative to transport time.
+**Architecture:**
+- `beatsToSeconds(beats, bpm)` / `secondsToBeats(seconds, bpm)` — pure conversion
+- `createScheduler(opts)` — builds `SchedulerState` with pre-computed wall-clock times for each chord
+- `startScheduler(state)` — begins `setInterval` lookahead loop (25ms interval, 100ms lookahead)
+- `stopScheduler(state)` — hard-stops all voices, clears timer
+- `pauseScheduler(state)` — releases voices smoothly, returns current beat position for resume
+- `getCurrentBeat(state)` — live beat position query
 
-- Convert beat times to AudioContext seconds using tempo
-- Schedule notes with lookahead buffer
-- Fire `onChordChange` events at chord boundaries
-- Handle stop/pause mid-progression
+**Files created:**
+- `src/scheduler.ts` — 8 exports + 3 type exports
+- `src/__tests__/scheduler.test.ts` — 40 tests across 9 describe blocks
 
-**Tests:**
-- [ ] Chord events scheduled at correct times
-- [ ] `onChordChange()` fires at chord transitions
-- [ ] Stop mid-progression cancels remaining events
-- [ ] Pause preserves position
-- [ ] Tempo change recalculates schedule
+**Tests:** 40 new (143 total)
+- [x] Beat→time conversion (6 tests: tempo scaling, fractional, round-trip)
+- [x] Seconds→beats conversion (3 tests)
+- [x] Chord wall-clock time computation from beats and tempo
+- [x] Beat offset for pause/resume
+- [x] Different tempos produce different timing
+- [x] `onChordChange()` fires at chord transitions
+- [x] Each chord change fires only once
+- [x] Stop mid-progression cancels remaining events
+- [x] Pause preserves position
+- [x] `setTempo()` affects scheduling timing
 
-### 2c: Integration with Voicing
+### 2c: Integration with Voicing ✅
 
-Wire scheduled playback through voicing model — each `ChordEvent.shape` is voiced and scheduled.
+Voicing integration built directly into `scheduler.ts`'s `scheduleChordVoices()`. Each `ChordEvent.shape` is voiced via `voiceLead()` / `voiceInRegister()` and played via `createVoice()`.
 
-**Tests:**
-- [ ] Scheduled shapes are voiced correctly
-- [ ] Voice-leading applies across sequential chords
-- [ ] Register consistency across progression
+**Tests:** (validated in scheduler.test.ts)
+- [x] Scheduled shapes are voiced correctly
+- [x] Voice-leading applies across sequential chords
+- [x] Transport end-to-end integration (7 tests: play, stop, pause/resume, cancel, chord changes, tempo)
 
 ---
 
 ## Phase 3: Cross-Module Integration
 
-**Objective:** Validate AudioTransport contract with Rendering/UI, end-to-end playback.
+**Objective:** Validate AudioTransport contract, test cross-module type compatibility, implement `Shape[] → ChordEvent[]` conversion utility.
 
-### 3a: AudioTransport Contract Tests
+### Contract Validation Summary (Discuss — 2026-02-15)
 
-Verify the full `AudioTransport` interface matches ARCH_AUDIO_ENGINE.md §6.
+**AudioTransport interface:** ✅ All 14 methods match RU expectations. Event payloads (`ChordChangeEvent`, `PlaybackStateChange`) structurally correct.
+
+**Immediate playback type flow:** ✅ Compatible.
+- HC `getTrianglePcs()` → `number[]` (sorted tuple) → RU spreads to `number[]` → AE `playPitchClasses(state, pcs: readonly number[])` ✅
+- HC `getEdgeUnionPcs()` → `number[] | null` → RU passes to callback → AE `playPitchClasses` ✅
+- HC `Shape.covered_pcs` (`Set<number>`) → AE `playShape(state, shape)` spreads to array ✅
+
+**Progression flow — one gap identified:**
+- HC `mapProgressionToShapes()` → `Shape[]` but AE `scheduleProgression()` expects `ChordEvent[]` with `startBeat`, `durationBeats`, `shape`
+- Need: utility to convert `Shape[] → ChordEvent[]` (assign beat positions/durations)
+- Owner: integration module (trivial mapping — e.g., 1 beat per chord, sequential)
+
+**Design decision needed:**
+
+```
+AE-D9: Interactive playback wiring — triangle vs Shape
+Date: 2026-02-15
+Status: Closed
+Priority: Normal
+Decision:
+Wire InteractionCallbacks.onTriangleSelect → playPitchClasses(state, pcs).
+Wire InteractionCallbacks.onEdgeSelect → playPitchClasses(state, pcs).
+Do NOT decompose to full Shape for interactive playback — tap plays exactly the
+pitch classes the hit-test returns (3 for triangle, 4 for edge union).
+playShape() is reserved for progression playback where full Shapes (with extensions)
+are available from mapProgressionToShapes().
+Rationale:
+Simplest wiring. Triangle tap = triad (3 pcs). Edge tap = union (4 pcs). No extra
+HC decomposition call on the interactive hot path. Extensions are only musically
+relevant for pre-parsed progressions, not ad-hoc triangle taps.
+```
+
+### 3a: AudioTransport Contract Tests ✅ → scope reduced
+
+Original plan: test all 14 interface methods. These are already covered by `audio-context.test.ts` (28 tests). Phase 3a adds only the **cross-module type compatibility** tests that can't be tested within a single module.
 
 **Tests:**
-- [ ] All interface methods present and callable
-- [ ] Event subscriptions work end-to-end
-- [ ] Multiple subscribers receive events
+- [ ] HC `Shape.covered_pcs` passes through `playShape()` correctly (type + value)
+- [ ] HC `getTrianglePcs()` output is accepted by `playPitchClasses()` (type compatibility)
+- [ ] HC `getEdgeUnionPcs()` output is accepted by `playPitchClasses()` (null guard + value)
+- [ ] `ChordEvent` with HC `Shape` schedules and plays correctly
+- [ ] `onChordChange` event contains correct `shape` reference from original `ChordEvent`
+- [ ] Multiple `onChordChange` subscribers receive events independently
 
-### 3b: Integration with Rendering/UI
+### 3b: Shape[] → ChordEvent[] Conversion
 
-Wire `AudioTransport` to Rendering/UI's `PathHandle.setActiveChord()` and control panel callbacks.
+**Utility function** (in Audio Engine, since `ChordEvent` is an AE type):
+
+```ts
+function shapesToChordEvents(
+  shapes: readonly Shape[],
+  beatsPerChord?: number,  // default: 1
+): ChordEvent[]
+```
+
+Sequential mapping: `startBeat = index * beatsPerChord`, `durationBeats = beatsPerChord`.
 
 **Tests:**
-- [ ] `onChordChange` → `setActiveChord()` round-trip
-- [ ] Play/stop buttons → transport state changes
-- [ ] Tempo control → transport tempo update
+- [ ] Empty array → empty array
+- [ ] Single shape → one ChordEvent at beat 0
+- [ ] Multiple shapes → sequential beats
+- [ ] Custom beatsPerChord respected
+- [ ] Shape reference preserved (same object)
+
+### 3c: Integration Smoke Test
+
+End-to-end test using all three modules together:
+
+**Tests:**
+- [ ] Parse progression string (HC) → map to shapes (HC) → convert to events (AE) → schedule (AE) → chord change events fire with correct shapes
+- [ ] Interactive flow: `getTrianglePcs()` (HC) → `playPitchClasses()` (AE) → voices created
+- [ ] Edge union flow: `getEdgeUnionPcs()` (HC) → `playPitchClasses()` (AE) → 4 voices created
 
 ---
 
@@ -313,13 +278,17 @@ Revisit if: voice-leading produces audibly poor results in common progressions (
 ```
 AE-D4: Drag-trigger debounce
 Date: 2026-02-13
-Status: Tentative
+Status: Closed
 Priority: Normal
 Decision:
-Debounce immediate playback triggers during drag-scrub. Exact timing TBD.
+No explicit debounce needed. Rendering/UI's pointer sampling model (RU-D5) already
+retriggers only on triangle change (UX_SPEC §6), which naturally prevents audio
+stuttering during drag-scrub.
 Rationale:
-Prevent audio stuttering during rapid scrub across multiple triangles.
-Revisit if: interaction testing reveals acceptable latency without debounce.
+The interaction layer's retrigger-on-triangle-change rule acts as an implicit
+debounce — playback only fires when the selected triangle actually changes, not on
+every pointer move event. Explicit timing-based debounce would add unnecessary
+complexity and introduce latency.
 ```
 
 ```

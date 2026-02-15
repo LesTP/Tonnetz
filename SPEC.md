@@ -253,6 +253,51 @@ See ARCH_RENDERING_UI.md Section 11 for full type definitions and function signa
 
 ---
 
+# Integration Module
+
+The integration module is the top-level orchestrator that wires subsystem APIs together. It is built after individual modules are complete and imports from all subsystems without any subsystem depending on it.
+
+## Responsibilities
+
+* Initialize Audio Engine (`initAudio()`, `createImmediatePlayback()`)
+* Initialize Rendering/UI (scaffold, camera, interaction controller, layout, control panel)
+* Wire interaction events to audio playback
+* Wire AudioTransport events to rendering animation
+* Enforce UI state constraints (e.g., suppress interactive playback during scheduled playback per UX-D6)
+
+## Cross-Module Wiring Points
+
+| Direction | From → To | Mechanism | Purpose |
+|-----------|-----------|-----------|---------|
+| Interaction → Audio | Rendering/UI → Audio Engine | `InteractionCallbacks` → `playShape(state, shape)`, `playPitchClasses(state, pcs)`, `stopAll(state)` | Interactive chord playback on tap/click |
+| Transport → Animation | Audio Engine → Rendering/UI | `AudioTransport.onChordChange()` → `PathHandle.setActiveChord(index)` | Progression highlight sync |
+| Transport → UI | Audio Engine → Rendering/UI | `AudioTransport.onStateChange()` → `ControlPanel` state update | Play/stop button state |
+| Transport → Animation | Audio Engine → Rendering/UI | `AudioTransport.getTime()` in rAF loop | Smooth path progress animation |
+| UI → Audio | Rendering/UI → Audio Engine | `ControlPanel` callbacks → `AudioTransport.play()` / `.stop()` / `.pause()` | Transport control buttons |
+| UI → Audio | Rendering/UI → Audio Engine | `ControlPanel` tempo input → `AudioTransport.setTempo(bpm)` | Tempo control |
+
+## Dependency Direction
+
+```
+Integration Module
+  ├── imports from: Harmony Core
+  ├── imports from: Rendering/UI
+  ├── imports from: Audio Engine
+  └── imports from: Persistence/Data
+```
+
+No subsystem imports from the integration module. Audio Engine does not import from Rendering/UI. The integration module is the sole location where cross-subsystem dependencies are resolved.
+
+## UI State Enforcement
+
+Audio Engine is stateless with respect to UI state (see ARCH_AUDIO_ENGINE.md §4). The integration module checks `UIStateController` state before invoking Audio Engine APIs:
+
+* **Idle / Chord Selected:** immediate playback permitted via `playShape()`
+* **Playback Running:** interactive playback suppressed (UX-D6); only `AudioTransport` controls active
+* **Progression Loaded:** ready for scheduled playback; interactive playback permitted
+
+---
+
 # Decisions
 
 ### Decision Log
