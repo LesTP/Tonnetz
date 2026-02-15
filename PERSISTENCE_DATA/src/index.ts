@@ -34,3 +34,9 @@ export {
   listProgressions,
   deleteProgression,
 } from "./progressions.js";
+
+// Sharing
+export { encodeShareUrl, decodeShareUrl } from "./sharing.js";
+
+// Settings
+export { loadSettings, saveSettings } from "./settings.js";

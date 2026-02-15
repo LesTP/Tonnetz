@@ -15,7 +15,7 @@ Client-side persistence subsystem for the Tonnetz Interactive Harmonic Explorer.
 **Key constraints:**
 - localStorage backend for MVP (PD-D1 tentative; IndexedDB deferred)
 - Grid-based progression encoding: duration is implicit via repeated chord tokens (PD-D2)
-- URL sharing via JSON → base64url in hash fragment (`/#p=...`)
+- URL sharing via human-readable hash fragment (`/#p=Dm7-G7-Cmaj7&t=120&g=4&v=1`) (PD-DEV-D5)
 - Schema version field in all stored records for forward migration (PD-D4)
 - Chord symbols stored verbatim — PD does NOT parse or validate chord grammar (HC responsibility)
 - Grid-to-beat conversion is NOT a PD responsibility (integration module bridges PD grid → AE beats)
@@ -319,6 +319,33 @@ Decision: All localStorage keys prefixed with "tonnetz:" to avoid collisions.
 Progression keys: "tonnetz:prog:<uuid>". Settings key: "tonnetz:settings".
 Rationale: Standard namespacing practice for shared-origin storage.
 Revisit if: Multiple Tonnetz instances on same origin need isolation.
+```
+
+```
+PD-DEV-D5: Human-readable URL sharing format
+Date: 2026-02-15
+Status: Closed
+Priority: Important
+Decision:
+Replace base64url-encoded JSON with a human-readable query-parameter-style
+format in the URL hash fragment:
+  #p=Dm7-G7-Cmaj7&t=120&g=4&v=1
+Parameters:
+  c (chords): dash-separated chord symbols, # encoded as "s" (F#7 → Fs7)
+  t (tempo): BPM integer
+  g (grid): denominator integer (4 for "1/4", 8 for "1/8", etc.)
+  v (schema version): integer
+Rationale:
+- Shorter than base64 for typical progressions
+- Readable, debuggable, hand-editable by power users
+- All chord symbols (except #) are already URL-safe
+- "s" for sharp is unambiguous in the chord grammar (no collision with
+  quality/extension tokens which always follow the root+accidental position)
+Trade-offs:
+- Sharp sign needs encode/decode convention (# ↔ s)
+- Future slash chords (C/G) would need "/" handling (not in MVP grammar)
+Revisit if: Payload size becomes an issue (compression) or chord grammar adds
+tokens containing "-" or "&".
 ```
 
 ---

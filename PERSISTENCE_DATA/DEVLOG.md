@@ -236,6 +236,72 @@ Date: 2026-02-15
 
 ---
 
+## Entry 7 — Phase 3: URL Sharing (initial base64url implementation)
+
+Date: 2026-02-15
+Status: Superseded by Entry 8 (PD-DEV-D5)
+
+**Changes:**
+- Created `src/sharing.ts`: `encodeShareUrl()`, `decodeShareUrl()`
+  - Initial encoding: `SharePayload` → `JSON.stringify()` → base64url
+- Created `src/__tests__/sharing.test.ts` (15 tests)
+- Updated `src/index.ts` barrel: exports `encodeShareUrl`, `decodeShareUrl`
+
+**Test totals:** 70 tests across 5 files
+
+**Decisions made:**
+- None (used base64url as the default conservative choice)
+
+---
+
+## Entry 8 — Phase 3 refactor: Human-readable URL format (PD-DEV-D5)
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Rewrote `src/sharing.ts`: replaced base64url JSON encoding with human-readable format
+  - Format: `Dm7-G7-Cmaj7&t=120&g=4&v=1`
+  - Chords: dash-separated, `#` → `s` for URL safety (F#7 → Fs7)
+  - Parameters: `t` (tempo BPM), `g` (grid denominator), `v` (schema version)
+  - Grid mapping: `"1/4"` ↔ `4`, `"1/8"` ↔ `8`, `"1/3"` ↔ `3`, `"1/6"` ↔ `6`
+  - Decode validates all required params, grid value, numeric types
+- Rewrote `src/__tests__/sharing.test.ts` (15 tests for new format)
+  - Added: human-readable format assertion, sharp round-trip, missing param rejection,
+    invalid grid denominator, empty chord segment, non-numeric param rejection
+- Updated DEVPLAN: PD-DEV-D5 decision recorded, cold start summary updated
+
+**Tests passed:**
+- [x] Encode then decode round-trips correctly
+- [x] Produces human-readable format (`Dm7-G7-Cmaj7&t=120&g=4&v=1`)
+- [x] Encoded string is URL-safe (no #, spaces, control chars)
+- [x] Sharp signs round-trip correctly (# ↔ s)
+- [x] Decode malformed string returns null (not throw)
+- [x] Decode missing required parameter returns null
+- [x] schema_version is preserved through round-trip
+- [x] Long progression (50+ chords) round-trips
+- [x] Rejects invalid grid denominator
+- [x] Rejects non-numeric tempo
+- [x] Rejects non-numeric version
+- [x] Rejects empty chord segment
+- [x] Round-trips all supported grid values
+- [x] Payload size for typical progression (8 chords) is under 100 chars
+- [x] Deterministic: same input → identical output
+
+**Test totals:** 77 tests across 6 files
+
+**Issues encountered:**
+- None
+
+**Decisions made:**
+- PD-DEV-D5: Human-readable URL sharing format (closed)
+
+**Doc sync:**
+- DEVPLAN: PD-DEV-D5 decision recorded
+- DEVPLAN: Cold start summary updated (base64url → human-readable)
+
+---
+
 ## Template
 
 Each entry follows this format:
