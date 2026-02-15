@@ -38,3 +38,21 @@ export {
   stopAll,
 } from "./immediate-playback.js";
 export type { ImmediatePlaybackState } from "./immediate-playback.js";
+
+// Scheduled playback / scheduler (Phase 2)
+export {
+  beatsToSeconds,
+  secondsToBeats,
+  createScheduler,
+  startScheduler,
+  stopScheduler,
+  pauseScheduler,
+  getCurrentBeat,
+  SCHEDULE_AHEAD_TIME,
+  SCHEDULER_INTERVAL_MS,
+} from "./scheduler.js";
+export type {
+  ScheduledChord,
+  SchedulerState,
+  CreateSchedulerOptions,
+} from "./scheduler.js";

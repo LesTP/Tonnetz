@@ -12,7 +12,9 @@ const asMock = (Cls: typeof MockAudioContext) =>
   Cls as unknown as { new (): AudioContext };
 
 /** Minimal stub Shape for transport control tests. */
-const stubShape = {} as Shape;
+const stubShape = {
+  covered_pcs: new Set([0, 4, 7]),
+} as unknown as Shape;
 
 function stubChordEvent(startBeat: number): ChordEvent {
   return { shape: stubShape, startBeat, durationBeats: 1 };

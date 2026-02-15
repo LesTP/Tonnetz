@@ -6,8 +6,7 @@
  * the shared transport timebase for both Audio Engine and Rendering/UI.
  *
  * Phase 1b: Time/state queries fully implemented.
- * Phase 2: Transport control methods (play/stop/pause/schedule) will be
- * connected to the scheduler.
+ * Phase 2: Transport control methods connected to the scheduler engine.
  */
 
 import type {
@@ -18,6 +17,13 @@ import type {
   PlaybackStateChange,
   TransportState,
 } from "./types.js";
+import {
+  createScheduler,
+  startScheduler,
+  stopScheduler,
+  pauseScheduler,
+  type SchedulerState,
+} from "./scheduler.js";
 
 const DEFAULT_TEMPO = 120;
 
@@ -44,6 +50,9 @@ export async function initAudio(
   let playing = false;
   let currentChordIndex = -1;
   let scheduledEvents: readonly ChordEvent[] = [];
+  let pausedBeatOffset = 0;
+  let scheduler: SchedulerState | null = null;
+  let prevVoicing: number[] = [];
 
   const stateListeners = new Set<(e: PlaybackStateChange) => void>();
   const chordListeners = new Set<(e: ChordChangeEvent) => void>();
@@ -55,6 +64,21 @@ export async function initAudio(
     };
     for (const cb of stateListeners) {
       cb(event);
+    }
+  }
+
+  function emitChordChange(event: ChordChangeEvent): void {
+    currentChordIndex = event.chordIndex;
+    for (const cb of chordListeners) {
+      cb(event);
+    }
+  }
+
+  function cleanupScheduler(): void {
+    if (scheduler) {
+      stopScheduler(scheduler);
+      prevVoicing = scheduler.prevVoicing;
+      scheduler = null;
     }
   }
 
@@ -108,6 +132,19 @@ export async function initAudio(
       if (playing) return;
       playing = true;
       currentChordIndex = 0;
+
+      // Create and start the scheduler
+      scheduler = createScheduler({
+        ctx,
+        destination: ctx.destination,
+        events: scheduledEvents,
+        bpm: tempo,
+        beatOffset: pausedBeatOffset,
+        prevVoicing,
+        onChordChange: emitChordChange,
+      });
+      startScheduler(scheduler);
+
       emitStateChange();
     },
 
@@ -115,12 +152,19 @@ export async function initAudio(
       if (!playing) return;
       playing = false;
       currentChordIndex = -1;
+      pausedBeatOffset = 0;
+      cleanupScheduler();
       emitStateChange();
     },
 
     pause(): void {
       if (!playing) return;
       playing = false;
+      if (scheduler) {
+        pausedBeatOffset = pauseScheduler(scheduler);
+        prevVoicing = scheduler.prevVoicing;
+        scheduler = null;
+      }
       emitStateChange();
     },
 
@@ -128,6 +172,8 @@ export async function initAudio(
       const wasPlaying = playing;
       playing = false;
       currentChordIndex = -1;
+      pausedBeatOffset = 0;
+      cleanupScheduler();
       scheduledEvents = [];
       if (wasPlaying) {
         emitStateChange();
