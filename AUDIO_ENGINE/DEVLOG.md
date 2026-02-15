@@ -575,3 +575,56 @@ tsc --noEmit: clean (0 errors)
 ### Next Steps
 
 Phase 4: Review & Polish. Code review, latency profiling, ARCH/SPEC doc updates.
+
+---
+
+## Entry 9 — Phase 4: RU Integration Tests (AudioTransport Contract) ✅
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Created integration tests in the Rendering/UI module that validate RU components correctly consume and produce data compatible with the AudioTransport contract. Tests simulate the integration module wiring pattern — RU never imports AE directly in production; only the integration module does.
+
+### Approach
+
+Added `audio-engine` as a **devDependency** in `RENDERING_UI/package.json` (test-only — no production coupling). Created `createMockTransport()` — a full 14-method AudioTransport mock with test helpers (`fireStateChange`, `fireChordChange`) that satisfies the interface contract.
+
+### Files Created
+
+| File | Description |
+|------|-------------|
+| `RENDERING_UI/src/__tests__/audio-transport-integration.test.ts` | 20 tests across 6 describe blocks |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `RENDERING_UI/package.json` | Added `audio-engine` as devDependency |
+
+### Test Coverage (6 groups, 20 tests)
+
+1. **AudioTransport mock conformance** (4 tests) — verifies mock satisfies all 14 interface methods, correct return types, unsubscribe functions work
+2. **InteractionCallbacks → AE type compatibility** (4 tests) — `onTriangleSelect` (3 pcs), `onEdgeSelect` (4 pcs), `onDragScrub`, `onPointerUp` all produce AE-compatible data
+3. **ControlPanel → Transport wiring** (3 tests) — Play/Stop buttons correctly call `transport.play()`/`stop()`, Play disabled during playback
+4. **Transport events → UIStateController** (3 tests) — `playing:true` → `startPlayback()`, `playing:false` → `stopPlayback()`, events ignored in incompatible UI state
+5. **onChordChange → UI sync** (3 tests) — chord change events deliver valid index + shape, state query matches, unsubscribe works
+6. **Full round-trip** (3 tests) — HC parse → shapes → `shapesToChordEvents` → schedule → play → chordChange → UI update → stop; interaction tap flow; progression preserved through play/stop cycle
+
+### Bug Fixed
+
+`mapProgressionToShapes()` call in round-trip test initially passed an options object `{ maxTriDistance: 3 }` as the third arg instead of `WindowIndices`. Fixed by using `buildWindowIndices(bounds)` — same pattern as AE Phase 3c.
+
+### Test Results
+
+```
+RU: 344 tests passing (18 test files) — 20 new integration tests
+AE: 158 tests passing (9 test files) — unchanged
+Total: 502 tests passing
+tsc --noEmit: clean (both modules)
+```
+
+### Next Steps
+
+Phase 5: Review & Polish — code review, latency profiling, ARCH/SPEC doc updates.

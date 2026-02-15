@@ -36,10 +36,10 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 
 ## Current Status
 
-**Phase:** Phase 3 — Cross-Module Integration ✅
-**Focus:** Phase 4 (Review & Polish) next
+**Phase:** Phase 4 — RU Integration Tests ✅
+**Focus:** Review & Polish next
 **Blocked/Broken:** None
-**Test count:** 158 passing (9 test files, 8 source files)
+**Test count:** 158 AE + 344 RU (20 new integration tests in RU)
 
 ---
 
@@ -215,7 +215,69 @@ End-to-end test using all three modules together:
 
 ---
 
-## Phase 4: Review & Polish
+## Phase 4: RU Integration Tests (AudioTransport Contract) ✅
+
+**Objective:** Validate RU components correctly consume/produce data compatible with the AudioTransport contract, simulating the integration module wiring pattern.
+
+### Setup
+
+- Added `audio-engine` as a devDependency in `RENDERING_UI/package.json` (test-only — no production coupling)
+- RU imports AE types (`AudioTransport`, `TransportState`, event payloads, `ChordEvent`) for type-safe mock
+
+### 4a: AudioTransport Mock + Conformance Tests ✅
+
+Created `createMockTransport()` — full 14-method mock with test helpers (`fireStateChange`, `fireChordChange`).
+
+**Tests:**
+- [x] Mock satisfies all 14 AudioTransport interface methods
+- [x] `getState()` returns valid `TransportState` shape
+- [x] `onStateChange` / `onChordChange` return unsubscribe functions
+
+### 4b: InteractionCallbacks → AE Type Compatibility ✅
+
+**Tests:**
+- [x] `onTriangleSelect` pcs array (3 pitch classes) valid for `playPitchClasses`
+- [x] `onEdgeSelect` pcs array (4 pitch classes) valid for 7th chord playback
+- [x] `onDragScrub` pcs array compatible with `playPitchClasses`
+- [x] `onPointerUp` fires with no args — compatible with `stopAll(state)`
+
+### 4c: ControlPanel → Transport Wiring ✅
+
+**Tests:**
+- [x] Play button click → `transport.play()` called
+- [x] Stop button click → `transport.stop()` called
+- [x] Play button disabled during playback prevents double-play
+
+### 4d: Transport Events → UIStateController ✅
+
+**Tests:**
+- [x] `transport playing:true` → `uiState.startPlayback()`
+- [x] `transport playing:false` → `uiState.stopPlayback()`
+- [x] Transport events ignored when UI not in compatible state
+
+### 4e: onChordChange → UI Sync ✅
+
+**Tests:**
+- [x] Chord change events deliver valid index + shape
+- [x] Chord change index matches transport state query
+- [x] Unsubscribe stops chord change delivery
+
+### 4f: Full Round-Trip Integration ✅
+
+**Tests:**
+- [x] HC parse → shapes → `shapesToChordEvents` → `scheduleProgression` → play → chordChange → UI update → stop
+- [x] Interaction tap → pcs compatible with AE immediate playback (triangle 3 pcs, edge 4 pcs, pointerUp)
+- [x] Progression preserved through play/stop cycle via transport
+
+**Files:**
+- `RENDERING_UI/src/__tests__/audio-transport-integration.test.ts` — 20 tests across 6 describe blocks
+- `RENDERING_UI/package.json` — added `audio-engine` devDependency
+
+**Totals:** 344 RU tests (18 files) + 158 AE tests (9 files) = 502 tests passing
+
+---
+
+## Phase 5: Review & Polish
 
 **Objective:** Code review, performance profiling, documentation sync.
 

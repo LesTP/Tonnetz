@@ -261,40 +261,99 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 
 * Initialize Audio Engine (`initAudio()`, `createImmediatePlayback()`)
 * Initialize Rendering/UI (scaffold, camera, interaction controller, layout, control panel)
+* Initialize Persistence/Data (load settings, detect URL-shared progression)
 * Wire interaction events to audio playback
 * Wire AudioTransport events to rendering animation
+* Wire ControlPanel save/load/share actions to Persistence/Data
+* Bridge PD grid notation to AE beat-based scheduling
 * Enforce UI state constraints (e.g., suppress interactive playback during scheduled playback per UX-D6)
 
 ## Cross-Module Wiring Points
 
+### Audio ↔ Rendering
+
 | Direction | From → To | Mechanism | Purpose |
 |-----------|-----------|-----------|---------|
-| Interaction → Audio | Rendering/UI → Audio Engine | `InteractionCallbacks` → `playShape(state, shape)`, `playPitchClasses(state, pcs)`, `stopAll(state)` | Interactive chord playback on tap/click |
-| Transport → Animation | Audio Engine → Rendering/UI | `AudioTransport.onChordChange()` → `PathHandle.setActiveChord(index)` | Progression highlight sync |
-| Transport → UI | Audio Engine → Rendering/UI | `AudioTransport.onStateChange()` → `ControlPanel` state update | Play/stop button state |
-| Transport → Animation | Audio Engine → Rendering/UI | `AudioTransport.getTime()` in rAF loop | Smooth path progress animation |
-| UI → Audio | Rendering/UI → Audio Engine | `ControlPanel` callbacks → `AudioTransport.play()` / `.stop()` / `.pause()` | Transport control buttons |
-| UI → Audio | Rendering/UI → Audio Engine | `ControlPanel` tempo input → `AudioTransport.setTempo(bpm)` | Tempo control |
+| Interaction → Audio | RU → AE | `InteractionCallbacks` → `playPitchClasses(state, pcs)`, `stopAll(state)` | Interactive chord playback on tap/click (AE-D9) |
+| Transport → Animation | AE → RU | `AudioTransport.onChordChange()` → `PathHandle.setActiveChord(index)` | Progression highlight sync |
+| Transport → UI | AE → RU | `AudioTransport.onStateChange()` → `ControlPanel` state update | Play/stop button state |
+| Transport → Animation | AE → RU | `AudioTransport.getTime()` in rAF loop | Smooth path progress animation |
+| UI → Audio | RU → AE | `ControlPanel` callbacks → `AudioTransport.play()` / `.stop()` / `.pause()` | Transport control buttons |
+| UI → Audio | RU → AE | `ControlPanel` tempo input → `AudioTransport.setTempo(bpm)` | Tempo control |
+
+### Persistence ↔ Other Modules
+
+| Direction | From → To | Mechanism | Purpose |
+|-----------|-----------|-----------|---------|
+| Startup → Settings | PD → AE + RU | `loadSettings()` → `setTempo(bpm)`, apply view prefs | Restore user preferences on page load |
+| URL → Progression | PD → HC → RU + AE | `decodeShareUrl(hash)` → `parseChordSymbol()` each → `mapProgressionToShapes()` → `UIState.loadProgression()` | Auto-load shared progression from URL fragment |
+| Load → Progression | PD → HC → RU + AE | `loadProgression(id)` → same parse pipeline | Load saved progression from local storage |
+| Save ← UI | RU → PD | ControlPanel save action → `saveProgression({ title, tempo_bpm, grid, chords })` | Persist current progression locally |
+| Share ← UI | RU → PD | ControlPanel share action → `encodeShareUrl(prog)` → clipboard / URL bar | Generate shareable URL |
+| Settings ← UI | RU → PD | Tempo change, view prefs → `saveSettings(partial)` | Persist user preferences |
+| Grid → Beats | PD → AE (bridged) | Integration converts PD grid notation (e.g., `"1/4"`) + `tempo_bpm` → AE `beatsPerChord` for `shapesToChordEvents()` | Bridge PD's time model to AE's beat model |
+
+### Data Flow: Progression Load Pipeline
+
+```
+PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120, grid: "1/4" }
+  │
+  ├─→ HC: parseChordSymbol() each → Chord[]
+  ├─→ HC: mapProgressionToShapes(chords, focus, indices) → Shape[]
+  │
+  ├─→ RU: UIState.loadProgression(shapes)
+  ├─→ RU: renderProgressionPath(shapes)
+  │
+  ├─→ AE: setTempo(120)
+  └─→ AE: shapesToChordEvents(shapes, beatsPerChord) → scheduleProgression(events)
+```
 
 ## Dependency Direction
 
 ```
 Integration Module
-  ├── imports from: Harmony Core
-  ├── imports from: Rendering/UI
-  ├── imports from: Audio Engine
-  └── imports from: Persistence/Data
+  ├── imports from: Harmony Core       (parsing, placement, types)
+  ├── imports from: Rendering/UI       (scaffold, interaction, UI state)
+  ├── imports from: Audio Engine       (transport, playback, scheduling)
+  └── imports from: Persistence/Data   (save/load, URL encode/decode, settings)
 ```
 
-No subsystem imports from the integration module. Audio Engine does not import from Rendering/UI. The integration module is the sole location where cross-subsystem dependencies are resolved.
+No subsystem imports from the integration module. Subsystems do not import from each other except: AE and RU both import types from HC. The integration module is the sole location where cross-subsystem dependencies are resolved.
+
+## Startup Sequence
+
+The integration module owns the application startup sequence:
+
+1. **Load settings** — `PD.loadSettings()` → retrieve persisted tempo, view preferences
+2. **Init Audio Engine** — `initAudio()` (deferred until first user gesture per browser autoplay policy)
+3. **Init Rendering/UI** — scaffold SVG, camera, interaction controller, layout, control panel
+4. **Apply settings** — `setTempo(settings.tempo_bpm)`, apply saved view state to camera
+5. **Check URL hash** — if `location.hash` contains `#p=...`:
+   - `PD.decodeShareUrl(hash)` → progression record
+   - Parse chords via HC → place shapes → load into UIState + render path
+   - Schedule on transport (ready to play, not auto-playing)
+6. **Wire callbacks** — bind interaction, transport, and persistence event handlers
+7. **Ready** — UI in idle or progression-loaded state
+
+Audio Engine initialization (step 2) may be deferred to first user interaction (tap/click) to comply with browser autoplay policies. The integration module handles this by lazy-initializing on the first `InteractionCallbacks.onPointerDown`.
 
 ## UI State Enforcement
 
 Audio Engine is stateless with respect to UI state (see ARCH_AUDIO_ENGINE.md §4). The integration module checks `UIStateController` state before invoking Audio Engine APIs:
 
-* **Idle / Chord Selected:** immediate playback permitted via `playShape()`
+* **Idle / Chord Selected:** immediate playback permitted via `playPitchClasses()`
 * **Playback Running:** interactive playback suppressed (UX-D6); only `AudioTransport` controls active
 * **Progression Loaded:** ready for scheduled playback; interactive playback permitted
+
+## Grid-to-Beat Bridging
+
+Persistence/Data stores durations as grid notation (e.g., `"1/4"` = quarter-note grid, repeated chord symbols for longer durations). Audio Engine schedules in beats. The integration module bridges these:
+
+* Parse grid string to fractional beat value: `"1/4"` → 1 beat, `"1/8"` → 0.5 beats, `"1/3"` → triplet
+* Count consecutive identical chord symbols to compute per-chord duration in grid units
+* Pass `beatsPerChord` to `shapesToChordEvents(shapes, beatsPerChord)`
+
+This conversion logic lives in the integration module, not in PD or AE, keeping both subsystems grid-agnostic and beat-agnostic respectively.
 
 ---
 

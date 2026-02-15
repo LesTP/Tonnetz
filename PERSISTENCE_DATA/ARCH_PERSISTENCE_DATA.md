@@ -105,6 +105,14 @@ loadSettings()
 saveSettings(partial)
 ```
 
+### Cross-Module Notes
+
+**Grid → Beat conversion is NOT a PD responsibility.** PD stores and returns the raw `grid` string (e.g., `"1/4"`) and `tempo_bpm` as opaque values. The integration module owns the conversion from grid notation to Audio Engine beat durations (`beatsPerChord` for `shapesToChordEvents()`). This keeps PD storage-focused and AE beat-focused, with neither aware of the other's time model. See SPEC.md § Integration Module — Grid-to-Beat Bridging.
+
+**Chord symbol strings are stored verbatim.** PD returns `chords: string[]` exactly as entered by the user. Parsing to Harmony Core `Chord` objects (via `parseChordSymbol()`) happens in the integration module, not in PD. PD does not validate chord grammar — invalid symbols are caught at parse time during progression load.
+
+**Settings round-trip.** `loadSettings()` / `saveSettings(partial)` store user preferences (tempo, view state). The integration module calls `loadSettings()` at startup and applies values to Audio Engine (`setTempo`) and Rendering/UI (camera state). Settings are written back via `saveSettings()` when the user changes tempo or view preferences.
+
 ---
 
 ## 8. Testing Strategy
