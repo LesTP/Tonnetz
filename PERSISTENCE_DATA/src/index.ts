@@ -1,0 +1,28 @@
+/**
+ * Persistence/Data — client-side persistence module.
+ * Public API surface per ARCH_PERSISTENCE_DATA.md Section 7.
+ */
+
+// Types
+export type {
+  GridValue,
+  ProgressionRecord,
+  SettingsRecord,
+  SharePayload,
+} from "./types.js";
+
+// Constants
+export {
+  CURRENT_SCHEMA_VERSION,
+  DEFAULT_GRID,
+  DEFAULT_SETTINGS,
+  generateId,
+} from "./types.js";
+
+// Storage
+export type { StorageBackend } from "./storage.js";
+export {
+  createMemoryStorageBackend,
+  createLocalStorageBackend,
+  StorageError,
+} from "./storage.js";

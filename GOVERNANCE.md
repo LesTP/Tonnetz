@@ -1,6 +1,6 @@
 # Governance
 
-This document defines the high-level rules and expectations for development work in this repository.
+This document defines the development process for projects built through **asynchronous, multi-session collaboration with a stateless partner** (AI or otherwise). Every rule here serves one governing constraint: **minimize wasted work when each session starts cold.**
 
 ---
 
@@ -8,42 +8,44 @@ This document defines the high-level rules and expectations for development work
 
 Documentation must provide enough context of intent, constraints, and decisions for a collaborator/model to start cold each session.
 
-- The docs are the source of truth, do not rely on previous conversations.
-- If something is ambiguous, ASK (don't guess).
-- Prioritize clarity over speed.
+- Docs are the source of truth — do not rely on prior conversations
+- If something is ambiguous, **ask** (don't guess)
+- Prioritize clarity over speed
 
-### Two-File Structure
+### Per-Module Structure
 
-Every project has the following documentation structure:
+Every module maintains two files:
 
-| File | Purpose | When to Update |
-|------|---------|----------------|
-| **DEVPLAN.md** | Cold start context, product vision, roadmap, requirements, design specs, decisions | Before each dev iteration |
-| **DEVLOG.md** | Implementation history, issues encountered, lessons learned | After each dev iteration |
+| File | Purpose | Stability |
+|------|---------|-----------|
+| **DEVPLAN.md** | Cold start context, roadmap, phase breakdown, test specs | Updated before each iteration |
+| **DEVLOG.md** | What actually happened — changes, issues, lessons | Appended after each iteration |
+
+Architecture documents (ARCH_*.md) live separately when the module's contracts need to be consumed by other modules.
 
 ### Cold Start Summary
 
-DEVPLAN opens with two sections before the main plan content:
+DEVPLAN opens with:
 
 **Cold Start Summary** (stable, update on major shifts):
 - **What this is** (e.g., "Personal Android widget for habit tracking")
 - **Key constraints** (e.g., "Android 12+ requires manual alarm permission")
 - **Gotchas** (e.g., "Never call X inside Y - causes deadlock")
 
-**Current Status** (volatile, update after each phase):
-- **Phase** (e.g., "5d - Calendar UI Basic")
-- **Focus** (e.g., "Build scrollable calendar view")
-- **Blocked/Broken** (e.g., "Multi-day testing incomplete")
+**Current Status** (volatile — update after each step):
+- **Phase** — e.g., "3b — Hit-test math"
+- **Focus** — what's being built right now
+- **Blocked/Broken** — anything preventing progress
 
 ### Decision Template
 
 When a decision is needed, present options following this template:
 
 ```
-D-#: [Decision Title]
+D-#: [Title]
 Date: YYYY-MM-DD
-Status: [Open / Closed]
-Priority: [Critical / Important / Nice-to-have]
+Status: Open | Closed
+Priority: Critical | Important | Nice-to-have
 Decision:
 Rationale:
 Trade-offs:
@@ -56,88 +58,119 @@ Revisit if:
 
 ## Work Modes
 
-The session operates in one of three modes:
+Each session operates in one mode at a time:
 
-### 1. Discuss
+### 1. Discuss (no code changes)
 
-- Involves documentation updates but **NO code changes at all**
-- Every iteration starts with a discuss session
-- In making plans, prioritize the simplest solutions possible
-- Always check existing architecture to see if elements can be used/extended
-- Preserve existing architecture unless there's a clear reason to change it; if changing, document using decision template
-- Reuse existing structures/functions/names whenever possible
-- Do not invent variable names, APIs, schemas, or file structures
+- Every iteration **starts** here
+- Determine scope, identify changes, specify tests
+- Prioritize simplest solutions; check if existing code can be reused/extended
+- Preserve existing architecture unless there's a clear reason to change it
 - If context is missing, ask before proceeding
-- Consider and discuss edge cases, document decisions
-- Every discuss session ends with a DEVPLAN update (including cold start sections if context has shifted)
+- **Ends with** a DEVPLAN update
 
-### 2. Code/Debug
+### 2. Code / Debug
 
-These are distinct but the model will switch between them as needed:
-
-- **Code:** Implement the plan made in the discuss session for this iteration
-- **Debug:** Propose specific testable hypothesis, only make code changes after testing
+- **Code:** implement the plan from the discuss session
+- **Debug:** propose a testable hypothesis first, then make changes
+- Switching between code and debug within a session is expected
 
 ### 3. Review
 
-- The goal is to improve existing code, not to write anything new
-- **Priority #1:** Preserve existing functionality
-- **Priority #2:** Optimize and simplify the code
-- For trade-offs between performance and simplicity, clarify explicitly using the decision template
-- The outcome should ideally be less and simpler code than what we started with; more complexity is only okay if it results in notable performance improvement
-- Confirm architecture alignment (we didn't drift)
-- Doc sync: ensure docs are up to date, make a pass to remove redundancies
+- Goal: improve existing code, not write new features
+- **Priority #1:** preserve existing functionality
+- **Priority #2:** simplify and reduce code
+- More complexity is acceptable only for demonstrated performance gains
+- Confirm architecture alignment (no drift from spec)
+- Documentation pass: remove redundancies, fix staleness
 
 ---
 
 ## Workflow
 
-### Greenfield Projects (Initial Setup)
+### New Projects
 
-1. Discuss the overall goal/purpose
-2. Define use cases
-3. Make architecture and tool choices
-4. Define specific MVP features and put everything else into "Future plans"
-5. Break into distinct individual features that can be worked on in separate sequential iterations called **Phases**
-6. Set up documentation and document everything in the README and DEVPLAN
+1. Define the goal, target user, and use cases
+2. Make architecture and technology choices (document as decisions)
+3. Define MVP features; put everything else in "Future"
+4. Decompose into modules with explicit dependency ordering
+5. For each module, identify interface contracts consumed by other modules
+6. Set up documentation (DEVPLAN, DEVLOG per module; ARCH docs for shared contracts)
 
-### Development Phases
+### Module Dependency Ordering
 
-One phase per feature, each phase consisting of one or more steps.
+Before implementation begins, draw the dependency graph. Implement leaf-first (modules with no dependencies on other unfinished modules). A module may begin implementation once its upstream dependencies have **stable interface contracts** — full implementation is not required, only frozen API signatures.
 
-#### Phase Planning (Discuss Mode Only)
+### Phase Structure
 
-*Example: "Phase 5, add item to favorites"*
+One phase per feature or capability, following a general pattern:
 
-1. Determine the scope of this phase and specific outcomes
-2. Break into smallest possible steps, to be implemented and tested individually
-   - e.g., Phase 5a: create a favorites page
-   - e.g., Phase 5b: add "fav_bool" field to the item table
-3. Create a checkbox list of tests which:
-   - Correspond to the items in scope for this phase
-   - Could be manually executed and visually observed
-4. Update DEVPLAN with the above
+| Position | Phase Type | Content |
+|----------|-----------|---------|
+| First | Foundation | Types, primitives, coordinate systems, constants |
+| Middle | Domain-specific | The module's core algorithms and logic |
+| Middle | Input processing | Parsing, validation, external data handling |
+| Middle | Composition | Combining primitives into higher-level workflows |
+| Second-to-last | API assembly | Barrel exports, cross-module integration tests |
+| Last | Review | Optimization, simplification, disambiguation |
 
-#### Step Implementation
+The first and last phases are invariant. Middle phases vary by module. Their granularity should match **risk and uncertainty**, not be uniform — fine-grained for foundational work where errors propagate, coarser for independent lower-risk components.
 
-*Example: "Phase 5b, add fav_bool field"*
+### Phase Planning (Discuss Mode)
 
-1. **Discuss:**
-   - Determine specific changes, tech specs, files to be changed/added
-   - Identify and document choices, discuss with user and document decisions using template
-   - Create a checkbox list of tests for this step
-   - Update DEVPLAN with the above
+1. Determine scope and specific outcomes
+2. Break into smallest useful steps (each independently testable and commitable)
+3. Create test specs at two levels:
+   - **Phase-level:** observable outcomes (what the user can verify)
+   - **Step-level:** implementation verification (what the code must satisfy)
+4. Update DEVPLAN
+
+### Step Execution
+
+1. **Discuss:** specific changes, files affected, decisions needed, step-level tests
 2. **Code/Debug**
 3. **Run tests** defined in step discussion
-4. **Update DEVLOG** only upon confirmation that all tests pass
+4. **Update DEVLOG** only after tests pass
 5. **Commit**
 
-#### Phase Completion
+### Phase Completion
 
-When all steps in a phase are completed:
-
-1. Run tests defined in phase discussion
-2. Review
-3. Update DEVLOG with any changes
-4. Make one more pass to clean up documentation (remove redundancies, fix drift)
+1. Run phase-level tests
+2. Review (simplify, remove dead code)
+3. Update DEVLOG
+4. Documentation pass (remove redundancies, fix drift)
 5. Commit
+
+---
+
+## Cross-Module Integration
+
+Before integrating modules A and B:
+
+1. **Type compatibility** — verify A's output types match B's input types
+2. **Boundary tests** — feed A's actual outputs into B's actual functions
+3. **Bridge logic** — document any adapter/conversion needed between modules
+
+Maintain a cross-module compatibility table (✅ implemented / 🔲 pending) in the spec or architecture doc. This is the integration checklist.
+
+No module should import from the integration/orchestration layer. Subsystems should not import from each other except for shared types from upstream dependencies.
+
+---
+
+## What Not to Systematize
+
+- **Decision granularity** — don't gate which decisions "deserve" the template. Log all of them.
+- **Step size** — break at natural test/commit boundaries, not at fixed time intervals.
+- **Discussion length** — a bug fix may need 2 minutes of discussion; a new interaction model may need an entire session. The rule is qualitative: discuss until scope, approach, and tests are agreed.
+- **Documentation volume** — during active development, thorough logs are load-bearing. Once a module stabilizes, the detail becomes archival. Don't prune it, but don't mandate exact fields for every entry either.
+
+---
+
+## Applicability
+
+This process is designed for:
+- Modular systems developed over multiple sessions
+- Collaboration with stateless partners (AI or rotating contributors)
+- Projects where integration across modules is a distinct concern
+
+It adds justified overhead for these contexts. For a single-file script, a weekend prototype, or continuous same-day work on a familiar codebase, apply the principles (separate thinking from doing, document decisions, test at two levels) without the full formalism.

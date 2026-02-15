@@ -424,6 +424,64 @@ Persistence/Data stores durations as grid notation (e.g., `"1/4"` = quarter-note
 
 This conversion logic lives in the integration module, not in PD or AE, keeping both subsystems grid-agnostic and beat-agnostic respectively.
 
+## Integration Readiness Checklist
+
+All items must be verified before starting integration module development.
+
+### Harmony Core
+
+- [x] Public API complete: all functions in ARCH §11 exported and tested
+- [x] Types consumed by other modules exported: `Shape`, `Chord`, `NodeCoord`, `CentroidCoord`, `TriRef`, `TriId`, `EdgeId`, `WindowBounds`, `WindowIndices`
+- [x] `parseChordSymbol()` handles all MVP chord grammar (HC-D4)
+- [x] `mapProgressionToShapes()` implements chain focus (HC-D11)
+- [x] `getEdgeUnionPcs()` returns `number[] | null` (boundary edge = null)
+- [x] All tests passing (158 tests)
+- [x] No runtime dependencies on UI, audio, or storage
+
+### Rendering/UI
+
+- [x] SVG scaffold, grid rendering, camera controller operational
+- [x] `hitTest()` returns discriminated `HitResult` (HitTriangle | HitEdge | HitNone)
+- [x] `createInteractionController()` emits `onTriangleSelect`, `onEdgeSelect`, `onDragScrub`, `onPointerUp` with pitch classes
+- [x] `renderShape()` / `renderProgressionPath()` render HC Shape objects
+- [x] `PathHandle.setActiveChord(index)` ready for transport subscription
+- [x] `createUIStateController()` implements all state transitions (idle → chord-selected → progression-loaded → playback-running)
+- [x] `createControlPanel()` exposes play/stop/clear callbacks
+- [x] `createLayoutManager()` provides three-zone layout
+- [x] All tests passing (344 tests including 20 AE contract tests)
+- [x] No runtime dependencies on audio or storage
+
+### Audio Engine
+
+- [x] `initAudio()` → `AudioTransport` with all 14 interface methods
+- [x] `createImmediatePlayback()` / `playPitchClasses()` / `playShape()` / `stopAll()` operational
+- [x] `AudioTransport.scheduleProgression()` / `play()` / `stop()` / `pause()` operational
+- [x] `AudioTransport.onChordChange()` / `onStateChange()` fire correctly
+- [x] `shapesToChordEvents()` converts `Shape[]` → `ChordEvent[]`
+- [x] Voice-leading (`voiceLead`) threads across sequential chords
+- [x] All tests passing (157 tests)
+- [x] No runtime dependencies on UI or storage
+
+### Persistence/Data
+
+- [ ] `saveProgression()` / `loadProgression()` / `listProgressions()` / `deleteProgression()` operational
+- [ ] `encodeShareUrl()` / `decodeShareUrl()` produce valid URL-fragment payloads
+- [ ] `loadSettings()` / `saveSettings()` round-trip correctly
+- [ ] Schema version field present in all stored records
+- [ ] All tests passing
+- [ ] No runtime dependencies on UI, audio, or harmony logic
+
+### Cross-Module Compatibility
+
+- [x] HC `Shape.covered_pcs` (Set) → AE `playShape()` accepts Shape directly
+- [x] HC `getTrianglePcs()` → `number[]` → AE `playPitchClasses()` accepts `readonly number[]`
+- [x] HC `getEdgeUnionPcs()` → `number[] | null` → null guard before AE `playPitchClasses()`
+- [x] RU `InteractionCallbacks` pitch-class arrays compatible with AE immediate playback
+- [x] AE `AudioTransport` interface satisfies RU event subscription needs (onChordChange, onStateChange, getTime)
+- [x] AE `ChordEvent.shape` references HC `Shape` — same object identity preserved through pipeline
+- [ ] PD `chords: string[]` → HC `parseChordSymbol()` each → valid `Chord[]` (integration pipeline)
+- [ ] PD `grid` string + `tempo_bpm` → integration bridge → AE `beatsPerChord` (grid-to-beat conversion)
+
 ---
 
 # Decisions
