@@ -302,7 +302,134 @@ Status: Complete
 
 ---
 
-## Template
+## Entry 9 — Phase 4: Settings
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Created `src/settings.ts`: `loadSettings()`, `saveSettings(partial)`
+  - Key: `tonnetz:settings`
+  - Loads defaults if nothing stored or corrupted
+  - Partial updates merge into existing settings
+- Created `src/__tests__/settings.test.ts` (7 tests)
+- Updated `src/index.ts` barrel: exports `loadSettings`, `saveSettings`
+
+**Tests passed:**
+- [x] loadSettings on empty storage returns defaults
+- [x] saveSettings then loadSettings round-trips
+- [x] saveSettings with partial update merges (does not overwrite unrelated fields)
+- [x] Corrupted settings JSON returns defaults (not throw)
+- [x] Multiple partial saves accumulate correctly
+- [x] Default settings are well-defined
+- [x] Settings survive across save/load cycles
+
+**Test totals:** 77 tests across 6 files
+
+**Issues encountered:**
+- None
+
+---
+
+## Entry 10 — Phase 5: Schema Migration
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Created `src/migration.ts`: `migrateProgression()`, `MigrationFn` type, migration registry
+  - Sequential v→v+1 migration chain
+  - Returns null for future versions (cannot downgrade)
+  - Missing schema_version treated as v1
+  - Test utilities: `_registerMigration()`, `_unregisterMigration()` (not exported from barrel)
+- Created `src/__tests__/migration.test.ts` (9 tests)
+- Wired `migrateProgression()` into `loadProgression()` and `listProgressions()`:
+  - Migrated records are re-saved at current schema version
+  - Unmigrateable records (future version) return null / are skipped in list
+- Updated `src/index.ts` barrel: exports `migrateProgression`, `MigrationFn`
+
+**Tests passed:**
+- [x] v1 record passes through unchanged
+- [x] Record with missing schema_version treated as v1
+- [x] Record with future version (999) returns null
+- [x] Migration chain applies sequentially (v0→v1 when migration registered)
+- [x] Returns null when a migration step is missing
+- [x] loadProgression applies migration on load
+- [x] Migrated records are re-saved at current version
+- [x] listProgressions includes migrated records
+- [x] Unmigrateable records (future version) are skipped in list
+
+**Test totals:** 86 tests across 7 files
+
+**Issues encountered:**
+- None
+
+---
+
+## Entry 11 — Phase 6: Public API Assembly & Integration Tests
+
+Date: 2026-02-15
+Status: Complete
+
+**Changes:**
+- Created `src/__tests__/integration-e2e.test.ts` (19 tests)
+  - Phase 6a: API surface — all 12 public functions exported, constants verified, types compile, StorageError class works, internal helpers not leaked
+  - Phase 6b: full lifecycle (save → list → load → encode → decode), settings round-trip, corrupted data resilience (4 scenarios), multi-progression management (save 5 → delete 2 → 3 remain), backend parity, all grid values round-trip, sharp survival, update flow
+- Phase 6c review:
+  - No dead code found
+  - All exports have JSDoc documentation
+  - Zero imports from harmony-core, audio-engine, or rendering-ui (fully standalone)
+  - No external dependencies in package.json
+
+**Tests passed:**
+- [x] All 12 public functions exported and callable
+- [x] All public types exported (compile-time verification)
+- [x] Constants exported: CURRENT_SCHEMA_VERSION, DEFAULT_GRID, DEFAULT_SETTINGS
+- [x] StorageError exported as class
+- [x] Internal helpers (_registerMigration, _unregisterMigration) not accessible via barrel
+- [x] Full lifecycle round-trip: save → list → load → encode → decode → verify
+- [x] Settings: load defaults → save partial → load → verify merge
+- [x] Corrupted progression → load returns null
+- [x] Corrupted progression → list skips it
+- [x] Corrupted settings → returns defaults
+- [x] Corrupted share URL → returns null
+- [x] Multi-progression: save 5 → list (correct order) → delete 2 → list (3 remain)
+- [x] Memory and localStorage backends produce identical interface shapes
+- [x] All 4 grid values round-trip through URL sharing
+- [x] Sharp signs survive URL round-trip (F#m7, C#7, G#m)
+- [x] Progression update flow: save → modify → save → load reflects changes
+
+**Test totals:** 105 tests across 8 files (1 smoke + 12 types + 24 storage + 18 progressions + 15 sharing + 7 settings + 9 migration + 19 integration)
+
+**Issues encountered:**
+- Initial `require()` call for internal-helper-leak test failed in ESM mode. Fixed by switching to `await import()`.
+
+---
+
+## Phase 6 Completion — Module Complete
+
+Date: 2026-02-15
+
+**Phase tests passed:**
+- [x] All public functions exported and callable
+- [x] All public types exported
+- [x] No internal helpers accessible via barrel
+- [x] Full lifecycle e2e round-trip
+- [x] Settings round-trip with defaults and partial merges
+- [x] Corrupted data handling across all subsystems
+- [x] Multi-progression management
+- [x] Zero dependencies on HC, AE, or RU
+
+**Test totals:** 105 tests across 8 files
+
+**Review notes:**
+- Module is fully self-contained: zero external imports, only devDependencies (typescript, vitest)
+- All source files have complete JSDoc on every exported function
+- No dead code found
+- Migration wiring pattern (re-save on load) ensures storage is always upgraded in-place
+
+**Doc sync:**
+- DEVPLAN: Current Status updated to Phase 6 complete (module complete)
 
 Each entry follows this format:
 
