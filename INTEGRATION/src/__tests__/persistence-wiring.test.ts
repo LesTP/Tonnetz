@@ -20,10 +20,9 @@ import {
   generateShareUrl,
   updateSettings,
   DEFAULT_SETTINGS,
-  DEFAULT_GRID,
 } from "../persistence-wiring.js";
 import type { AppPersistenceState } from "../persistence-wiring.js";
-import { encodeShareUrl, decodeShareUrl } from "persistence-data";
+import { encodeShareUrl } from "persistence-data";
 import type { GridValue } from "persistence-data";
 
 // ── Setup ───────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@
  * See DEVPLAN §Phase 3.
  */
 
-import type { WindowIndices, TriRef, EdgeId, TriId } from "harmony-core";
+import type { WindowIndices, EdgeId, TriId } from "harmony-core";
 import { getTrianglePcs, getEdgeUnionPcs } from "harmony-core";
 
 import type { AudioTransport, ImmediatePlaybackState } from "audio-engine";

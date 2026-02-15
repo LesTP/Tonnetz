@@ -19,7 +19,6 @@ import {
   triId,
   edgeId,
 } from "harmony-core";
-import type { Shape, Chord, NodeCoord, WindowIndices } from "harmony-core";
 
 // Rendering/UI
 import {
@@ -30,7 +29,6 @@ import {
   computeProximityRadius,
   createUIStateController,
 } from "rendering-ui";
-import type { WorldPoint, HitResult, UIStateController } from "rendering-ui";
 
 // Audio Engine
 import {
@@ -44,7 +42,6 @@ import {
   midiToFreq,
   beatsToSeconds,
 } from "audio-engine";
-import type { AudioTransport, ChordEvent, TransportState } from "audio-engine";
 
 // Persistence/Data
 import {
@@ -61,12 +58,7 @@ import {
   DEFAULT_GRID,
   CURRENT_SCHEMA_VERSION,
 } from "persistence-data";
-import type {
-  ProgressionRecord,
-  SettingsRecord,
-  SharePayload,
-  GridValue,
-} from "persistence-data";
+import type { GridValue } from "persistence-data";
 
 describe("Subsystem imports (smoke test)", () => {
   describe("Harmony Core", () => {

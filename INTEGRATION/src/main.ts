@@ -11,7 +11,7 @@
  * See DEVPLAN §Phase 6.
  */
 
-import type { CentroidCoord, Shape } from "harmony-core";
+import type { CentroidCoord } from "harmony-core";
 
 import {
   createSvgScaffold,

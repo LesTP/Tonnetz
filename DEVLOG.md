@@ -716,3 +716,146 @@ Test Files  6 passed (6)
 - Phase 7c: Optional polish (keyboard shortcuts, debug logging)
 
 ---
+
+## Entry 14 — Phase 7b: Code Review & Cleanup (Complete)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Systematic code review of all 7 integration module source files. Verified dependency direction constraint, removed unused imports, cleaned up test files. Zero functional changes — all fixes were dead code removal.
+
+### Review Methodology
+
+1. Read all 7 source files (`grid-to-beats.ts`, `progression-pipeline.ts`, `interaction-wiring.ts`, `transport-wiring.ts`, `persistence-wiring.ts`, `main.ts`, `index.ts`)
+2. Ran `tsc --noEmit --noUnusedLocals --noUnusedParameters` to catch all unused imports
+3. Verified dependency direction: `grep` across all 4 subsystem `src/` directories for `integration` imports → zero hits
+4. Reviewed error paths, null guards, and state machine interaction safety
+
+### Fixes Applied
+
+| File | Fix | Category |
+|------|-----|----------|
+| `src/main.ts` | Removed unused `Shape` type import from `harmony-core` | Dead import |
+| `src/interaction-wiring.ts` | Removed unused `TriRef` type import from `harmony-core` | Dead import |
+| `src/__tests__/integration-flow.test.ts` | Removed unused `Shape` type import from `harmony-core` | Dead import |
+| `src/__tests__/persistence-wiring.test.ts` | Removed unused `DEFAULT_GRID` value import | Dead import |
+| `src/__tests__/persistence-wiring.test.ts` | Removed unused `decodeShareUrl` value import | Dead import |
+| `src/__tests__/smoke.test.ts` | Removed 3 unused type-only import blocks (`Shape, Chord, NodeCoord, WindowIndices`, `WorldPoint, HitResult, UIStateController`, `AudioTransport, ChordEvent, TransportState`, `ProgressionRecord, SettingsRecord, SharePayload`) | Dead imports |
+
+### Review Findings (No Action Required)
+
+1. **Double state transitions safe**: `handlePlay()` calls `uiState.startPlayback()` directly AND `wireTransportToUIState` also fires it when transport emits `stateChange(playing:true)`. The UIStateController guards duplicate transitions internally — double-call is a safe no-op.
+
+2. **Clear during playback ordering**: `handleClear()` calls `uiState.clearProgression()` which transitions to `"idle"`. If transport was playing, the subsequent `stateChange(playing:false)` from transport → `stopPlayback()` is a no-op from idle state. Safe.
+
+3. **Dependency direction clean**: No subsystem imports from the integration module. HC types are consumed by RU and AE (per SPEC §Dependency Direction).
+
+4. **Error paths covered**: Invalid chord symbols → `PipelineError`; malformed URL hash → `console.warn` + `{ found: false }`; corrupt localStorage → PD's `loadSettings` returns `DEFAULT_SETTINGS`; null audio state → all callbacks guard.
+
+5. **Build output unchanged**: 49 modules, 33.63 KB / 12.56 KB gzip — no size change from Phase 6 (dead import removal has zero runtime effect).
+
+### Test Results
+
+```
+✓ src/__tests__/grid-to-beats.test.ts (12 tests) 7ms
+✓ src/__tests__/persistence-wiring.test.ts (20 tests) 11ms
+✓ src/__tests__/progression-pipeline.test.ts (23 tests) 8ms
+✓ src/__tests__/transport-wiring.test.ts (17 tests) 21ms
+✓ src/__tests__/integration-flow.test.ts (32 tests) 53ms
+✓ src/__tests__/smoke.test.ts (9 tests) 7ms
+✓ src/__tests__/interaction-wiring.test.ts (18 tests) 165ms
+
+Test Files  7 passed (7)
+     Tests  131 passed (131)
+```
+
+### Next Steps
+
+- Phase 7c: Optional polish (keyboard shortcuts, debug logging)
+- INT-D8: Tempo control UI decision (deferred to visual testing)
+
+### Action Item: Rendering/UI Module Cleanup
+
+The `tsc --noUnusedLocals --noUnusedParameters` pass surfaced 4 warnings in the **RENDERING_UI** subsystem (not addressed here — outside integration module scope):
+
+| File | Line | Issue |
+|------|------|-------|
+| `RENDERING_UI/src/camera.ts` | 136 | `containerWidth` declared but never read |
+| `RENDERING_UI/src/camera.ts` | 137 | `containerHeight` declared but never read |
+| `RENDERING_UI/src/path-renderer.ts` | 152 | `currentActiveIndex` declared but never read |
+| `RENDERING_UI/src/renderer.ts` | 8 | `setAttrs` imported but never read |
+
+These should be resolved in the RU module's own maintenance pass. They do not affect integration module correctness or build output (TypeScript compiles cleanly under standard `--strict` flags; these only surface with the stricter `--noUnusedLocals` / `--noUnusedParameters` checks).
+
+---
+
+## Entry 13 — Phase 7a: Integration Flow Tests (Complete)
+
+**Date:** 2026-02-15
+**Mode:** Code
+
+### Summary
+
+Created comprehensive integration flow test (`integration-flow.test.ts`) exercising the full progression lifecycle: load → play → chord-advance → stop → reload → clear. This is the cross-module "wiring correctness" test that validates the data flow paths main.ts orchestrates.
+
+32 new tests across 5 describe blocks. All 131 integration tests pass (99 prior + 32 new).
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `src/__tests__/integration-flow.test.ts` | 32 end-to-end flow tests across 5 describe groups |
+
+### Test Coverage
+
+| Group | Tests | What it validates |
+|-------|-------|-------------------|
+| **Full progression lifecycle** | 20 | Load (8), Play (2), Chord advance (2), Stop (3), Clear (2), Full cycle (1) |
+| **Persistence integration** | 5 | initPersistence defaults, URL hash decode/pipeline, invalid hash handling |
+| **UI state machine constraints** | 4 | Idle guard, state sequence tracking, idempotent play, subscription cleanup |
+| **Cross-module data integrity** | 4 | covered_pcs Sets, centroid references, triplet grid timing, chain-focus movement |
+
+### Test Strategy
+
+- **Mock AE module** with controllable transport — stores `onChordChange` / `onStateChange` listeners in arrays; test helper functions `fireChordChange(index)` and `fireStateChange(playing)` simulate transport events
+- **Real HC functions** — `buildWindowIndices`, `parseChordSymbol`, `mapProgressionToShapes` — validates actual chord parsing and placement
+- **Real RU UIStateController** — verifies actual state machine transitions
+- **Real PD functions** — `encodeShareUrl`, `decodeShareUrl` via happy-dom localStorage
+- **`loadAndWire()` helper** — replicates the main.ts wiring sequence (parse → pipeline → loadProgression → ensureAudio → scheduleProgression → wireAllTransportSubscriptions) in miniature, returning pipeline result + composite unsubscribe function
+
+### Key Tests
+
+1. **Full lifecycle test** — exercises complete cycle: load ii-V-I → play → advance 3 chords → stop → clear → load second progression (Am-F-C-G) → play → advance 4 chords → force-stop during playback → clear
+2. **State sequence test** — `uiState.onStateChange` captures: `progression-loaded → playback-running → progression-loaded → idle`
+3. **URL hash → pipeline** — real `encodeShareUrl()` → `checkUrlHash()` → `loadProgressionPipeline()` at 1/8 grid → verifies 0.5-beat durations
+4. **Chain-focus movement** — verifies each chord in C-Am-F-G has a distinct centroid (progression traverses the lattice)
+5. **Shape identity preservation** — `scheduledEvents[i].shape === pipelineResult.shapes[i]` (same object, not copy)
+
+### Fixes During Development
+
+1. **`require("persistence-data")` fails** — Vitest aliases only work for ESM imports. Changed to top-level `import { encodeShareUrl } from "persistence-data"`.
+2. **`onStateChange` callback signature** — UIStateController's callback receives `{ state, prevState, ... }` object, not bare string. Fixed to extract `.state` field.
+
+### Test Results
+
+```
+✓ src/__tests__/grid-to-beats.test.ts (12 tests) 5ms
+✓ src/__tests__/persistence-wiring.test.ts (20 tests) 18ms
+✓ src/__tests__/progression-pipeline.test.ts (23 tests) 13ms
+✓ src/__tests__/transport-wiring.test.ts (17 tests) 34ms
+✓ src/__tests__/integration-flow.test.ts (32 tests) 46ms
+✓ src/__tests__/smoke.test.ts (9 tests) 5ms
+✓ src/__tests__/interaction-wiring.test.ts (18 tests) 174ms
+
+Test Files  7 passed (7)
+     Tests  131 passed (131)
+```
+
+### Next Steps
+
+- Phase 7b: Code review and cleanup
+- Phase 7c: Optional polish (keyboard shortcuts, debug logging)
+
+---
