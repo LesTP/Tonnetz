@@ -464,12 +464,12 @@ All items must be verified before starting integration module development.
 
 ### Persistence/Data
 
-- [ ] `saveProgression()` / `loadProgression()` / `listProgressions()` / `deleteProgression()` operational
-- [ ] `encodeShareUrl()` / `decodeShareUrl()` produce valid URL-fragment payloads
-- [ ] `loadSettings()` / `saveSettings()` round-trip correctly
-- [ ] Schema version field present in all stored records
-- [ ] All tests passing
-- [ ] No runtime dependencies on UI, audio, or harmony logic
+- [x] `saveProgression()` / `loadProgression()` / `listProgressions()` / `deleteProgression()` operational
+- [x] `encodeShareUrl()` / `decodeShareUrl()` produce valid URL-fragment payloads
+- [x] `loadSettings()` / `saveSettings()` round-trip correctly
+- [x] Schema version field present in all stored records
+- [x] All tests passing (105 tests)
+- [x] No runtime dependencies on UI, audio, or harmony logic
 
 ### Cross-Module Compatibility
 
@@ -479,8 +479,8 @@ All items must be verified before starting integration module development.
 - [x] RU `InteractionCallbacks` pitch-class arrays compatible with AE immediate playback
 - [x] AE `AudioTransport` interface satisfies RU event subscription needs (onChordChange, onStateChange, getTime)
 - [x] AE `ChordEvent.shape` references HC `Shape` — same object identity preserved through pipeline
-- [ ] PD `chords: string[]` → HC `parseChordSymbol()` each → valid `Chord[]` (integration pipeline)
-- [ ] PD `grid` string + `tempo_bpm` → integration bridge → AE `beatsPerChord` (grid-to-beat conversion)
+- [x] PD `chords: string[]` → HC `parseChordSymbol()` each → valid `Chord[]` (integration pipeline)
+- [x] PD `grid` string + `tempo_bpm` → integration bridge → AE `beatsPerChord` (grid-to-beat conversion)
 
 ---
 

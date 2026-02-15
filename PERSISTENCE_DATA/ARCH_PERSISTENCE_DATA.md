@@ -67,10 +67,12 @@ Payload fields:
 * tempo (optional)
 * chords[]
 
-Encoded as:
+Encoded as a human-readable query-parameter-style format (PD-DEV-D5):
 
-* JSON → base64url string
-* embedded in URL fragment (`/#p=`)
+* Chords: dash-separated, `#` encoded as `s` (e.g., F#7 → Fs7)
+* Parameters: `t` (tempo BPM), `g` (grid denominator), `v` (schema version)
+* Example: `Dm7-G7-Cmaj7&t=120&g=4&v=1`
+* Embedded in URL fragment: `/#p=Dm7-G7-Cmaj7&t=120&g=4&v=1`
 
 **PD-D3: Compression**
 Status: Open (not required for MVP)

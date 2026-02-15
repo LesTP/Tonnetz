@@ -37,6 +37,27 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Parse a raw JSON string, migrate to current schema, and optionally re-save
+ * if the schema version changed. Returns null on parse failure, invalid
+ * structure, or unmigrateable records (future version).
+ */
+function parseAndMigrate(
+  backend: StorageBackend,
+  key: string,
+  raw: string,
+): ProgressionRecord | null {
+  const parsed: Record<string, unknown> = JSON.parse(raw);
+  const record = migrateProgression(parsed);
+  if (record === null) return null;
+
+  if (parsed.schema_version !== record.schema_version) {
+    backend.setItem(key, JSON.stringify(record));
+  }
+
+  return record;
+}
+
 // ---------------------------------------------------------------------------
 // saveProgression
 // ---------------------------------------------------------------------------
@@ -93,16 +114,7 @@ export function loadProgression(
   if (raw === null) return null;
 
   try {
-    const parsed: Record<string, unknown> = JSON.parse(raw);
-    const record = migrateProgression(parsed);
-    if (record === null) return null;
-
-    // Re-save if migration changed the schema version
-    if (parsed.schema_version !== record.schema_version) {
-      backend.setItem(progKey(id), JSON.stringify(record));
-    }
-
-    return record;
+    return parseAndMigrate(backend, progKey(id), raw);
   } catch {
     return null;
   }
@@ -130,15 +142,8 @@ export function listProgressions(
     if (raw === null) continue;
 
     try {
-      const parsed: Record<string, unknown> = JSON.parse(raw);
-      const record = migrateProgression(parsed);
-      if (record === null) continue; // Unmigrateable (future version) — skip
-
-      // Re-save if migration changed the schema version
-      if (parsed.schema_version !== record.schema_version) {
-        backend.setItem(key, JSON.stringify(record));
-      }
-
+      const record = parseAndMigrate(backend, key, raw);
+      if (record === null) continue;
       results.push(record);
     } catch {
       // Corrupted record — skip silently

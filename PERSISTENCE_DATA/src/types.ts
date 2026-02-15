@@ -76,7 +76,8 @@ export const DEFAULT_SETTINGS: Readonly<SettingsRecord> = {
 /**
  * Minimal payload for URL-based progression sharing.
  * Subset of ProgressionRecord — excludes id, title, notes, timestamps.
- * Serialized as JSON → base64url in the URL hash fragment.
+ * Serialized as a human-readable URL fragment (PD-DEV-D5):
+ *   `Dm7-G7-Cmaj7&t=120&g=4&v=1`
  */
 export interface SharePayload {
   readonly schema_version: number;

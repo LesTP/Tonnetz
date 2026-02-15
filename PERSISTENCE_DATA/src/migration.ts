@@ -48,9 +48,11 @@ const MIGRATIONS: Map<number, MigrationFn> = new Map();
  * - If `schema_version` equals `CURRENT_SCHEMA_VERSION`, returned as-is.
  * - If `schema_version` < `CURRENT_SCHEMA_VERSION`, migrations applied sequentially.
  * - If `schema_version` > `CURRENT_SCHEMA_VERSION`, returns `null` (cannot downgrade).
+ * - After migration, validates that required fields are present and correctly typed.
  *
  * @param raw - The parsed JSON object from storage.
- * @returns The migrated `ProgressionRecord`, or `null` if migration is not possible.
+ * @returns The migrated `ProgressionRecord`, or `null` if migration is not possible
+ *          or the record is structurally invalid.
  */
 export function migrateProgression(
   raw: Record<string, unknown>,
@@ -70,7 +72,27 @@ export function migrateProgression(
     current.schema_version = version;
   }
 
+  if (!isValidProgressionShape(current)) return null;
+
   return current as unknown as ProgressionRecord;
+}
+
+/**
+ * Lightweight structural check: verify the essential ProgressionRecord fields
+ * exist and have the correct types. Does NOT validate chord grammar or grid
+ * values — those are other modules' responsibilities.
+ */
+function isValidProgressionShape(obj: Record<string, unknown>): boolean {
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.schema_version === "number" &&
+    typeof obj.title === "string" &&
+    typeof obj.tempo_bpm === "number" &&
+    typeof obj.grid === "string" &&
+    Array.isArray(obj.chords) &&
+    typeof obj.created_at === "string" &&
+    typeof obj.updated_at === "string"
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -60,6 +60,21 @@ describe("migrateProgression", () => {
     expect(result).toBeNull();
   });
 
+  it("structurally invalid record (missing required fields) returns null", () => {
+    const raw = { schema_version: 1, id: "x" };
+    expect(migrateProgression(raw)).toBeNull();
+  });
+
+  it("record with chords as non-array returns null", () => {
+    const raw = { ...v1Raw(), chords: "not-an-array" };
+    expect(migrateProgression(raw)).toBeNull();
+  });
+
+  it("record with tempo_bpm as string returns null", () => {
+    const raw = { ...v1Raw(), tempo_bpm: "fast" };
+    expect(migrateProgression(raw)).toBeNull();
+  });
+
   describe("migration chain", () => {
     // Register temporary v0→v1 migration to test the chain mechanism.
     // v0 records have "name" instead of "title" — the migration renames the field.
