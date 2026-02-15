@@ -40,7 +40,7 @@ export function createImmediatePlayback(
 
   return {
     transport,
-    masterGain: masterGain as GainNode,
+    masterGain,
     voices: new Set(),
     prevVoicing: [],
   };
@@ -89,8 +89,8 @@ export function playPitchClasses(
   // Create new voices
   for (const midi of midiNotes) {
     const voice = createVoice(
-      ctx as AudioContext,
-      state.masterGain as AudioNode,
+      ctx,
+      state.masterGain,
       midi,
       velocity,
     );

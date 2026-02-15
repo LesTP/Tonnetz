@@ -628,3 +628,78 @@ tsc --noEmit: clean (both modules)
 ### Next Steps
 
 Phase 5: Review & Polish — code review, latency profiling, ARCH/SPEC doc updates.
+
+---
+
+## Entry 10 — Phase 5: Review & Polish ✅
+
+**Date:** 2026-02-15
+**Mode:** Code + Discuss
+
+### Summary
+
+Code review of all 8 AE source files, static latency analysis, and comprehensive documentation sync. Removed redundant type casts, consolidated smoke tests, tightened barrel exports, fixed stale doc comments, expanded ARCH §7 testing strategy, and added Audio Engine API overview to SPEC.md. Audio Engine development is now complete.
+
+### Code Cleanup (5a–5c)
+
+| # | Fix | File | Severity |
+|---|-----|------|----------|
+| 1 | Removed stale "Phase 1a/1b" header comment | `index.ts` | Low |
+| 2 | Added internal/public boundary comment for scheduler exports | `index.ts` | Medium |
+| 3 | Removed redundant `as GainNode` cast | `immediate-playback.ts:42` | Low |
+| 4 | Removed redundant `as AudioContext` / `as AudioNode` casts | `immediate-playback.ts:92,95` | Low |
+| 5 | Removed redundant `as GainNode` cast | `scheduler.ts:137` | Low |
+| 6 | Removed redundant `as AudioNode` cast | `scheduler.ts:167` | Low |
+| 7 | Fixed stale doc comment (`resumeScheduler` → `getCurrentBeat`) | `scheduler.ts:14` | Low |
+| 8 | Consolidated 2 trivial smoke tests into 1 comprehensive API check | `smoke.test.ts` | Low |
+
+**No issues found in:** `types.ts`, `voicing.ts`, `synth.ts`, `audio-context.ts`, `conversion.ts`, `web-audio-mock.ts`
+
+### Latency Analysis (5d)
+
+Static analysis of interaction → audio onset critical path:
+
+| Step | Cost |
+|------|------|
+| `voiceLead()` (O(n²), n ≤ 4) | ~5 μs |
+| `createVoice()` × 3–4 (5 Web Audio nodes each) | ~100–200 μs |
+| Master gain update | ~1 μs |
+| **JS overhead total** | **~0.2–0.5 ms** |
+| Platform audio output buffer (128 samples @ 44.1kHz) | ~3–10 ms |
+| **End-to-end estimate** | **~3–10 ms ≪ 50 ms target ✅** |
+
+No async operations on the critical path. Dominant latency is platform audio buffer, not our code.
+
+### Doc Sync (5e–5f)
+
+**ARCH_AUDIO_ENGINE.md:**
+- Version bumped 0.4 → 0.5
+- §6.3: Fixed stale usage example — `onTriangleSelect: (triId, shape) → playShape()` corrected to `(_triId, pcs) → playPitchClasses()` per AE-D9; `onSelectionClear` corrected to `onPointerUp`; added `onDragScrub` wiring
+- §7: Expanded from 3 skeletal bullet points to full test coverage table (9 files, 157 tests) + latency analysis section
+
+**SPEC.md:**
+- Added new **Audio Engine API Overview** section between RU and Integration Module
+- Documents all exported functions (initialization, immediate playback, voicing, synthesis, scheduling, AudioTransport 14 methods) and all 9 key types
+
+### Test Results
+
+```
+AE: 157 tests passing (9 test files) — 1 fewer (consolidated 2 smoke→1)
+RU: 344 tests passing (18 test files) — unchanged
+Total: 501 tests passing
+tsc --noEmit: clean (both modules)
+```
+
+### Audio Engine Status
+
+All 5 development phases complete:
+
+| Phase | Scope | Tests | Status |
+|-------|-------|-------|--------|
+| 1 | Init, voicing, immediate playback | 103 → 102 | ✅ |
+| 2 | Scheduled playback & transport | 40 | ✅ |
+| 3 | Cross-module integration (AE-side) | 15 | ✅ |
+| 4 | RU integration tests | 20 (in RU) | ✅ |
+| 5 | Review & polish | — (cleanup) | ✅ |
+
+Audio Engine module is **complete**. Next: Integration module.

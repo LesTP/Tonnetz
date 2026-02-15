@@ -253,6 +253,75 @@ See ARCH_RENDERING_UI.md Section 11 for full type definitions and function signa
 
 ---
 
+# Audio Engine API Overview
+
+Audio Engine handles chord voicing, Web Audio synthesis, and playback scheduling. Other modules consume it through the public API exported from `AUDIO_ENGINE/src/index.ts`. Full signatures and implementation details are in ARCH_AUDIO_ENGINE.md Sections 3, 5b, and 6.
+
+## Initialization
+
+| Function | Description |
+|----------|-------------|
+| `initAudio(options?)` | Create AudioContext (with autoplay resume) → returns `AudioTransport` |
+| `createImmediatePlayback(transport)` | Create immediate playback state (master gain + voice tracking) |
+
+## Immediate Playback (ARCH §6.2)
+
+| Function | Description |
+|----------|-------------|
+| `playPitchClasses(state, pcs, options?)` | Play pitch classes immediately (voice-led from previous voicing) |
+| `playShape(state, shape, options?)` | Play Shape's `covered_pcs` immediately |
+| `stopAll(state)` | Hard-stop all sounding voices, clear voicing state |
+
+## Voicing (ARCH §3)
+
+| Function | Description |
+|----------|-------------|
+| `nearestMidiNote(target, pc)` | MIDI note with pitch class `pc` closest to `target` |
+| `voiceInRegister(pcs, register?)` | Place pitch classes around register (no voice-leading) |
+| `voiceLead(prevVoicing, newPcs, register?)` | Greedy minimal-motion voice-leading (AE-D3) |
+
+## Synthesis (AE-D2)
+
+| Function | Description |
+|----------|-------------|
+| `createVoice(ctx, dest, midi, velocity?, when?)` | Create single voice (dual-oscillator pad signal chain) |
+| `midiToFreq(midi)` | MIDI note number → frequency Hz (A4 = 440) |
+
+## Scheduling (ARCH §5b)
+
+| Function | Description |
+|----------|-------------|
+| `beatsToSeconds(beats, bpm)` | Convert beats to seconds at tempo |
+| `secondsToBeats(seconds, bpm)` | Convert seconds to beats at tempo |
+| `shapesToChordEvents(shapes, beatsPerChord?)` | Convert `Shape[]` → `ChordEvent[]` (sequential, equal duration) |
+
+## AudioTransport (14 methods — ARCH §6.1)
+
+| Group | Methods |
+|-------|---------|
+| Time queries | `getTime()`, `getContext()` |
+| State queries | `getState()`, `isPlaying()`, `getTempo()`, `getCurrentChordIndex()` |
+| Playback control | `setTempo(bpm)`, `scheduleProgression(events)`, `play()`, `stop()`, `pause()`, `cancelSchedule()` |
+| Event subscriptions | `onStateChange(cb)`, `onChordChange(cb)` |
+
+## Key Types
+
+| Type | Description |
+|------|-------------|
+| `AudioTransport` | 14-method cross-module transport contract |
+| `TransportState` | Snapshot: `{ playing, tempo, currentChordIndex, totalChords }` |
+| `ChordEvent` | Scheduled chord: `{ shape, startBeat, durationBeats }` |
+| `PlaybackStateChange` | Event payload: `{ playing, timestamp }` |
+| `ChordChangeEvent` | Event payload: `{ chordIndex, shape, timestamp }` |
+| `ImmediatePlaybackState` | Opaque state for immediate playback (master gain, voices, voicing) |
+| `PlayOptions` | Options: `{ register?, velocity?, duration? }` |
+| `InitAudioOptions` | Options: `{ AudioContextClass?, initialTempo? }` |
+| `VoiceHandle` | Per-voice handle: `{ midi, release(when?), stop() }` |
+
+See ARCH_AUDIO_ENGINE.md Sections 3, 5b, and 6 for full type definitions, algorithm details, and usage patterns.
+
+---
+
 # Integration Module
 
 The integration module is the top-level orchestrator that wires subsystem APIs together. It is built after individual modules are complete and imports from all subsystems without any subsystem depending on it.

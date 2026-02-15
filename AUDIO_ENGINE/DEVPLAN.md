@@ -36,10 +36,10 @@ Web Audio API–based synthesis and playback subsystem for the Tonnetz Interacti
 
 ## Current Status
 
-**Phase:** Phase 4 — RU Integration Tests ✅
-**Focus:** Review & Polish next
+**Phase:** Phase 5 — Review & Polish ✅
+**Focus:** Audio Engine complete. Integration module next.
 **Blocked/Broken:** None
-**Test count:** 158 AE + 344 RU (20 new integration tests in RU)
+**Test count:** 157 AE + 344 RU = 501 total
 
 ---
 

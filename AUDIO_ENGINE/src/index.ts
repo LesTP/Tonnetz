@@ -1,9 +1,6 @@
 /**
  * Audio Engine — Tonnetz synthesis and playback module.
  * Public API surface per ARCH_AUDIO_ENGINE.md Section 6.
- *
- * Phase 1a: Scaffold — HC type re-exports.
- * Phase 1b: AudioContext initialization + AudioTransport.
  */
 
 // HC types consumed by Audio Engine public API
@@ -39,17 +36,23 @@ export {
 } from "./immediate-playback.js";
 export type { ImmediatePlaybackState } from "./immediate-playback.js";
 
-// Scheduled playback / scheduler (Phase 2)
+// Scheduled playback utilities (ARCH §5b)
 export {
   beatsToSeconds,
   secondsToBeats,
+  SCHEDULE_AHEAD_TIME,
+  SCHEDULER_INTERVAL_MS,
+} from "./scheduler.js";
+
+// Scheduler internals — exported for integration tests and advanced use.
+// Not part of the ARCH §6 public contract; integration module should use
+// AudioTransport.play()/stop()/pause() instead of driving the scheduler directly.
+export {
   createScheduler,
   startScheduler,
   stopScheduler,
   pauseScheduler,
   getCurrentBeat,
-  SCHEDULE_AHEAD_TIME,
-  SCHEDULER_INTERVAL_MS,
 } from "./scheduler.js";
 export type {
   ScheduledChord,

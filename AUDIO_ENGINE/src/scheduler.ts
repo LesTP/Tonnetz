@@ -11,7 +11,7 @@
  *   - startScheduler(): begins the lookahead interval
  *   - stopScheduler(): hard-stops all voices + interval
  *   - pauseScheduler(): soft-stops voices, preserves beat position
- *   - resumeScheduler(): resumes from paused beat position
+ *   - getCurrentBeat(): live beat position query
  */
 
 import type { ChordEvent, ChordChangeEvent } from "./types.js";
@@ -134,7 +134,7 @@ export function createScheduler(opts: CreateSchedulerOptions): SchedulerState {
     currentChordIndex: -1,
     prevVoicing: opts.prevVoicing ?? [],
     timerHandle: null,
-    masterGain: masterGain as GainNode,
+    masterGain,
     onChordChange,
     stopped: false,
   };
@@ -164,7 +164,7 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
   for (const midi of midiNotes) {
     const voice = createVoice(
       state.ctx,
-      state.masterGain as AudioNode,
+      state.masterGain,
       midi,
       100,
       slot.startTime,

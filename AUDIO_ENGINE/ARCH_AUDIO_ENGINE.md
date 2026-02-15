@@ -1,7 +1,7 @@
 # ARCH_AUDIO_ENGINE.md
 
-Version: Draft 0.4
-Date: 2026-02-13
+Version: Draft 0.5
+Date: 2026-02-15
 
 ---
 
@@ -443,20 +443,21 @@ function stopAll(state: ImmediatePlaybackState): void;
 
 ### 6.3 Cross-Module Usage Patterns
 
-**Immediate playback (integration module wires interaction → audio):**
+**Immediate playback (integration module wires interaction → audio per AE-D9):**
 
 ```ts
 // In integration module — wires Rendering/UI interaction to Audio Engine
 const transport = await initAudio();
 const playback = createImmediatePlayback(transport);
 
-// InteractionController emits selection callbacks
+// InteractionController emits selection callbacks with pitch classes
 createInteractionController({
   // ... other options ...
   callbacks: {
-    onTriangleSelect: (triId, shape) => playShape(playback, shape),
-    onEdgeSelect: (edgeId, pcs) => playPitchClasses(playback, pcs),
-    onSelectionClear: () => stopAll(playback),
+    onTriangleSelect: (_triId, pcs) => playPitchClasses(playback, pcs),
+    onEdgeSelect: (_edgeId, _triIds, pcs) => playPitchClasses(playback, pcs),
+    onDragScrub: (_triId, pcs) => playPitchClasses(playback, pcs),
+    onPointerUp: () => stopAll(playback),
   }
 });
 ```
@@ -503,9 +504,36 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 
 ## 7. Testing Strategy
 
-* deterministic voicing tests
-* scheduling accuracy tests
-* latency tests
+### Test Infrastructure
+
+- **Framework:** Vitest 3.x (consistent with HC and RU)
+- **Web Audio mocking:** Dependency injection via `InitAudioOptions.AudioContextClass` (AE-DEV-D1). Lightweight manual mock (`web-audio-mock.ts`) — no npm mock dependencies.
+- **Environment:** Node.js (no DOM — Audio Engine has no UI layer)
+
+### Test Coverage
+
+| Test File | Tests | Covers |
+|-----------|-------|--------|
+| `smoke.test.ts` | 1 | Barrel export resolves with expected public API |
+| `audio-context.test.ts` | 28 | initAudio, transport state machine, play/stop/pause/cancel, event subscriptions, tempo, suspended context |
+| `voicing.test.ts` | 30 | nearestMidiNote, voiceInRegister, voiceLead, edge cases, musical progressions |
+| `synth.test.ts` | 18 | midiToFreq, createVoice signal chain, velocity scaling, release/stop idempotency |
+| `immediate-playback.test.ts` | 25 | createImmediatePlayback, playPitchClasses, playShape, stopAll, voice-count normalization, duration, velocity |
+| `scheduler.test.ts` | 40 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration |
+| `cross-module.test.ts` | 7 | HC Shape → playShape, HC getTrianglePcs → playPitchClasses, HC getEdgeUnionPcs → playPitchClasses, ChordEvent scheduling, onChordChange subscribers |
+| `conversion.test.ts` | 5 | shapesToChordEvents: empty, single, multiple, custom beatsPerChord, reference preservation |
+| `integration-e2e.test.ts` | 3 | ii–V–I pipeline (HC→AE→events), triangle tap → 3 voices, edge union → 4 voices |
+| **Total** | **157** | |
+
+### Latency Analysis (Static)
+
+Interaction → audio onset critical path:
+- `voiceLead()`: O(n²) where n ≤ 4 → ~5 μs
+- `createVoice()` × 3–4 voices: ~100–200 μs (5 Web Audio nodes each)
+- Master gain update: ~1 μs
+- **JS overhead: ~0.2–0.5 ms**
+- Platform audio output buffer: ~3–10 ms (128 samples @ 44.1 kHz)
+- **Total: ~3–10 ms ≪ 50 ms target ✅**
 
 ---
 
