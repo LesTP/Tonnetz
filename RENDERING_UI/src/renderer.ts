@@ -42,18 +42,18 @@ const NODE_RADIUS = 0.15;
 const LABEL_FONT_SIZE = 0.18;
 const EDGE_STROKE_WIDTH = 0.02;
 const TRI_STROKE_WIDTH = 0.01;
-const NODE_STROKE_WIDTH = 0.015;
+const NODE_STROKE_WIDTH = 0.02;
 
 /** Color constants for the grid. */
-const GRID_EDGE_COLOR = "#ccc";
+const GRID_EDGE_COLOR = "#bbb";
 const GRID_TRI_STROKE = "#d0d0d0";
 const NODE_FILL = "#e8e8e8";
 const NODE_STROKE = "#bbb";
 const LABEL_COLOR = "#555";
 
-/** Pale background tints for major (Up) and minor (Down) triangles. */
-const MAJOR_TRI_FILL = "rgba(240, 185, 185, 0.25)";
-const MINOR_TRI_FILL = "rgba(180, 200, 240, 0.25)";
+/** Visible background tints for major (Up) and minor (Down) triangles ("at rest" state). */
+const MAJOR_TRI_FILL = "rgba(230, 180, 180, 0.45)";
+const MINOR_TRI_FILL = "rgba(170, 195, 235, 0.45)";
 
 /**
  * Create the root SVG scaffold with 5 layered `<g>` groups (RU-D12).

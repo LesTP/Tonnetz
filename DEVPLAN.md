@@ -40,7 +40,7 @@ Top-level orchestrator for the Tonnetz Interactive Harmonic Explorer. Wires all 
 ## Current Status
 
 **Phase:** 8 — User Testing (In Progress)
-**Focus:** Design passes 1–3 complete (visual tuning, interaction fixes, colors/labels). Scrub removed; all drag = pan. Next: playback and audio testing.
+**Focus:** Design passes 1–4 complete (visual tuning, interaction fixes, colors/labels, triangle playing-state redesign). Scrub removed; all drag = pan. Grid-highlighter replaces overlay approach. Next: playback and audio testing.
 **Blocked/Broken:** INT-D8 (tempo control UI) deferred to UI testing phase — not blocking implementation
 
 ---

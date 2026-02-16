@@ -1314,3 +1314,104 @@ Total: 936 passed (936) — 0 failures
 Design passes 1-3 complete. User indicated next testing sessions: **playback** and **audio**.
 
 ---
+
+## Entry 21 — Phase 8: User Testing — Design Pass 4 (Triangle Playing State + Grid Highlighter)
+
+Date: 2026-02-16
+
+### Goal
+
+Redesign the visual treatment of triangles when "playing" (interactive press or progression playback) vs "at rest" (idle). User provided reference images showing desired look: at rest = soft pastel fill with grey outlines; playing = deep opaque fill with colored outlines and node circles sitting cleanly on top of the triangle.
+
+### Architecture Change: Overlay → Mutate-Grid
+
+**Problem:** The previous approach created overlay SVG polygons on `layer-chords` / `layer-interaction` on top of the static `layer-grid`. This caused node circles (rendered in `layer-grid`) to be covered by the overlay triangle fill — the nodes looked buried under the playing state instead of sitting cleanly on top.
+
+**Solution:** New **mutate-grid** approach. Instead of creating overlay elements, directly mutate the existing `layer-grid` triangle polygon `fill`, edge line `stroke`/`stroke-width`, and node circle `stroke`/`stroke-width` attributes. A `saveOnce` mechanism stores original values and restores them on deactivation. Since node circles are rendered _after_ triangle polygons within `layer-grid`, they naturally sit on top — no z-order conflict.
+
+**Trade-off:** `layer-grid` is no longer fully static (attributes are mutated during interaction). This is an acceptable pragmatic compromise — the grid structure is static, only visual attributes change transiently.
+
+### Feedback Items
+
+| # | User Report | Resolution |
+|---|-------------|------------|
+| 1 | At rest triangles too faint (0.25 opacity) | Increased idle fill opacity to 0.45 |
+| 2 | Playing triangles not dramatic enough (0.55 opacity) | Replaced with fully opaque hex fills: major `#c84646`, minor `#5082d2` |
+| 3 | Playing state covers node circles — nodes should sit on top of triangle fill | New grid-highlighter mutates grid elements directly instead of overlay approach |
+| 4 | Node circles don't restore to grey after release | Fixed double-save bug: `saveOnce()` tracks already-saved elements by Set to prevent shared vertices from overwriting originals |
+| 5 | Triangle edges should also change when playing (bold, colored) | Grid-highlighter now also mutates edge `<line>` strokes; polygon stroke set to `"none"` to prevent double-line overlap |
+| 6 | Double-line effect at edges when playing (semi-transparent overlay) | All playing-state colors switched to fully opaque hex; polygon stroke set to `"none"` when active |
+| 7 | Edges and node circles should be same shade for visual continuity | Unified at-rest grey (`#bbb` for both), unified playing colors (`#b05050` major, `#5070b0` minor for both) |
+| 8 | Edges and node circles should have same thickness | Unified at-rest width (`0.02` for both), unified playing width (`0.035` for both; root nodes `0.05`) |
+
+### Files Changed
+
+**RENDERING_UI (new file):**
+
+| File | Change |
+|------|--------|
+| `grid-highlighter.ts` | **New file.** `activateGridHighlight()` mutates grid triangle fills, edge strokes, and node circle strokes. `deactivateGridHighlight()` restores originals. `saveOnce()` prevents double-save for shared vertices/edges. |
+
+**RENDERING_UI (modified):**
+
+| File | Change |
+|------|--------|
+| `renderer.ts` | Idle fills: 0.25 → 0.45 opacity. `GRID_EDGE_COLOR` `#ccc` → `#bbb` to match `NODE_STROKE`. `NODE_STROKE_WIDTH` 0.015 → 0.02 to match `EDGE_STROKE_WIDTH`. |
+| `shape-renderer.ts` | Updated color constants to match new scheme: main fills 0.82 opacity, ext fills 0.45 opacity, darker strokes. (Used by overlay rendering for future/fallback cases.) |
+| `highlight.ts` | Updated color constants to match shape-renderer: fills 0.82/0.45, strokes 0.9 opacity. Node outline colors updated. |
+| `index.ts` | Added barrel exports: `activateGridHighlight`, `deactivateGridHighlight`, `GridHighlightHandle`, `GridHighlightOptions`. |
+
+**INTEGRATION (modified):**
+
+| File | Change |
+|------|--------|
+| `main.ts` | Replaced `highlightTriangle` / `clearAllHighlights` / `renderShape` overlay approach with `activateGridHighlight` / `deactivateGridHighlight` for both interactive press/release and progression playback highlighting. Added `triId` import from HC. Removed unused imports (`renderShape`, `highlightTriangle`, `clearAllHighlights`, `ShapeHandle`, `TriId`, `EdgeId`). |
+
+### Design Constants After Pass 4
+
+**At rest (renderer.ts):**
+
+| Constant | Value |
+|----------|-------|
+| Major (Up) grid fill | `rgba(230, 180, 180, 0.45)` |
+| Minor (Down) grid fill | `rgba(170, 195, 235, 0.45)` |
+| Grid edge color | `#bbb` |
+| Node circle stroke | `#bbb` |
+| Edge stroke width | `0.02` |
+| Node stroke width | `0.02` |
+
+**Playing (grid-highlighter.ts):**
+
+| Constant | Value |
+|----------|-------|
+| Major (Up) active fill | `#c84646` (opaque) |
+| Minor (Down) active fill | `#5082d2` (opaque) |
+| Major extension fill | `#d99a9a` (opaque) |
+| Minor extension fill | `#9ab5d9` (opaque) |
+| Edge stroke (major) | `#b05050` |
+| Edge stroke (minor) | `#5070b0` |
+| Non-root node stroke (major) | `#b05050` |
+| Non-root node stroke (minor) | `#5070b0` |
+| Root node stroke (major) | `#7a1515` |
+| Root node stroke (minor) | `#153a7a` |
+| Edge & non-root node width | `0.035` |
+| Root node width | `0.05` |
+| Polygon stroke when active | `none` (prevents double-line) |
+
+### Test Results
+
+```
+tsc -b: 0 errors
+HC:  168 passed (168) — unchanged
+PD:  108 passed (108) — unchanged
+AE:  172 passed (172) — unchanged
+RU:  344 passed (344) — unchanged
+INT: 144 passed (144) — unchanged
+Total: 936 passed (936) — 0 failures
+```
+
+### Phase 8 Status: In Progress
+
+Design passes 1-4 complete. Next: playback and audio testing.
+
+---

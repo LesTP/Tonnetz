@@ -5,17 +5,17 @@ import { svgEl } from "./svg-helpers.js";
 
 // --- Visual constants ---
 
-/** Bright highlight fill colors by orientation (major=Up=red, minor=Down=blue, matches shape-renderer). */
-const HIGHLIGHT_FILL_MAJOR = "rgba(220, 60, 60, 0.55)";
-const HIGHLIGHT_FILL_MINOR = "rgba(60, 120, 230, 0.55)";
+/** Bright highlight fill colors by orientation — rich, nearly-opaque for "playing" state (matches shape-renderer). */
+const HIGHLIGHT_FILL_MAJOR = "rgba(200, 70, 70, 0.82)";
+const HIGHLIGHT_FILL_MINOR = "rgba(80, 130, 210, 0.82)";
 
-/** Extension highlight fill (half intensity, matches shape-renderer). */
-const HIGHLIGHT_EXT_FILL_MAJOR = "rgba(220, 60, 60, 0.28)";
-const HIGHLIGHT_EXT_FILL_MINOR = "rgba(60, 120, 230, 0.28)";
+/** Extension highlight fill (lighter but clearly active, matches shape-renderer). */
+const HIGHLIGHT_EXT_FILL_MAJOR = "rgba(200, 70, 70, 0.45)";
+const HIGHLIGHT_EXT_FILL_MINOR = "rgba(80, 130, 210, 0.45)";
 
-/** Default highlight stroke colors (major=Up=red, minor=Down=blue, matches shape-renderer). */
-const HIGHLIGHT_STROKE_MAJOR = "rgba(200, 40, 40, 0.8)";
-const HIGHLIGHT_STROKE_MINOR = "rgba(40, 90, 200, 0.8)";
+/** Default highlight stroke colors — dark, saturated for "playing" state (matches shape-renderer). */
+const HIGHLIGHT_STROKE_MAJOR = "rgba(160, 30, 30, 0.9)";
+const HIGHLIGHT_STROKE_MINOR = "rgba(30, 70, 170, 0.9)";
 
 /** Default highlight stroke width (world units). */
 const DEFAULT_HIGHLIGHT_STROKE_WIDTH = 0.04;
@@ -26,13 +26,13 @@ const VERTEX_MARKER_RADIUS = 0.15;
 /** Vertex marker stroke width (world units). */
 const VERTEX_MARKER_STROKE_WIDTH = 0.035;
 
-/** Root vertex outline colors (dark, by orientation). */
-const ROOT_OUTLINE_MAJOR = "#8b1a1a";
-const ROOT_OUTLINE_MINOR = "#1a3c8b";
+/** Root vertex outline colors (dark, bold, by orientation). */
+const ROOT_OUTLINE_MAJOR = "#7a1515";
+const ROOT_OUTLINE_MINOR = "#153a7a";
 
-/** Non-root vertex outline colors (light, by orientation). */
-const VERTEX_OUTLINE_MAJOR = "rgba(220, 60, 60, 0.45)";
-const VERTEX_OUTLINE_MINOR = "rgba(60, 120, 230, 0.45)";
+/** Non-root vertex outline colors (medium, by orientation). */
+const VERTEX_OUTLINE_MAJOR = "rgba(200, 70, 70, 0.6)";
+const VERTEX_OUTLINE_MINOR = "rgba(80, 130, 210, 0.6)";
 
 // --- Types ---
 

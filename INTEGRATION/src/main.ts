@@ -11,7 +11,8 @@
  * See DEVPLAN §Phase 6.
  */
 
-import type { CentroidCoord, Shape } from "harmony-core";
+import type { CentroidCoord, Shape, TriRef } from "harmony-core";
+import { triId } from "harmony-core";
 
 import {
   createSvgScaffold,
@@ -24,16 +25,15 @@ import {
   createToolbar,
   createUIStateController,
   renderProgressionPath,
-  renderShape,
-  highlightTriangle,
-  clearAllHighlights,
+  activateGridHighlight,
+  deactivateGridHighlight,
   createProximityCursor,
   computeProximityRadius,
   hitTest,
 } from "rendering-ui";
 import type {
   PathHandle,
-  ShapeHandle,
+  GridHighlightHandle,
   CameraController,
   ResizeController,
   LayoutManager,
@@ -78,8 +78,8 @@ let activeGrid: GridValue = DEFAULT_GRID;
 /** Currently loaded progression shapes (for playback highlighting). */
 let currentShapes: readonly Shape[] = [];
 
-/** Active chord shape handle during playback (bright highlight). */
-let activeShapeHandle: ShapeHandle | null = null;
+/** Active grid highlight handle during playback (deep fill on grid triangles). */
+let activeGridHandle: GridHighlightHandle | null = null;
 
 /**
  * PathHandle proxy for transport wiring.
@@ -92,29 +92,30 @@ const pathHandleProxy: PathHandle = {
   setActiveChord: (index: number) => {
     currentPathHandle?.setActiveChord(index);
 
-    // Clear previous active shape highlight
-    if (activeShapeHandle) {
-      activeShapeHandle.clear();
-      activeShapeHandle = null;
-    }
+    // Deactivate previous grid highlight
+    deactivateGridHighlight(activeGridHandle);
+    activeGridHandle = null;
 
-    // Render the active chord's Shape with bright fill
+    // Activate grid highlight on the active chord's triangles
     if (index >= 0 && index < currentShapes.length) {
       const shape = currentShapes[index];
-      activeShapeHandle = renderShape(
-        scaffold.layers["layer-chords"],
-        scaffold.layers["layer-dots"],
-        shape,
-        resizeCtrl.getIndices(),
+      const indices = resizeCtrl.getIndices();
+      activeGridHandle = activateGridHighlight(
+        scaffold.layers["layer-grid"],
+        indices,
+        {
+          mainTriId: shape.main_tri ? triId(shape.main_tri) : null,
+          extTriIds: shape.ext_tris.map((ext: TriRef) => triId(ext)),
+          orientation: shape.main_tri?.orientation ?? "U",
+          rootVertexIndex: shape.root_vertex_index,
+        },
       );
     }
   },
   clear: () => {
     currentPathHandle?.clear();
-    if (activeShapeHandle) {
-      activeShapeHandle.clear();
-      activeShapeHandle = null;
-    }
+    deactivateGridHighlight(activeGridHandle);
+    activeGridHandle = null;
   },
   getChordCount: () => currentPathHandle?.getChordCount() ?? 0,
 };
@@ -205,8 +206,9 @@ function loadProgressionFromChords(chords: string[]): boolean {
 
   if (result.shapes.length === 0) return false;
 
-  // Clear interaction highlights when loading a progression
-  clearAllHighlights(scaffold.layers["layer-interaction"]);
+  // Deactivate any interactive grid highlight when loading a progression
+  deactivateGridHighlight(activeGridHandle);
+  activeGridHandle = null;
 
   // Store shapes for playback highlighting
   currentShapes = result.shapes;
@@ -262,10 +264,8 @@ function handleClear(): void {
     currentPathHandle.clear();
     currentPathHandle = null;
   }
-  if (activeShapeHandle) {
-    activeShapeHandle.clear();
-    activeShapeHandle = null;
-  }
+  deactivateGridHighlight(activeGridHandle);
+  activeGridHandle = null;
   currentShapes = [];
   controlPanel.setProgressionLoaded(false);
   controlPanel.setPlaybackRunning(false);
@@ -273,8 +273,9 @@ function handleClear(): void {
 
 function handlePlay(): void {
   if (!audioState.transport) return;
-  // Clear interaction highlights when entering playback mode
-  clearAllHighlights(scaffold.layers["layer-interaction"]);
+  // Deactivate any interactive grid highlight when entering playback mode
+  deactivateGridHighlight(activeGridHandle);
+  activeGridHandle = null;
   audioState.transport.play();
   uiState.startPlayback();
 }
@@ -316,6 +317,9 @@ const baseInteractionCallbacks = createInteractionWiring({
 });
 
 // Wrap callbacks to add visual highlighting on pointer-down (immediate feedback)
+// Uses grid-highlighter: mutates grid triangle fills directly instead of overlays
+let interactiveGridHandle: GridHighlightHandle | null = null;
+
 const interactionCallbacks = {
   ...baseInteractionCallbacks,
   onPointerDown: (world: { x: number; y: number }) => {
@@ -323,17 +327,33 @@ const interactionCallbacks = {
     const indices = resizeCtrl.getIndices();
     const hit = hitTest(world.x, world.y, INTERACTION_PROXIMITY, indices);
 
-    clearAllHighlights(scaffold.layers["layer-interaction"]);
+    // Deactivate previous interactive highlight
+    deactivateGridHighlight(interactiveGridHandle);
+    interactiveGridHandle = null;
+
     if (hit.type === "triangle") {
-      highlightTriangle(scaffold.layers["layer-interaction"], hit.triId, indices);
+      const triRef = indices.triIdToRef.get(hit.triId);
+      interactiveGridHandle = activateGridHighlight(
+        scaffold.layers["layer-grid"],
+        indices,
+        {
+          mainTriId: hit.triId,
+          orientation: triRef?.orientation ?? "U",
+          rootVertexIndex: triRef?.orientation === "U" ? 0 : 2,
+        },
+      );
     } else if (hit.type === "edge") {
-      // For edge clicks (diamonds), use the first triangle's orientation as
-      // the color basis so the second triangle's markers match the main palette.
-      const mainOrientation = indices.triIdToRef.get(hit.triIds[0])?.orientation;
-      highlightTriangle(scaffold.layers["layer-interaction"], hit.triIds[0], indices);
-      highlightTriangle(
-        scaffold.layers["layer-interaction"], hit.triIds[1], indices,
-        undefined, mainOrientation,
+      // For edge hits, highlight both triangles as a combined shape
+      const mainRef = indices.triIdToRef.get(hit.triIds[0]);
+      interactiveGridHandle = activateGridHighlight(
+        scaffold.layers["layer-grid"],
+        indices,
+        {
+          mainTriId: hit.triIds[0],
+          extTriIds: [hit.triIds[1]],
+          orientation: mainRef?.orientation ?? "U",
+          rootVertexIndex: mainRef?.orientation === "U" ? 0 : 2,
+        },
       );
     }
 
@@ -341,8 +361,9 @@ const interactionCallbacks = {
     baseInteractionCallbacks.onPointerDown?.(world);
   },
   onPointerUp: () => {
-    // Clear highlights on release
-    clearAllHighlights(scaffold.layers["layer-interaction"]);
+    // Restore grid on release
+    deactivateGridHighlight(interactiveGridHandle);
+    interactiveGridHandle = null;
     baseInteractionCallbacks.onPointerUp?.();
   },
 };

@@ -63,10 +63,39 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 * Non-triangulated tones → dot markers
 * Dot-only chords (e.g., diminished and augmented triads) → cluster of dot markers near focus
 * Selected chord → highlighted cluster (same color scheme as fills)
-* Root tone → distinct outline on root vertex
+* Root tone → distinct outline on root vertex (bold, darker shade)
 * Progression path → centroid-connected overlay
 * Union chord (edge selection) → both adjacent triangles highlighted
 * Node labels → dark grey (`#555`); enharmonic nodes show sharp name on top, flat name on bottom (e.g., D# / Eb)
+
+### At-Rest vs Playing States
+
+The grid uses a **mutate-grid** approach: playing state is achieved by changing existing grid element attributes (fill, stroke, stroke-width) directly, rather than creating overlay elements. This ensures node circles remain visually on top of triangle fills.
+
+**At rest (idle):**
+
+| Element | Fill | Stroke | Stroke Width |
+|---------|------|--------|-------------|
+| Major (Up) triangle | pale red, 0.45 opacity | light grey (`#d0d0d0`) | 0.01 |
+| Minor (Down) triangle | pale blue, 0.45 opacity | light grey (`#d0d0d0`) | 0.01 |
+| Edge lines | — | grey (`#bbb`) | 0.02 |
+| Node circles | light grey (`#e8e8e8`) | grey (`#bbb`) | 0.02 |
+
+**Playing (active):**
+
+| Element | Fill | Stroke | Stroke Width |
+|---------|------|--------|-------------|
+| Major (Up) main triangle | opaque red (`#c84646`) | none | — |
+| Minor (Down) main triangle | opaque blue (`#5082d2`) | none | — |
+| Extension triangles | lighter opaque (major `#d99a9a`, minor `#9ab5d9`) | none | — |
+| Edge lines | — | colored (major `#b05050`, minor `#5070b0`) | 0.035 |
+| Non-root node circles | unchanged fill | colored (major `#b05050`, minor `#5070b0`) | 0.035 |
+| Root node circle | unchanged fill | dark colored (major `#7a1515`, minor `#153a7a`) | 0.05 |
+
+**Visual continuity rules:**
+* At rest: edges and node circles share the same grey shade (`#bbb`) and stroke width (`0.02`)
+* Playing: edges and non-root node circles share the same colored shade and stroke width (`0.035`)
+* Triangle polygon stroke is set to `none` when active to prevent double-line overlap with edge `<line>` elements
 
 ---
 

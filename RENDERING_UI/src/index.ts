@@ -142,6 +142,16 @@ export {
   HIDDEN_CLASS,
 } from "./css-utils.js";
 
+// Grid highlighter (mutate-grid approach for playing state)
+export {
+  activateGridHighlight,
+  deactivateGridHighlight,
+} from "./grid-highlighter.js";
+export type {
+  GridHighlightHandle,
+  GridHighlightOptions,
+} from "./grid-highlighter.js";
+
 // Proximity cursor
 export {
   createProximityCursor,

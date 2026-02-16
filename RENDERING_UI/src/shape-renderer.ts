@@ -5,13 +5,13 @@ import { svgEl } from "./svg-helpers.js";
 
 // --- Visual constants ---
 
-/** Main triangle fill colors by orientation (major=Up=red, minor=Down=blue). */
-const MAIN_TRI_FILL_MAJOR = "rgba(220, 60, 60, 0.55)";
-const MAIN_TRI_FILL_MINOR = "rgba(60, 120, 230, 0.55)";
+/** Main triangle fill colors by orientation — rich, nearly-opaque for "playing" state. */
+const MAIN_TRI_FILL_MAJOR = "rgba(200, 70, 70, 0.82)";
+const MAIN_TRI_FILL_MINOR = "rgba(80, 130, 210, 0.82)";
 
-/** Extension triangle fill colors (half intensity). */
-const EXT_TRI_FILL_MAJOR = "rgba(220, 60, 60, 0.28)";
-const EXT_TRI_FILL_MINOR = "rgba(60, 120, 230, 0.28)";
+/** Extension triangle fill colors (lighter but still clearly active). */
+const EXT_TRI_FILL_MAJOR = "rgba(200, 70, 70, 0.45)";
+const EXT_TRI_FILL_MINOR = "rgba(80, 130, 210, 0.45)";
 
 /** Vertex marker radius — matches grid NODE_RADIUS so the ring wraps the node circle. */
 const VERTEX_MARKER_RADIUS = 0.15;
@@ -19,13 +19,13 @@ const VERTEX_MARKER_RADIUS = 0.15;
 /** Vertex marker stroke width (world units). */
 const VERTEX_MARKER_STROKE_WIDTH = 0.035;
 
-/** Root vertex outline colors (dark, by orientation). */
-const ROOT_OUTLINE_MAJOR = "#8b1a1a";
-const ROOT_OUTLINE_MINOR = "#1a3c8b";
+/** Root vertex outline colors (dark, bold, by orientation). */
+const ROOT_OUTLINE_MAJOR = "#7a1515";
+const ROOT_OUTLINE_MINOR = "#153a7a";
 
-/** Non-root vertex outline colors (light, by orientation). */
-const VERTEX_OUTLINE_MAJOR = "rgba(220, 60, 60, 0.45)";
-const VERTEX_OUTLINE_MINOR = "rgba(60, 120, 230, 0.45)";
+/** Non-root vertex outline colors (medium, by orientation). */
+const VERTEX_OUTLINE_MAJOR = "rgba(200, 70, 70, 0.6)";
+const VERTEX_OUTLINE_MINOR = "rgba(80, 130, 210, 0.6)";
 
 /** Dot cluster dot radius (world units). */
 const DOT_RADIUS = 0.1;
@@ -36,9 +36,9 @@ const DOT_FILL = "#457b9d";
 /** Stroke width for triangle fills. */
 const TRI_STROKE_WIDTH = 0.02;
 
-/** Triangle stroke colors by orientation (major=Up=red, minor=Down=blue). */
-const TRI_STROKE_MAJOR = "rgba(200, 40, 40, 0.8)";
-const TRI_STROKE_MINOR = "rgba(40, 90, 200, 0.8)";
+/** Triangle stroke colors by orientation — dark, saturated for "playing" state. */
+const TRI_STROKE_MAJOR = "rgba(160, 30, 30, 0.9)";
+const TRI_STROKE_MINOR = "rgba(30, 70, 170, 0.9)";
 
 // --- Helpers for orientation-based colors ---
 
