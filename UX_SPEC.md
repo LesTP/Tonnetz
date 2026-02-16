@@ -167,13 +167,13 @@ UX introduces the following interface expectations:
 | Immediate playback mode | `createImmediatePlayback(transport)`, `playShape(state, shape)`, `playPitchClasses(state, pcs)`, `stopAll(state)` | ✅ Implemented |
 | Scheduled playback mode | `AudioTransport` interface (play/stop/pause/setTempo/scheduleProgression) | ✅ Implemented |
 | Chord change events | `AudioTransport.onChordChange()` | ✅ Implemented |
-| 4-note edge-proximity playback | Integration module wiring (`InteractionCallbacks` → `playPitchClasses`) | 🔲 Pending (cross-module) |
+| 4-note edge-proximity playback | Integration module wiring (`InteractionCallbacks` → `playPitchClasses`) | ✅ Implemented |
 
 ### Persistence
 
 | Requirement | API | Status |
 |-------------|-----|--------|
-| Progression serialization | — | 🔲 Pending |
+| Progression serialization | `saveProgression()` / `loadProgression()` / `encodeShareUrl()` / `decodeShareUrl()` | ✅ Implemented |
 
 ---
 

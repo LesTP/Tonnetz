@@ -11,7 +11,7 @@
  * See DEVPLAN §Phase 6.
  */
 
-import type { CentroidCoord } from "harmony-core";
+import type { TriId, EdgeId, CentroidCoord, Shape } from "harmony-core";
 
 import {
   createSvgScaffold,
@@ -24,9 +24,15 @@ import {
   createToolbar,
   createUIStateController,
   renderProgressionPath,
+  renderShape,
+  highlightTriangle,
+  clearAllHighlights,
+  createProximityCursor,
+  computeProximityRadius,
 } from "rendering-ui";
 import type {
   PathHandle,
+  ShapeHandle,
   CameraController,
   ResizeController,
   LayoutManager,
@@ -34,6 +40,7 @@ import type {
   Toolbar,
   UIStateController,
   InteractionController,
+  ProximityCursor,
 } from "rendering-ui";
 
 import { stopAll } from "audio-engine";
@@ -67,6 +74,12 @@ let currentPathHandle: PathHandle | null = null;
 let transportUnsub: (() => void) | null = null;
 let activeGrid: GridValue = DEFAULT_GRID;
 
+/** Currently loaded progression shapes (for playback highlighting). */
+let currentShapes: readonly Shape[] = [];
+
+/** Active chord shape handle during playback (bright highlight). */
+let activeShapeHandle: ShapeHandle | null = null;
+
 /**
  * PathHandle proxy for transport wiring.
  *
@@ -75,8 +88,33 @@ let activeGrid: GridValue = DEFAULT_GRID;
  * progression load.
  */
 const pathHandleProxy: PathHandle = {
-  setActiveChord: (index: number) => currentPathHandle?.setActiveChord(index),
-  clear: () => currentPathHandle?.clear(),
+  setActiveChord: (index: number) => {
+    currentPathHandle?.setActiveChord(index);
+
+    // Clear previous active shape highlight
+    if (activeShapeHandle) {
+      activeShapeHandle.clear();
+      activeShapeHandle = null;
+    }
+
+    // Render the active chord's Shape with bright fill
+    if (index >= 0 && index < currentShapes.length) {
+      const shape = currentShapes[index];
+      activeShapeHandle = renderShape(
+        scaffold.layers["layer-chords"],
+        scaffold.layers["layer-dots"],
+        shape,
+        resizeCtrl.getIndices(),
+      );
+    }
+  },
+  clear: () => {
+    currentPathHandle?.clear();
+    if (activeShapeHandle) {
+      activeShapeHandle.clear();
+      activeShapeHandle = null;
+    }
+  },
   getChordCount: () => currentPathHandle?.getChordCount() ?? 0,
 };
 
@@ -166,6 +204,9 @@ function loadProgressionFromChords(chords: string[]): boolean {
 
   if (result.shapes.length === 0) return false;
 
+  // Store shapes for playback highlighting
+  currentShapes = result.shapes;
+
   // Clear previous path
   if (currentPathHandle) {
     currentPathHandle.clear();
@@ -217,6 +258,11 @@ function handleClear(): void {
     currentPathHandle.clear();
     currentPathHandle = null;
   }
+  if (activeShapeHandle) {
+    activeShapeHandle.clear();
+    activeShapeHandle = null;
+  }
+  currentShapes = [];
   controlPanel.setProgressionLoaded(false);
   controlPanel.setPlaybackRunning(false);
 }
@@ -253,11 +299,27 @@ const toolbar: Toolbar = createToolbar({
 
 // ── Step 11: Interaction Wiring ─────────────────────────────────────
 
-const interactionCallbacks = createInteractionWiring({
+const baseInteractionCallbacks = createInteractionWiring({
   audioState,
   uiState,
   getIndices: () => resizeCtrl.getIndices(),
 });
+
+// Wrap callbacks to add visual highlighting on interactive clicks
+const interactionCallbacks = {
+  ...baseInteractionCallbacks,
+  onTriangleSelect: (triId: TriId, pcs: number[]) => {
+    baseInteractionCallbacks.onTriangleSelect?.(triId, pcs);
+    clearAllHighlights(scaffold.layers["layer-interaction"]);
+    highlightTriangle(scaffold.layers["layer-interaction"], triId, resizeCtrl.getIndices());
+  },
+  onEdgeSelect: (edgeId: EdgeId, triIds: [TriId, TriId], pcs: number[]) => {
+    baseInteractionCallbacks.onEdgeSelect?.(edgeId, triIds, pcs);
+    clearAllHighlights(scaffold.layers["layer-interaction"]);
+    highlightTriangle(scaffold.layers["layer-interaction"], triIds[0], resizeCtrl.getIndices());
+    highlightTriangle(scaffold.layers["layer-interaction"], triIds[1], resizeCtrl.getIndices());
+  },
+};
 
 // ── Step 12: Interaction Controller ─────────────────────────────────
 
@@ -268,7 +330,16 @@ const interactionCtrl: InteractionController = createInteractionController({
   callbacks: interactionCallbacks,
 });
 
-// ── Step 12b: Keyboard Shortcuts ────────────────────────────────────
+// ── Step 12b: Proximity Cursor ──────────────────────────────────────
+
+const proximityCursor: ProximityCursor = createProximityCursor(
+  scaffold.svg,
+  scaffold.layers["layer-interaction"],
+  computeProximityRadius() / 3,
+  () => camera!.getViewBox(),
+);
+
+// ── Step 12c: Keyboard Shortcuts ────────────────────────────────────
 
 const keyboardShortcuts = createKeyboardShortcuts({
   uiState,
@@ -324,8 +395,9 @@ export function destroyApp(): void {
     currentPathHandle = null;
   }
 
-  // Destroy keyboard shortcuts
+  // Destroy keyboard shortcuts and cursor
   keyboardShortcuts.destroy();
+  proximityCursor.destroy();
 
   // Destroy controllers (order: interaction first, camera, resize, UI components, layout last)
   interactionCtrl.destroy();

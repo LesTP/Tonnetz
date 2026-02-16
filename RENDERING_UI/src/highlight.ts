@@ -4,11 +4,17 @@ import { svgEl } from "./svg-helpers.js";
 
 // --- Visual constants ---
 
-/** Default highlight fill color. */
-const DEFAULT_HIGHLIGHT_FILL = "rgba(255, 215, 0, 0.5)";
+/** Bright highlight fill colors by orientation. */
+const HIGHLIGHT_FILL_MAJOR = "rgba(60, 120, 230, 0.65)";
+const HIGHLIGHT_FILL_MINOR = "rgba(220, 60, 60, 0.65)";
 
-/** Default highlight stroke color. */
-const DEFAULT_HIGHLIGHT_STROKE = "rgba(255, 215, 0, 0.9)";
+/** Extension highlight fill (half intensity). */
+const HIGHLIGHT_EXT_FILL_MAJOR = "rgba(60, 120, 230, 0.35)";
+const HIGHLIGHT_EXT_FILL_MINOR = "rgba(220, 60, 60, 0.35)";
+
+/** Default highlight stroke colors. */
+const HIGHLIGHT_STROKE_MAJOR = "rgba(40, 90, 200, 0.9)";
+const HIGHLIGHT_STROKE_MINOR = "rgba(200, 40, 40, 0.9)";
 
 /** Default highlight stroke width (world units). */
 const DEFAULT_HIGHLIGHT_STROKE_WIDTH = 0.04;
@@ -39,9 +45,16 @@ export interface HighlightStyle {
 function createHighlightPolygon(
   tri: TriRef,
   style: HighlightStyle,
+  isExtension: boolean = false,
 ): SVGPolygonElement {
-  const fill = style.fill ?? DEFAULT_HIGHLIGHT_FILL;
-  const stroke = style.stroke ?? DEFAULT_HIGHLIGHT_STROKE;
+  const isMajor = tri.orientation === "U";
+  const defaultFill = isExtension
+    ? (isMajor ? HIGHLIGHT_EXT_FILL_MAJOR : HIGHLIGHT_EXT_FILL_MINOR)
+    : (isMajor ? HIGHLIGHT_FILL_MAJOR : HIGHLIGHT_FILL_MINOR);
+  const defaultStroke = isMajor ? HIGHLIGHT_STROKE_MAJOR : HIGHLIGHT_STROKE_MINOR;
+
+  const fill = style.fill ?? defaultFill;
+  const stroke = style.stroke ?? defaultStroke;
   const strokeWidth = style.strokeWidth ?? DEFAULT_HIGHLIGHT_STROKE_WIDTH;
 
   const poly = svgEl("polygon", {
@@ -120,7 +133,7 @@ export function highlightShape(
 
   // Highlight extension triangles
   for (const extTri of shape.ext_tris) {
-    const poly = createHighlightPolygon(extTri, style ?? {});
+    const poly = createHighlightPolygon(extTri, style ?? {}, true);
     poly.setAttribute("data-highlight-element", "ext-tri");
     layer.appendChild(poly);
     elements.push(poly);

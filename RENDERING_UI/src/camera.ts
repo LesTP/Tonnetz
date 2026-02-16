@@ -17,7 +17,8 @@ export interface ViewBox {
 }
 
 const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
+const MAX_ZOOM = 8;
+const DEFAULT_ZOOM = 4;
 
 /**
  * Compute responsive window bounds based on container size and minimum
@@ -141,7 +142,7 @@ export function computeInitialCamera(
   return {
     centerX: (ext.minX + ext.maxX) / 2,
     centerY: (ext.minY + ext.maxY) / 2,
-    zoom: 1,
+    zoom: DEFAULT_ZOOM,
   };
 }
 

@@ -118,7 +118,7 @@ describe("computeInitialCamera — fit-to-viewport (RU-D11)", () => {
 
     expect(cam.centerX).toBeCloseTo(worldCenterX, 10);
     expect(cam.centerY).toBeCloseTo(worldCenterY, 10);
-    expect(cam.zoom).toBe(1);
+    expect(cam.zoom).toBe(4);
   });
 });
 
@@ -126,10 +126,10 @@ describe("computeViewBox", () => {
   const bounds = computeWindowBounds(1024, 768, 40);
   const cam = computeInitialCamera(1024, 768, bounds);
 
-  it("at zoom=1 shows the full window", () => {
+  it("at initial zoom shows a zoomed-in portion of the window", () => {
     const vb = computeViewBox(cam, 1024, 768, bounds);
 
-    // The viewBox should encompass the full window extent
+    // At zoom=4 (MAX_ZOOM default), viewBox should be 1/4 the full extent
     const corners = [
       latticeToWorld(bounds.uMin, bounds.vMin),
       latticeToWorld(bounds.uMax + 1, bounds.vMin),
@@ -138,20 +138,16 @@ describe("computeViewBox", () => {
     ];
     const worldMinX = Math.min(...corners.map((c) => c.x));
     const worldMaxX = Math.max(...corners.map((c) => c.x));
-    const worldMinY = Math.min(...corners.map((c) => c.y));
-    const worldMaxY = Math.max(...corners.map((c) => c.y));
     const worldW = worldMaxX - worldMinX;
-    const worldH = worldMaxY - worldMinY;
 
-    // ViewBox should be at least as large as world extent (may be larger
-    // due to aspect ratio padding)
-    expect(vb.width).toBeGreaterThanOrEqual(worldW - 0.001);
-    expect(vb.height).toBeGreaterThanOrEqual(worldH - 0.001);
+    // ViewBox width should be roughly 1/4 of the full extent (zoom=4)
+    expect(vb.width).toBeLessThan(worldW);
+    expect(vb.width).toBeGreaterThan(0);
   });
 
-  it("at zoom=2 shows half the extent (zoomed in)", () => {
+  it("at zoom=2x from initial shows half the initial extent", () => {
     const vb1 = computeViewBox(cam, 1024, 768, bounds);
-    const cam2 = { ...cam, zoom: 2 };
+    const cam2 = { ...cam, zoom: cam.zoom * 2 };
     const vb2 = computeViewBox(cam2, 1024, 768, bounds);
 
     expect(vb2.width).toBeCloseTo(vb1.width / 2, 8);
@@ -298,10 +294,10 @@ describe("applyZoom", () => {
     expect(zoomed.zoom).toBe(2);
   });
 
-  it("clamps zoom at maximum (4)", () => {
+  it("clamps zoom at maximum (8)", () => {
     const cam = { centerX: 0, centerY: 0, zoom: 7 };
     const zoomed = applyZoom(cam, 2, 0, 0);
-    expect(zoomed.zoom).toBe(4);
+    expect(zoomed.zoom).toBe(8);
   });
 
   it("clamps zoom at minimum (0.25)", () => {

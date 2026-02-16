@@ -141,3 +141,11 @@ export {
   clearInjectedStyles,
   HIDDEN_CLASS,
 } from "./css-utils.js";
+
+// Proximity cursor
+export {
+  createProximityCursor,
+} from "./cursor.js";
+export type {
+  ProximityCursor,
+} from "./cursor.js";

@@ -6,11 +6,13 @@ import { svgEl } from "./svg-helpers.js";
 
 // --- Visual constants ---
 
-/** Main triangle fill color (semi-transparent blue). */
-const MAIN_TRI_FILL = "rgba(100, 149, 237, 0.4)";
+/** Main triangle fill colors by orientation. */
+const MAIN_TRI_FILL_MAJOR = "rgba(60, 120, 230, 0.55)";
+const MAIN_TRI_FILL_MINOR = "rgba(220, 60, 60, 0.55)";
 
-/** Extension triangle fill color (lighter). */
-const EXT_TRI_FILL = "rgba(100, 149, 237, 0.2)";
+/** Extension triangle fill colors (half intensity). */
+const EXT_TRI_FILL_MAJOR = "rgba(60, 120, 230, 0.28)";
+const EXT_TRI_FILL_MINOR = "rgba(220, 60, 60, 0.28)";
 
 /** Root vertex marker radius (world units). */
 const ROOT_MARKER_RADIUS = 0.12;
@@ -27,8 +29,23 @@ const DOT_FILL = "#457b9d";
 /** Stroke width for triangle fills. */
 const TRI_STROKE_WIDTH = 0.02;
 
-/** Triangle stroke color. */
-const TRI_STROKE = "rgba(100, 149, 237, 0.8)";
+/** Triangle stroke colors by orientation. */
+const TRI_STROKE_MAJOR = "rgba(40, 90, 200, 0.8)";
+const TRI_STROKE_MINOR = "rgba(200, 40, 40, 0.8)";
+
+// --- Helpers for orientation-based colors ---
+
+function mainTriFill(tri: TriRef): string {
+  return tri.orientation === "U" ? MAIN_TRI_FILL_MAJOR : MAIN_TRI_FILL_MINOR;
+}
+
+function extTriFill(tri: TriRef): string {
+  return tri.orientation === "U" ? EXT_TRI_FILL_MAJOR : EXT_TRI_FILL_MINOR;
+}
+
+function triStroke(tri: TriRef): string {
+  return tri.orientation === "U" ? TRI_STROKE_MAJOR : TRI_STROKE_MINOR;
+}
 
 // --- Types ---
 
@@ -117,10 +134,8 @@ export function renderShape(
 ): ShapeHandle {
   const elements: SVGElement[] = [];
 
-  const mainFill = options?.mainTriFill ?? MAIN_TRI_FILL;
-  const extFill = options?.extTriFill ?? EXT_TRI_FILL;
   const rootFill = options?.rootMarkerFill ?? ROOT_MARKER_FILL;
-  const dotFill = options?.dotFill ?? DOT_FILL;
+  const dotFillColor = options?.dotFill ?? DOT_FILL;
   const showRoot = options?.showRootMarker !== false;
 
   // Use DocumentFragment for batched DOM insertion (avoid multiple reflows)
@@ -129,10 +144,12 @@ export function renderShape(
 
   // --- Render main triangle ---
   if (shape.main_tri !== null) {
+    const fill = options?.mainTriFill ?? mainTriFill(shape.main_tri);
+    const stroke = triStroke(shape.main_tri);
     const mainPoly = svgEl("polygon", {
       points: triPolygonPoints(shape.main_tri),
-      fill: mainFill,
-      stroke: TRI_STROKE,
+      fill,
+      stroke,
       "stroke-width": TRI_STROKE_WIDTH,
       "data-shape-element": "main-tri",
     });
@@ -141,11 +158,13 @@ export function renderShape(
   }
 
   // --- Render extension triangles ---
-  for (const extTri of shape.ext_tris) {
+  for (const ext of shape.ext_tris) {
+    const fill = options?.extTriFill ?? extTriFill(ext);
+    const stroke = triStroke(ext);
     const extPoly = svgEl("polygon", {
-      points: triPolygonPoints(extTri),
-      fill: extFill,
-      stroke: TRI_STROKE,
+      points: triPolygonPoints(ext),
+      fill,
+      stroke,
       "stroke-width": TRI_STROKE_WIDTH,
       "data-shape-element": "ext-tri",
     });
@@ -177,7 +196,7 @@ export function renderShape(
       cx: w.x,
       cy: w.y,
       r: DOT_RADIUS,
-      fill: dotFill,
+      fill: dotFillColor,
       "data-shape-element": "dot",
       "data-pc": dotPc,
     });

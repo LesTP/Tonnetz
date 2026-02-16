@@ -1098,3 +1098,96 @@ All three items delivered:
 - ✅ Performance review (clean — no changes needed)
 
 ---
+
+## Entry 18 — Phase 8: User Testing — Design Pass 1
+
+**Date:** 2026-02-16
+**Scope:** Visual design adjustments based on first live user testing session.
+
+### User Feedback (5 items)
+
+| # | Feedback | Resolution |
+|---|----------|------------|
+| 1 | Default zoom too far out — few progressions span more than 6 triangles | **Fixed.** Default zoom changed from 1 to 4 (MAX_ZOOM raised to 8 so users can still zoom in from default) |
+| 2 | Pointer should be a circle to show triangle vs edge hit zone | **Fixed.** Added `ProximityCursor` — dashed circle follows pointer at 1/3 proximity radius. New file: `cursor.ts` |
+| 3 | Node labels overlap circles, hard to read; grid too dark | **Fixed.** Node circles enlarged (0.08→0.15 radius), grid edges/triangles lightened to pale grey, labels bolded black |
+| 4 | Grid is a skewed parallelogram, should be rectangular | **Skipped.** Would require HC `WindowBounds` API change or per-row filtering. At 4× default zoom the edges are off-screen — moot. |
+| 5 | Major/minor triangles should be different colors; active chord should be bright | **Fixed.** Grid: major=pale blue, minor=pale red. Active shapes: bright blue/red at 0.55 opacity. Extensions: half intensity (0.28). |
+
+Additional feedback during testing:
+- Cursor circle too large (bigger than a triangle) → reduced to 1/3 proximity radius
+- Playing chord not highlighted → wired `highlightTriangle` on interactive clicks + `renderShape` on progression playback chord changes
+
+### Files Changed
+
+**RENDERING_UI (visual design):**
+
+| File | Change |
+|------|--------|
+| `camera.ts` | `DEFAULT_ZOOM = 4`, `MAX_ZOOM = 8` (was 4). `computeInitialCamera` returns `DEFAULT_ZOOM`. |
+| `renderer.ts` | Grid colors: edges `#ccc`, triangle strokes `#d0d0d0`, node fill `#e8e8e8`/stroke `#bbb`, labels bold black `#111`. Triangle fills: `MAJOR_TRI_FILL` (pale blue 0.25) and `MINOR_TRI_FILL` (pale red 0.25). Node radius `0.15` (was 0.08), font size `0.18` (was 0.22). |
+| `shape-renderer.ts` | Orientation-aware fill colors. Main: major `rgba(60,120,230,0.55)`, minor `rgba(220,60,60,0.55)`. Extension: half-opacity variants. Stroke colors per orientation. Helper functions `mainTriFill()`, `extTriFill()`, `triStroke()`. |
+| `highlight.ts` | Orientation-aware highlight colors matching shape-renderer. `createHighlightPolygon` takes `isExtension` parameter for half-intensity extension highlights. |
+| `cursor.ts` | **New file.** `createProximityCursor()` — dashed SVG circle tracking pointer at proximity radius, hidden on pointer leave, `pointer-events: none`. |
+| `index.ts` | Added barrel exports for `createProximityCursor`, `ProximityCursor`. |
+
+**RENDERING_UI (test updates):**
+
+| File | Change |
+|------|--------|
+| `camera.test.ts` | Updated expectations: initial zoom = 4, MAX_ZOOM = 8. Rewritten zoom/viewBox tests for new defaults. |
+| `camera-controller.test.ts` | Updated expectations: initial zoom = 4, MAX_ZOOM clamp = 8, zoom-in wheel works from default. |
+
+**INTEGRATION (highlighting wiring):**
+
+| File | Change |
+|------|--------|
+| `main.ts` | (1) Wrapped `interactionCallbacks` to add `highlightTriangle` on triangle/edge select with `clearAllHighlights` before each. (2) `pathHandleProxy.setActiveChord` now renders active chord Shape via `renderShape` and clears previous. (3) `handleClear` clears active shape handle and resets stored shapes. (4) Imports: added `renderShape`, `highlightTriangle`, `clearAllHighlights`, `ShapeHandle`, `TriId`, `EdgeId`, `Shape`. (5) Cursor wired at Step 12b with 1/3 radius. |
+
+### Design Constants Summary
+
+```
+Grid:
+  GRID_EDGE_COLOR     = "#ccc"
+  GRID_TRI_STROKE     = "#d0d0d0"
+  NODE_FILL           = "#e8e8e8"
+  NODE_STROKE         = "#bbb"
+  NODE_RADIUS         = 0.15
+  LABEL_COLOR         = "#111"
+  LABEL_FONT_SIZE     = 0.18
+  MAJOR_TRI_FILL      = rgba(180, 200, 240, 0.25)   // pale blue
+  MINOR_TRI_FILL      = rgba(240, 185, 185, 0.25)   // pale red
+
+Active shape:
+  MAIN_TRI_FILL_MAJOR = rgba(60, 120, 230, 0.55)    // bright blue
+  MAIN_TRI_FILL_MINOR = rgba(220, 60, 60, 0.55)     // bright red
+  EXT_TRI_FILL_MAJOR  = rgba(60, 120, 230, 0.28)    // half blue
+  EXT_TRI_FILL_MINOR  = rgba(220, 60, 60, 0.28)     // half red
+
+Camera:
+  DEFAULT_ZOOM = 4
+  MAX_ZOOM     = 8
+  MIN_ZOOM     = 0.25
+
+Cursor:
+  Display radius = computeProximityRadius() / 3 ≈ 0.167 world units
+  Hit-test radius = 0.5 world units (unchanged)
+```
+
+### Test Results
+
+```
+tsc -b: 0 errors
+HC:  168 passed (168) — unchanged
+PD:  108 passed (108) — unchanged
+AE:  172 passed (172) — unchanged
+RU:  344 passed (344) — 7 tests updated for new zoom defaults
+INT: 144 passed (144) — unchanged
+Total: 936 passed (936) — 0 failures
+```
+
+### Phase 8 Status: In Progress
+
+First design pass complete. Awaiting further user testing feedback.
+
+---

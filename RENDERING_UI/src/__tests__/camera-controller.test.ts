@@ -66,8 +66,8 @@ describe("CameraController — initial state", () => {
     expect(vb.h).toBeGreaterThan(0);
   });
 
-  it("initial zoom is 1", () => {
-    expect(ctx.ctrl.getCamera().zoom).toBe(1);
+  it("initial zoom is MAX_ZOOM (4)", () => {
+    expect(ctx.ctrl.getCamera().zoom).toBe(4);
   });
 
   it("getViewBox matches the SVG attribute", () => {
@@ -159,6 +159,7 @@ describe("CameraController — zoom", () => {
   afterEach(() => { ctx.ctrl.destroy(); });
 
   it("wheel event with negative deltaY (scroll up) zooms in — viewBox shrinks", () => {
+    // Initial zoom is 4 (DEFAULT_ZOOM), MAX_ZOOM is 8, so zoom-in should work
     const before = parseViewBox(ctx.svg);
 
     ctx.svg.dispatchEvent(new WheelEvent("wheel", {
@@ -189,7 +190,7 @@ describe("CameraController — zoom", () => {
       }));
     }
     const cam = ctx.ctrl.getCamera();
-    expect(cam.zoom).toBeLessThanOrEqual(4);
+    expect(cam.zoom).toBeLessThanOrEqual(8);
   });
 
   it("zoom is clamped at minimum (repeated zoom-out)", () => {
@@ -245,17 +246,18 @@ describe("CameraController — reset", () => {
     expect(after.h).toBeCloseTo(initial.h, 5);
   });
 
-  it("reset restores zoom to 1 after zooming", () => {
+  it("reset restores zoom to initial (MAX_ZOOM=4) after zoom-out", () => {
+    // Zoom out first (since we start at max)
     for (let i = 0; i < 10; i++) {
       ctx.svg.dispatchEvent(new WheelEvent("wheel", {
-        clientX: 400, clientY: 300, deltaY: -120, bubbles: true,
+        clientX: 400, clientY: 300, deltaY: 120, bubbles: true,
       }));
     }
-    expect(ctx.ctrl.getCamera().zoom).not.toBeCloseTo(1, 1);
+    expect(ctx.ctrl.getCamera().zoom).toBeLessThan(4);
 
     ctx.ctrl.reset();
 
-    expect(ctx.ctrl.getCamera().zoom).toBe(1);
+    expect(ctx.ctrl.getCamera().zoom).toBe(4);
   });
 });
 
@@ -302,18 +304,19 @@ describe("CameraController — updateDimensions", () => {
     expect(vbAfter.w).not.toBeCloseTo(vbBefore.w, 1);
   });
 
-  it("resets camera to zoom=1 after updateDimensions", () => {
+  it("resets camera to initial zoom (MAX_ZOOM=4) after updateDimensions", () => {
+    // Zoom out first (since initial is already MAX_ZOOM)
     for (let i = 0; i < 10; i++) {
       ctx.svg.dispatchEvent(new WheelEvent("wheel", {
-        clientX: 400, clientY: 300, deltaY: -120, bubbles: true,
+        clientX: 400, clientY: 300, deltaY: 120, bubbles: true,
       }));
     }
-    expect(ctx.ctrl.getCamera().zoom).toBeGreaterThan(1);
+    expect(ctx.ctrl.getCamera().zoom).toBeLessThan(4);
 
     const newBounds: WindowBounds = { uMin: -3, uMax: 3, vMin: -3, vMax: 3 };
     ctx.ctrl.updateDimensions(1024, 768, newBounds);
 
-    expect(ctx.ctrl.getCamera().zoom).toBe(1);
+    expect(ctx.ctrl.getCamera().zoom).toBe(4);
   });
 
   it("resets camera center after updateDimensions (discards pan)", () => {

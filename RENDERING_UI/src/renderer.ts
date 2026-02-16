@@ -30,11 +30,22 @@ export interface SvgScaffold {
 }
 
 /** Visual sizing constants (world units, where edge length = 1). */
-const NODE_RADIUS = 0.08;
-const LABEL_FONT_SIZE = 0.22;
+const NODE_RADIUS = 0.15;
+const LABEL_FONT_SIZE = 0.18;
 const EDGE_STROKE_WIDTH = 0.02;
 const TRI_STROKE_WIDTH = 0.01;
-const NODE_STROKE_WIDTH = 0.01;
+const NODE_STROKE_WIDTH = 0.015;
+
+/** Color constants for the grid. */
+const GRID_EDGE_COLOR = "#ccc";
+const GRID_TRI_STROKE = "#d0d0d0";
+const NODE_FILL = "#e8e8e8";
+const NODE_STROKE = "#bbb";
+const LABEL_COLOR = "#111";
+
+/** Pale background tints for major (Up) and minor (Down) triangles. */
+const MAJOR_TRI_FILL = "rgba(180, 200, 240, 0.25)";
+const MINOR_TRI_FILL = "rgba(240, 185, 185, 0.25)";
 
 /**
  * Create the root SVG scaffold with 5 layered `<g>` groups (RU-D12).
@@ -123,13 +134,14 @@ export function renderGrid(
   // (avoids ~4,200 individual appendChild calls triggering layout recalc)
   const frag = document.createDocumentFragment();
 
-  // --- Triangles ---
+  // --- Triangles (major=Up=pale blue, minor=Down=pale red) ---
   for (const [tid, ref] of indices.triIdToRef) {
     const verts = triVertices(ref);
+    const fill = ref.orientation === "U" ? MAJOR_TRI_FILL : MINOR_TRI_FILL;
     const poly = svgEl("polygon", {
       points: polygonPoints(verts, worldCache),
-      fill: "none",
-      stroke: "#999",
+      fill,
+      stroke: GRID_TRI_STROKE,
       "stroke-width": TRI_STROKE_WIDTH,
       "data-id": tid as string,
     });
@@ -148,7 +160,7 @@ export function renderGrid(
       y1: wa.y,
       x2: wb.x,
       y2: wb.y,
-      stroke: "#666",
+      stroke: GRID_EDGE_COLOR,
       "stroke-width": EDGE_STROKE_WIDTH,
       "data-id": eid as string,
     });
@@ -165,8 +177,8 @@ export function renderGrid(
       cx: w.x,
       cy: w.y,
       r: NODE_RADIUS,
-      fill: "#fff",
-      stroke: "#333",
+      fill: NODE_FILL,
+      stroke: NODE_STROKE,
       "stroke-width": NODE_STROKE_WIDTH,
       "data-id": nid as string,
     });
@@ -179,7 +191,8 @@ export function renderGrid(
       "dominant-baseline": "central",
       "font-size": LABEL_FONT_SIZE,
       "font-family": "sans-serif",
-      fill: "#333",
+      "font-weight": "600",
+      fill: LABEL_COLOR,
       "data-id": `label-${nid as string}`,
     });
     label.textContent = PC_NAMES[pitchClass];
