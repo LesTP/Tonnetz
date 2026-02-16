@@ -11,7 +11,7 @@
  * See DEVPLAN §Phase 6.
  */
 
-import type { TriId, EdgeId, CentroidCoord, Shape } from "harmony-core";
+import type { CentroidCoord, Shape } from "harmony-core";
 
 import {
   createSvgScaffold,
@@ -29,6 +29,7 @@ import {
   clearAllHighlights,
   createProximityCursor,
   computeProximityRadius,
+  hitTest,
 } from "rendering-ui";
 import type {
   PathHandle,
@@ -204,6 +205,9 @@ function loadProgressionFromChords(chords: string[]): boolean {
 
   if (result.shapes.length === 0) return false;
 
+  // Clear interaction highlights when loading a progression
+  clearAllHighlights(scaffold.layers["layer-interaction"]);
+
   // Store shapes for playback highlighting
   currentShapes = result.shapes;
 
@@ -269,6 +273,8 @@ function handleClear(): void {
 
 function handlePlay(): void {
   if (!audioState.transport) return;
+  // Clear interaction highlights when entering playback mode
+  clearAllHighlights(scaffold.layers["layer-interaction"]);
   audioState.transport.play();
   uiState.startPlayback();
 }
@@ -299,25 +305,45 @@ const toolbar: Toolbar = createToolbar({
 
 // ── Step 11: Interaction Wiring ─────────────────────────────────────
 
+// Shared proximity radius for both visual highlights and audio hit-testing
+const INTERACTION_PROXIMITY = computeProximityRadius(0.12);
+
 const baseInteractionCallbacks = createInteractionWiring({
   audioState,
   uiState,
   getIndices: () => resizeCtrl.getIndices(),
+  proximityRadius: INTERACTION_PROXIMITY,
 });
 
-// Wrap callbacks to add visual highlighting on interactive clicks
+// Wrap callbacks to add visual highlighting on pointer-down (immediate feedback)
 const interactionCallbacks = {
   ...baseInteractionCallbacks,
-  onTriangleSelect: (triId: TriId, pcs: number[]) => {
-    baseInteractionCallbacks.onTriangleSelect?.(triId, pcs);
+  onPointerDown: (world: { x: number; y: number }) => {
+    // Highlight immediately on press (before tap/drag classification)
+    const indices = resizeCtrl.getIndices();
+    const hit = hitTest(world.x, world.y, INTERACTION_PROXIMITY, indices);
+
     clearAllHighlights(scaffold.layers["layer-interaction"]);
-    highlightTriangle(scaffold.layers["layer-interaction"], triId, resizeCtrl.getIndices());
+    if (hit.type === "triangle") {
+      highlightTriangle(scaffold.layers["layer-interaction"], hit.triId, indices);
+    } else if (hit.type === "edge") {
+      // For edge clicks (diamonds), use the first triangle's orientation as
+      // the color basis so the second triangle's markers match the main palette.
+      const mainOrientation = indices.triIdToRef.get(hit.triIds[0])?.orientation;
+      highlightTriangle(scaffold.layers["layer-interaction"], hit.triIds[0], indices);
+      highlightTriangle(
+        scaffold.layers["layer-interaction"], hit.triIds[1], indices,
+        undefined, mainOrientation,
+      );
+    }
+
+    // Delegate to base (audio + state gating)
+    baseInteractionCallbacks.onPointerDown?.(world);
   },
-  onEdgeSelect: (edgeId: EdgeId, triIds: [TriId, TriId], pcs: number[]) => {
-    baseInteractionCallbacks.onEdgeSelect?.(edgeId, triIds, pcs);
+  onPointerUp: () => {
+    // Clear highlights on release
     clearAllHighlights(scaffold.layers["layer-interaction"]);
-    highlightTriangle(scaffold.layers["layer-interaction"], triIds[0], resizeCtrl.getIndices());
-    highlightTriangle(scaffold.layers["layer-interaction"], triIds[1], resizeCtrl.getIndices());
+    baseInteractionCallbacks.onPointerUp?.();
   },
 };
 
@@ -335,7 +361,7 @@ const interactionCtrl: InteractionController = createInteractionController({
 const proximityCursor: ProximityCursor = createProximityCursor(
   scaffold.svg,
   scaffold.layers["layer-interaction"],
-  computeProximityRadius() / 3,
+  computeProximityRadius(0.12),
   () => camera!.getViewBox(),
 );
 

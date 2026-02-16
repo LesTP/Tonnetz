@@ -101,20 +101,17 @@ function mockCameraController(): CameraController & {
 function makeCallbacks(): Required<InteractionCallbacks> & {
   triangleSelects: { triId: TriId; pcs: number[] }[];
   edgeSelects: { edgeId: EdgeId; triIds: [TriId, TriId]; pcs: number[] }[];
-  scrubs: { triId: TriId; pcs: number[] }[];
   pointerDowns: WorldPoint[];
   pointerUps: number;
 } {
   const triangleSelects: { triId: TriId; pcs: number[] }[] = [];
   const edgeSelects: { edgeId: EdgeId; triIds: [TriId, TriId]; pcs: number[] }[] = [];
-  const scrubs: { triId: TriId; pcs: number[] }[] = [];
   const pointerDowns: WorldPoint[] = [];
   let pointerUps = 0;
 
   return {
     triangleSelects,
     edgeSelects,
-    scrubs,
     pointerDowns,
     get pointerUps() { return pointerUps; },
     onTriangleSelect(triId: TriId, pcs: number[]) {
@@ -122,9 +119,6 @@ function makeCallbacks(): Required<InteractionCallbacks> & {
     },
     onEdgeSelect(edgeId: EdgeId, triIds: [TriId, TriId], pcs: number[]) {
       edgeSelects.push({ edgeId, triIds, pcs });
-    },
-    onDragScrub(triId: TriId, pcs: number[]) {
-      scrubs.push({ triId, pcs });
     },
     onPointerDown(world: WorldPoint) {
       pointerDowns.push(world);
@@ -224,7 +218,6 @@ describe("InteractionController — tap triangle", () => {
     pointerUp(svg, c.x, c.y);
 
     expect(cb.edgeSelects).toHaveLength(0);
-    expect(cb.scrubs).toHaveLength(0);
   });
 });
 
@@ -306,13 +299,12 @@ describe("InteractionController — tap on empty background", () => {
     vi.restoreAllMocks();
   });
 
-  it("tap on empty background fires no triangle/edge/scrub events", () => {
+  it("tap on empty background fires no triangle/edge events", () => {
     pointerDown(svg, 700, 500);
     pointerUp(svg, 700, 500);
 
     expect(cb.triangleSelects).toHaveLength(0);
     expect(cb.edgeSelects).toHaveLength(0);
-    expect(cb.scrubs).toHaveLength(0);
   });
 
   it("tap on empty background still fires onPointerDown and onPointerUp", () => {
@@ -364,18 +356,17 @@ describe("InteractionController — drag on background → pan", () => {
     expect(cam.panCalls.some(c => c.method === "panEnd")).toBe(true);
   });
 
-  it("drag on background fires no triangle/edge/scrub events", () => {
+  it("drag on background fires no triangle/edge events", () => {
     pointerDown(svg, 700, 500);
     pointerMove(svg, 720, 510);
     pointerUp(svg, 720, 510);
 
     expect(cb.triangleSelects).toHaveLength(0);
     expect(cb.edgeSelects).toHaveLength(0);
-    expect(cb.scrubs).toHaveLength(0);
   });
 });
 
-describe("InteractionController — drag on triangle → scrub", () => {
+describe("InteractionController — drag on triangle → pan (no scrub)", () => {
   let svg: SVGSVGElement;
   let cam: ReturnType<typeof mockCameraController>;
   let cb: ReturnType<typeof makeCallbacks>;
@@ -404,65 +395,26 @@ describe("InteractionController — drag on triangle → scrub", () => {
     vi.restoreAllMocks();
   });
 
-  it("drag starting on triangle enters scrub mode, not pan", () => {
+  it("drag starting on triangle triggers camera pan (not scrub)", () => {
     const c = upCentroidWorld(0, 0);
     pointerDown(svg, c.x, c.y);
-
-    // Move enough to cross drag threshold (~0.03 world ≈ 6 screen px > 5 px threshold)
-    // while staying inside the triangle (centroid-to-edge ≈ 0.289)
-    pointerMove(svg, c.x + 0.05, c.y); // cross threshold, still inside tri
+    pointerMove(svg, c.x + 0.05, c.y);
     pointerUp(svg, c.x + 0.05, c.y);
 
-    // Should NOT have called panStart
-    expect(cam.panCalls.filter(p => p.method === "panStart")).toHaveLength(0);
+    expect(cam.panCalls.some(p => p.method === "panStart")).toBe(true);
+    expect(cam.panCalls.some(p => p.method === "panEnd")).toBe(true);
   });
 
-  it("drag from one triangle to another fires onDragScrub on triangle change", () => {
+  it("drag from one triangle to another pans without firing selection events", () => {
     const c0 = upCentroidWorld(0, 0);
     const c1 = upCentroidWorld(1, 0);
 
     pointerDown(svg, c0.x, c0.y);
-    // Move beyond threshold toward a different triangle
     pointerMove(svg, c1.x, c1.y);
     pointerUp(svg, c1.x, c1.y);
 
-    // Should have initial scrub event (from dragStart) + at least one more
-    expect(cb.scrubs.length).toBeGreaterThanOrEqual(1);
-    // No edge events during scrub (UX-D3)
-    expect(cb.edgeSelects).toHaveLength(0);
-  });
-
-  it("drag staying on same triangle does not fire duplicate scrub events", () => {
-    const c = upCentroidWorld(0, 0);
-    pointerDown(svg, c.x, c.y);
-    // Move enough to cross threshold (~0.04 world ≈ 8 screen px) but stay on same triangle
-    pointerMove(svg, c.x + 0.04, c.y);
-    pointerMove(svg, c.x + 0.05, c.y);
-    pointerMove(svg, c.x + 0.06, c.y);
-    pointerUp(svg, c.x + 0.06, c.y);
-
-    // Initial scrub event from dragStart + no duplicates for same triangle
-    const uniqueTriIds = new Set(cb.scrubs.map(s => s.triId));
-    // We might get 1 event (initial triangle) — no duplicates
-    expect(uniqueTriIds.size).toBeLessThanOrEqual(cb.scrubs.length);
-    // And the triangle should be the same one
-    if (cb.scrubs.length > 0) {
-      for (const s of cb.scrubs) {
-        expect(s.triId).toBe(cb.scrubs[0].triId);
-      }
-    }
-  });
-
-  it("edge selection is suppressed during drag-scrub (UX-D3)", () => {
-    // Start drag on a triangle, move through an edge midpoint
-    const c0 = upCentroidWorld(0, 0);
-    const mid = edgeMidpointWorld(1, 0, 0, 1);
-
-    pointerDown(svg, c0.x, c0.y);
-    pointerMove(svg, mid.x, mid.y); // crosses edge midpoint
-    pointerUp(svg, mid.x, mid.y);
-
-    // No edge selects during drag
+    expect(cam.panCalls.some(p => p.method === "panStart")).toBe(true);
+    expect(cb.triangleSelects).toHaveLength(0);
     expect(cb.edgeSelects).toHaveLength(0);
   });
 });
@@ -502,7 +454,6 @@ describe("InteractionController — pointer lifecycle", () => {
     expect(cb.pointerDowns).toHaveLength(1);
     // No classification yet
     expect(cb.triangleSelects).toHaveLength(0);
-    expect(cb.scrubs).toHaveLength(0);
 
     pointerUp(svg, c.x, c.y);
   });

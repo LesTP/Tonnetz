@@ -12,6 +12,14 @@ const PC_NAMES: readonly string[] = [
   "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
 ];
 
+/**
+ * Enharmonic flat name for pitch classes that have one.
+ * Only entries 1, 3, 6, 8, 10 have enharmonic equivalents.
+ */
+const PC_ENHARMONIC: readonly (string | null)[] = [
+  null, "Db", null, "Eb", null, null, "Gb", null, "Ab", null, "Bb", null,
+];
+
 /** Layer IDs matching ARCH_RENDERING_UI §2 (RU-D12). */
 export const LAYER_IDS = [
   "layer-grid",
@@ -41,11 +49,11 @@ const GRID_EDGE_COLOR = "#ccc";
 const GRID_TRI_STROKE = "#d0d0d0";
 const NODE_FILL = "#e8e8e8";
 const NODE_STROKE = "#bbb";
-const LABEL_COLOR = "#111";
+const LABEL_COLOR = "#555";
 
 /** Pale background tints for major (Up) and minor (Down) triangles. */
-const MAJOR_TRI_FILL = "rgba(180, 200, 240, 0.25)";
-const MINOR_TRI_FILL = "rgba(240, 185, 185, 0.25)";
+const MAJOR_TRI_FILL = "rgba(240, 185, 185, 0.25)";
+const MINOR_TRI_FILL = "rgba(180, 200, 240, 0.25)";
 
 /**
  * Create the root SVG scaffold with 5 layered `<g>` groups (RU-D12).
@@ -134,7 +142,7 @@ export function renderGrid(
   // (avoids ~4,200 individual appendChild calls triggering layout recalc)
   const frag = document.createDocumentFragment();
 
-  // --- Triangles (major=Up=pale blue, minor=Down=pale red) ---
+  // --- Triangles (major=Up=pale red, minor=Down=pale blue) ---
   for (const [tid, ref] of indices.triIdToRef) {
     const verts = triVertices(ref);
     const fill = ref.orientation === "U" ? MAJOR_TRI_FILL : MINOR_TRI_FILL;
@@ -168,6 +176,9 @@ export function renderGrid(
   }
 
   // --- Nodes (circles + labels) ---
+  const ENHARMONIC_FONT_SIZE = LABEL_FONT_SIZE * 0.62;
+  const ENHARMONIC_OFFSET = NODE_RADIUS * 0.38;
+
   for (const nid of indices.nodeToTris.keys()) {
     const coord = parseNodeId(nid);
     const w = worldCache.get(nid as string)!;
@@ -184,19 +195,52 @@ export function renderGrid(
     });
     frag.appendChild(circle);
 
-    const label = svgEl("text", {
-      x: w.x,
-      y: w.y,
-      "text-anchor": "middle",
-      "dominant-baseline": "central",
-      "font-size": LABEL_FONT_SIZE,
-      "font-family": "sans-serif",
-      "font-weight": "600",
-      fill: LABEL_COLOR,
-      "data-id": `label-${nid as string}`,
-    });
-    label.textContent = PC_NAMES[pitchClass];
-    frag.appendChild(label);
+    const enharmonic = PC_ENHARMONIC[pitchClass];
+    if (enharmonic) {
+      // Two lines: sharp name on top, flat name on bottom
+      const topLabel = svgEl("text", {
+        x: w.x,
+        y: w.y - ENHARMONIC_OFFSET,
+        "text-anchor": "middle",
+        "dominant-baseline": "central",
+        "font-size": ENHARMONIC_FONT_SIZE,
+        "font-family": "sans-serif",
+        "font-weight": "600",
+        fill: LABEL_COLOR,
+        "data-id": `label-${nid as string}`,
+      });
+      topLabel.textContent = PC_NAMES[pitchClass];
+      frag.appendChild(topLabel);
+
+      const bottomLabel = svgEl("text", {
+        x: w.x,
+        y: w.y + ENHARMONIC_OFFSET,
+        "text-anchor": "middle",
+        "dominant-baseline": "central",
+        "font-size": ENHARMONIC_FONT_SIZE,
+        "font-family": "sans-serif",
+        "font-weight": "600",
+        fill: LABEL_COLOR,
+        "data-id": `label-alt-${nid as string}`,
+      });
+      bottomLabel.textContent = enharmonic;
+      frag.appendChild(bottomLabel);
+    } else {
+      // Single centered label for natural notes
+      const label = svgEl("text", {
+        x: w.x,
+        y: w.y,
+        "text-anchor": "middle",
+        "dominant-baseline": "central",
+        "font-size": LABEL_FONT_SIZE,
+        "font-family": "sans-serif",
+        "font-weight": "600",
+        fill: LABEL_COLOR,
+        "data-id": `label-${nid as string}`,
+      });
+      label.textContent = PC_NAMES[pitchClass];
+      frag.appendChild(label);
+    }
   }
 
   // Single DOM insertion for all elements

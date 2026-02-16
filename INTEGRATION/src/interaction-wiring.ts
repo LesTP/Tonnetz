@@ -3,7 +3,7 @@
  *
  * Phase 3a: Lazy audio initialization (createAppAudioState, ensureAudio).
  * Phase 3b: onPointerDown → hit-test → immediate audio (UX-D4).
- * Phase 3c: Post-classification wiring (select, drag-scrub, pointer-up, state gating).
+ * Phase 3c: Post-classification wiring (select, pointer-up, state gating).
  *
  * This module produces an `InteractionCallbacks` object that the integration
  * module passes to `createInteractionController()`. It bridges RU interaction
@@ -113,7 +113,6 @@ function isPlaybackSuppressed(uiState: UIStateController): boolean {
  * - **onPointerDown** (Phase 3b): immediate audio on hit-test (UX-D4)
  * - **onTriangleSelect** (Phase 3c): UI state selection (audio already playing)
  * - **onEdgeSelect** (Phase 3c): UI state selection (audio already playing)
- * - **onDragScrub** (Phase 3c): retrigger audio on triangle change
  * - **onPointerUp** (Phase 3c): stop all audio
  *
  * All callbacks suppress audio and selection during `playback-running`
@@ -129,6 +128,20 @@ export function createInteractionWiring(
     proximityRadius = computeProximityRadius(),
   } = options;
 
+  /**
+   * Monotonic generation counter to prevent the async ensureAudio race.
+   *
+   * Problem: on the very first click, ensureAudio is truly async (~5-20ms).
+   * If the user releases the pointer before the promise resolves,
+   * onPointerUp calls stopAll() *before* playPitchClasses() runs,
+   * leaving voices playing indefinitely.
+   *
+   * Solution: increment on pointer-down, increment again on pointer-up.
+   * The async callback checks that generation hasn't changed; if it has,
+   * the pointer was already released so we skip playing.
+   */
+  let pointerGeneration = 0;
+
   // ── Phase 3b: onPointerDown → immediate audio (UX-D4) ──────────
 
   const onPointerDown = (world: WorldPoint): void => {
@@ -139,10 +152,15 @@ export function createInteractionWiring(
 
     if (hit.type === "none") return;
 
+    const gen = ++pointerGeneration;
+
     // Fire-and-forget: ensureAudio is async but we don't want to block
     // the gesture handler. On first call there's a one-time ~5-20ms delay;
     // subsequent calls resolve synchronously from cache (INT-D3).
     void ensureAudio(audioState).then(({ immediatePlayback }) => {
+      // If pointer was released while we were awaiting, don't start sound
+      if (gen !== pointerGeneration) return;
+
       let pcs: readonly number[] | null = null;
 
       if (hit.type === "triangle") {
@@ -165,11 +183,7 @@ export function createInteractionWiring(
   const onTriangleSelect = (_triId: TriId, _pcs: number[]): void => {
     if (isPlaybackSuppressed(uiState)) return;
     // Audio already playing from onPointerDown (UX-D4).
-    // Visual selection via UIState — selectChord requires a Shape, but
-    // the interaction controller only provides triId + pcs. The integration
-    // module's main.ts will build the Shape from context if needed.
-    // For now, selectChord is a no-op here — the orchestrator (main.ts)
-    // handles shape construction and passes to uiState.selectChord().
+    // Visual highlighting now handled in onPointerDown wrapper (main.ts).
   };
 
   const onEdgeSelect = (
@@ -179,18 +193,13 @@ export function createInteractionWiring(
   ): void => {
     if (isPlaybackSuppressed(uiState)) return;
     // Audio already playing from onPointerDown.
-    // Visual selection deferred to orchestrator (same as onTriangleSelect).
-  };
-
-  const onDragScrub = (_triId: TriId, pcs: number[]): void => {
-    if (isPlaybackSuppressed(uiState)) return;
-
-    // Retrigger audio on triangle change (UX-D3: sequential triads during drag).
-    if (!audioState.immediatePlayback) return;
-    playPitchClasses(audioState.immediatePlayback, pcs);
+    // Visual highlighting now handled in onPointerDown wrapper (main.ts).
   };
 
   const onPointerUp = (): void => {
+    // Bump generation so any in-flight async ensureAudio won't start playing
+    pointerGeneration++;
+
     // Always stop audio on pointer up, even if state is now suppressed
     // (user might have started a drag before state changed).
     if (audioState.immediatePlayback) {
@@ -202,7 +211,6 @@ export function createInteractionWiring(
     onPointerDown,
     onTriangleSelect,
     onEdgeSelect,
-    onDragScrub,
     onPointerUp,
   };
 }

@@ -234,21 +234,6 @@ describe("InteractionCallbacks → AE type compatibility", () => {
     });
   });
 
-  it("onDragScrub pcs array is compatible with playPitchClasses", () => {
-    const receivedPcs: number[] = [];
-    const callbacks: InteractionCallbacks = {
-      onDragScrub: (_triId, pcs) => { receivedPcs.push(...pcs); },
-    };
-
-    const pcs = getTrianglePcs({ orientation: "D", anchor: { u: 1, v: 1 } });
-    callbacks.onDragScrub!("D1,1" as any, [...pcs]);
-
-    expect(receivedPcs).toHaveLength(3);
-    receivedPcs.forEach(pc => {
-      expect(typeof pc).toBe("number");
-    });
-  });
-
   it("onPointerUp fires with no args — compatible with stopAll(state)", () => {
     let upFired = false;
     const callbacks: InteractionCallbacks = {

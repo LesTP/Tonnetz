@@ -272,7 +272,11 @@ describe("renderGrid — pitch-class labels", () => {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
   ];
 
-  it("all text labels contain correct pitch-class names", () => {
+  const PC_ENHARMONIC: (string | null)[] = [
+    null, "Db", null, "Eb", null, null, "Gb", null, "Ab", null, "Bb", null,
+  ];
+
+  it("all text labels contain correct pitch-class names (including enharmonics)", () => {
     const container = document.createElement("div");
     const scaffold = createSvgScaffold(container);
     const gridLayer = scaffold.layers["layer-grid"];
@@ -286,10 +290,20 @@ describe("renderGrid — pitch-class labels", () => {
 
     for (const text of texts) {
       const labelId = text.getAttribute("data-id")!;
-      const nid = labelId.slice(6); // strip "label-"
-      const { u, v } = parseNodeId(nid as any);
-      const expected = PC_NAMES[pc(u, v)];
-      expect(text.textContent).toBe(expected);
+      if (labelId.startsWith("label-alt-")) {
+        // Enharmonic (flat) label: data-id = "label-alt-N:u,v"
+        const nid = labelId.slice(10); // strip "label-alt-"
+        const { u, v } = parseNodeId(nid as any);
+        const expected = PC_ENHARMONIC[pc(u, v)];
+        expect(expected).not.toBeNull();
+        expect(text.textContent).toBe(expected);
+      } else {
+        // Primary label: data-id = "label-N:u,v"
+        const nid = labelId.slice(6); // strip "label-"
+        const { u, v } = parseNodeId(nid as any);
+        const expected = PC_NAMES[pc(u, v)];
+        expect(text.textContent).toBe(expected);
+      }
     }
   });
 

@@ -1191,3 +1191,126 @@ Total: 936 passed (936) — 0 failures
 First design pass complete. Awaiting further user testing feedback.
 
 ---
+
+## Entry 19 — Phase 8: User Testing — Design Pass 2 (Interaction Fixes)
+
+Date: 2026-02-16
+
+### Feedback Items
+
+| # | User Report | Root Cause | Resolution |
+|---|-------------|------------|------------|
+| 1 | First click sustains indefinitely; subsequent clicks stop on release | `ensureAudio()` is truly async on first call (~5-20ms). If pointer-up fires before the promise resolves, `stopAll()` runs before `playPitchClasses()` starts — the late voices are never stopped | Added monotonic `pointerGeneration` counter in `interaction-wiring.ts`. Increments on pointer-down and on pointer-up. Async callback checks generation hasn't changed; if it has, skips playing |
+| 2 | Triangle highlights appear only on release, not on press | Highlighting was wired to `onTriangleSelect`/`onEdgeSelect` (fire from `onTap` gesture = pointer-up). Not triggered on pointer-down | Moved highlight logic from `onTriangleSelect`/`onEdgeSelect` into `onPointerDown` wrapper in `main.ts`. Now runs `hitTest` immediately on press and highlights the hit triangle(s). `onPointerUp` clears highlights |
+| 3 | Clicking inside a triangle always plays an extended chord (3 triangles) instead of a single triad | Hit-test proximity radius (0.5) was larger than the triangle centroid-to-edge distance (~0.289), so virtually any click hit an edge | Reduced default proximity factor from 0.5 to 0.18 in `interaction-controller.ts` |
+| 4 | After switching to playback mode, interaction highlights persist | `clearAllHighlights` not called when loading a progression or starting playback | Added `clearAllHighlights(scaffold.layers["layer-interaction"])` in `handlePlay()` and `loadProgressionFromChords()` |
+| 5 | Interaction highlight colors are deeper/more vivid than playback colors | Highlight.ts used 0.65/0.35 opacity; shape-renderer.ts used 0.55/0.28 | Aligned highlight.ts fill opacities to match shape-renderer: main 0.55, ext 0.28, stroke 0.8 |
+| 6 | Cursor circle is bigger than a triangle | Visual cursor used full proximity radius (0.5) | Changed cursor radius to `computeProximityRadius() / 3` (later unified to match hit-test) |
+| 7 | Visual cursor is accurate but audio still hits edges (plays extension notes) | **Two separate hit-tests with different radii:** visual highlight in `main.ts` used 0.12 radius; audio hit-test in `interaction-wiring.ts` used default `computeProximityRadius()` = 0.5 | Passed `proximityRadius: INTERACTION_PROXIMITY` (0.12) to `createInteractionWiring()` so visual and audio use the same radius |
+| 8 | Clicking around a single triangle plays different chords near vertices | Same as #7 — audio radius 0.5 hit different edges depending on click position within the visual triangle | Resolved by #7 fix |
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `INTEGRATION/src/interaction-wiring.ts` | Added `pointerGeneration` counter for async race prevention; comments updated to reflect new highlighting location |
+| `INTEGRATION/src/main.ts` | Highlight on `onPointerDown`/`onPointerUp` instead of `onTriangleSelect`/`onEdgeSelect`; added `hitTest` import; pass `proximityRadius` to `createInteractionWiring`; clear highlights on play/load |
+| `RENDERING_UI/src/interaction-controller.ts` | Default proximity factor 0.5 → 0.18 → 0.12 |
+| `RENDERING_UI/src/highlight.ts` | Fill opacities aligned to match shape-renderer (0.65→0.55 main, 0.35→0.28 ext, 0.9→0.8 stroke) |
+
+### Architecture Insight: The Three Hit-Test Radii
+
+A key lesson from this pass: there were **three independent hit-test radii** that needed to stay synchronized:
+
+1. **`interaction-controller.ts`** — internal hit-test for tap/drag classification (`proximityFactor` option)
+2. **`interaction-wiring.ts`** — audio hit-test in `onPointerDown` (`proximityRadius` option)
+3. **`main.ts`** — visual highlight hit-test in `onPointerDown` wrapper (`INTERACTION_PROXIMITY` constant)
+
+All three now use `computeProximityRadius(0.12)` = 0.12 world units. The proximity cursor also uses this same radius.
+
+### Design Constants After Pass 2
+
+| Constant | Value | Location |
+|----------|-------|----------|
+| Hit-test proximity radius | 0.12 world units | interaction-controller.ts, interaction-wiring.ts, main.ts |
+| Proximity cursor radius | 0.12 world units | main.ts |
+| Pointer generation | monotonic counter | interaction-wiring.ts |
+
+### Test Results
+
+```
+tsc -b: 0 errors
+HC:  168 passed (168) — unchanged
+PD:  108 passed (108) — unchanged
+AE:  172 passed (172) — unchanged
+RU:  344 passed (344) — unchanged
+INT: 144 passed (144) — unchanged
+Total: 936 passed (936) — 0 failures
+```
+
+---
+
+## Entry 20 — Phase 8: User Testing — Design Pass 3 (Colors, Labels, Radius)
+
+Date: 2026-02-16
+
+### Feedback Items
+
+| # | User Report | Resolution |
+|---|-------------|------------|
+| 1 | Major/minor triangle colors should be flipped: major = red, minor = blue (standard musical affordance) | Swapped all color assignments across renderer.ts, shape-renderer.ts, highlight.ts |
+| 2 | Note labels should show enharmonic equivalents (e.g. C#/Db) | Added `PC_ENHARMONIC` lookup table; nodes with enharmonics render two text elements (sharp on top, flat on bottom) at 62% font size with 38% node-radius vertical offset; natural notes keep single centered label |
+| 3 | Enharmonic labels are too cramped inside the circle | Reduced enharmonic font size from 75% to 62% of base LABEL_FONT_SIZE |
+| 4 | Note labels should be dark grey instead of black | Changed LABEL_COLOR from `#111` to `#555` |
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `RENDERING_UI/src/renderer.ts` | Flipped `MAJOR_TRI_FILL` (→ pale red) and `MINOR_TRI_FILL` (→ pale blue); added `PC_ENHARMONIC` lookup table; dual-label rendering for enharmonic nodes; `LABEL_COLOR` `#111` → `#555`; enharmonic font 62% of base |
+| `RENDERING_UI/src/shape-renderer.ts` | Flipped `MAIN_TRI_FILL_MAJOR` (→ red 220,60,60), `MAIN_TRI_FILL_MINOR` (→ blue 60,120,230), and all extension/stroke variants |
+| `RENDERING_UI/src/highlight.ts` | Flipped `HIGHLIGHT_FILL_MAJOR` (→ red), `HIGHLIGHT_FILL_MINOR` (→ blue), and all extension/stroke variants |
+| `RENDERING_UI/src/__tests__/renderer.test.ts` | Updated pitch-class label test to handle both primary (`label-N:u,v`) and enharmonic (`label-alt-N:u,v`) text elements |
+
+### Design Constants After Pass 3
+
+| Constant | Value | Location |
+|----------|-------|----------|
+| **Color Scheme** | | |
+| Major (Up) grid tint | `rgba(240, 185, 185, 0.25)` pale red | renderer.ts |
+| Minor (Down) grid tint | `rgba(180, 200, 240, 0.25)` pale blue | renderer.ts |
+| Major active fill | `rgba(220, 60, 60, 0.55)` red | shape-renderer.ts, highlight.ts |
+| Minor active fill | `rgba(60, 120, 230, 0.55)` blue | shape-renderer.ts, highlight.ts |
+| Major extension fill | `rgba(220, 60, 60, 0.28)` pale red | shape-renderer.ts, highlight.ts |
+| Minor extension fill | `rgba(60, 120, 230, 0.28)` pale blue | shape-renderer.ts, highlight.ts |
+| Major stroke | `rgba(200, 40, 40, 0.8)` red | shape-renderer.ts, highlight.ts |
+| Minor stroke | `rgba(40, 90, 200, 0.8)` blue | shape-renderer.ts, highlight.ts |
+| **Labels** | | |
+| Label color | `#555` dark grey | renderer.ts |
+| Base font size | 0.18 world units | renderer.ts |
+| Enharmonic font size | 0.18 × 0.62 ≈ 0.112 world units | renderer.ts |
+| Enharmonic vertical offset | NODE_RADIUS × 0.38 | renderer.ts |
+| **Enharmonic Map** | | |
+| PC 1 | C# / Db | renderer.ts |
+| PC 3 | D# / Eb | renderer.ts |
+| PC 6 | F# / Gb | renderer.ts |
+| PC 8 | G# / Ab | renderer.ts |
+| PC 10 | A# / Bb | renderer.ts |
+
+### Test Results
+
+```
+tsc -b: 0 errors
+HC:  168 passed (168) — unchanged
+PD:  108 passed (108) — unchanged
+AE:  172 passed (172) — unchanged
+RU:  344 passed (344) — 1 test updated for enharmonic labels
+INT: 144 passed (144) — unchanged
+Total: 936 passed (936) — 0 failures
+```
+
+### Phase 8 Status: In Progress
+
+Design passes 1-3 complete. User indicated next testing sessions: **playback** and **audio**.
+
+---

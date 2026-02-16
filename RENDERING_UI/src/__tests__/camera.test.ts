@@ -118,7 +118,7 @@ describe("computeInitialCamera — fit-to-viewport (RU-D11)", () => {
 
     expect(cam.centerX).toBeCloseTo(worldCenterX, 10);
     expect(cam.centerY).toBeCloseTo(worldCenterY, 10);
-    expect(cam.zoom).toBe(4);
+    expect(cam.zoom).toBe(6);
   });
 });
 
@@ -294,10 +294,10 @@ describe("applyZoom", () => {
     expect(zoomed.zoom).toBe(2);
   });
 
-  it("clamps zoom at maximum (8)", () => {
-    const cam = { centerX: 0, centerY: 0, zoom: 7 };
+  it("clamps zoom at maximum (12)", () => {
+    const cam = { centerX: 0, centerY: 0, zoom: 11 };
     const zoomed = applyZoom(cam, 2, 0, 0);
-    expect(zoomed.zoom).toBe(8);
+    expect(zoomed.zoom).toBe(12);
   });
 
   it("clamps zoom at minimum (0.25)", () => {

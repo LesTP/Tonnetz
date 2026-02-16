@@ -40,7 +40,7 @@ Top-level orchestrator for the Tonnetz Interactive Harmonic Explorer. Wires all 
 ## Current Status
 
 **Phase:** 8 — User Testing (In Progress)
-**Focus:** Design pass 1 — visual tuning based on live testing feedback.
+**Focus:** Design passes 1–3 complete (visual tuning, interaction fixes, colors/labels). Scrub removed; all drag = pan. Next: playback and audio testing.
 **Blocked/Broken:** INT-D8 (tempo control UI) deferred to UI testing phase — not blocking implementation
 
 ---
@@ -108,7 +108,6 @@ User gesture (pointer down)
   │
   ├─ onTriangleSelect (post-classification) → UIState.selectChord() + highlight
   ├─ onEdgeSelect (post-classification) → UIState.selectChord() + highlight
-  ├─ onDragScrub → playPitchClasses() on triangle change
   └─ onPointerUp → stopAll()
 
 Progression paste/load
@@ -247,15 +246,14 @@ Play button → AudioTransport.play()
 #### 3c: Interaction post-classification wiring
 - `onTriangleSelect(triId, pcs)` → `UIState.selectChord(shape)` + `highlightTriangle()` (audio already playing from 3b)
 - `onEdgeSelect(edgeId, triIds, pcs)` → `UIState.selectChord(shape)` + `highlightShape()` (audio already playing from 3b)
-- `onDragScrub(triId, pcs)` → `playPitchClasses(state, pcs)` (retrigger on triangle change)
 - `onPointerUp()` → `stopAll(state)`
 - UI state gating: all callbacks suppressed when `"playback-running"` (UX-D6)
 - Note: `UIStateController.selectChord()` silently rejects from `progression-loaded` — integration follows the state machine's lead for visual selection
+- Note: Drag-scrub (`onDragScrub`) was removed — all drag now triggers camera pan regardless of start position. See UX-D3 (Superseded).
 
 **Tests (3c):**
 - [ ] Triangle select → `UIState.selectChord()` called
 - [ ] Edge select → `UIState.selectChord()` called
-- [ ] Drag scrub → `playPitchClasses` on triangle change
 - [ ] Pointer up → `stopAll`
 - [ ] All callbacks suppressed when `"playback-running"`
 - [ ] `"idle"` and `"chord-selected"`: audio plays + visual selection updates

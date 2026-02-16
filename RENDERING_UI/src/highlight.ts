@@ -1,23 +1,38 @@
 import type { TriRef, TriId, Shape, WindowIndices } from "harmony-core";
-import { triPolygonPoints } from "./coords.js";
+import { triVertices } from "harmony-core";
+import { triPolygonPoints, latticeToWorld } from "./coords.js";
 import { svgEl } from "./svg-helpers.js";
 
 // --- Visual constants ---
 
-/** Bright highlight fill colors by orientation. */
-const HIGHLIGHT_FILL_MAJOR = "rgba(60, 120, 230, 0.65)";
-const HIGHLIGHT_FILL_MINOR = "rgba(220, 60, 60, 0.65)";
+/** Bright highlight fill colors by orientation (major=Up=red, minor=Down=blue, matches shape-renderer). */
+const HIGHLIGHT_FILL_MAJOR = "rgba(220, 60, 60, 0.55)";
+const HIGHLIGHT_FILL_MINOR = "rgba(60, 120, 230, 0.55)";
 
-/** Extension highlight fill (half intensity). */
-const HIGHLIGHT_EXT_FILL_MAJOR = "rgba(60, 120, 230, 0.35)";
-const HIGHLIGHT_EXT_FILL_MINOR = "rgba(220, 60, 60, 0.35)";
+/** Extension highlight fill (half intensity, matches shape-renderer). */
+const HIGHLIGHT_EXT_FILL_MAJOR = "rgba(220, 60, 60, 0.28)";
+const HIGHLIGHT_EXT_FILL_MINOR = "rgba(60, 120, 230, 0.28)";
 
-/** Default highlight stroke colors. */
-const HIGHLIGHT_STROKE_MAJOR = "rgba(40, 90, 200, 0.9)";
-const HIGHLIGHT_STROKE_MINOR = "rgba(200, 40, 40, 0.9)";
+/** Default highlight stroke colors (major=Up=red, minor=Down=blue, matches shape-renderer). */
+const HIGHLIGHT_STROKE_MAJOR = "rgba(200, 40, 40, 0.8)";
+const HIGHLIGHT_STROKE_MINOR = "rgba(40, 90, 200, 0.8)";
 
 /** Default highlight stroke width (world units). */
 const DEFAULT_HIGHLIGHT_STROKE_WIDTH = 0.04;
+
+/** Vertex marker radius — matches grid NODE_RADIUS so the ring wraps the node circle. */
+const VERTEX_MARKER_RADIUS = 0.15;
+
+/** Vertex marker stroke width (world units). */
+const VERTEX_MARKER_STROKE_WIDTH = 0.035;
+
+/** Root vertex outline colors (dark, by orientation). */
+const ROOT_OUTLINE_MAJOR = "#8b1a1a";
+const ROOT_OUTLINE_MINOR = "#1a3c8b";
+
+/** Non-root vertex outline colors (light, by orientation). */
+const VERTEX_OUTLINE_MAJOR = "rgba(220, 60, 60, 0.45)";
+const VERTEX_OUTLINE_MINOR = "rgba(60, 120, 230, 0.45)";
 
 // --- Types ---
 
@@ -68,38 +83,103 @@ function createHighlightPolygon(
   return poly;
 }
 
+/**
+ * Determine the root vertex index for a triangle.
+ * Up (major): root at vertex 0 (anchor). Down (minor): root at vertex 2.
+ */
+function rootVertexIndex(orientation: "U" | "D"): 0 | 2 {
+  return orientation === "U" ? 0 : 2;
+}
+
+/**
+ * Create outline circles at all three vertices of a triangle.
+ * Root vertex gets a dark stroke; the other two get a lighter stroke.
+ * All circles are stroke-only (transparent fill) so node labels remain visible.
+ *
+ * @param tri The triangle reference
+ * @param colorOrientation Orientation used to pick colors (override for extension triangles
+ *        so they match the main triad's palette).
+ */
+function createVertexMarkers(
+  tri: TriRef,
+  colorOrientation?: "U" | "D",
+): SVGCircleElement[] {
+  const orient = colorOrientation ?? tri.orientation;
+  const isMajor = orient === "U";
+  const rootStroke = isMajor ? ROOT_OUTLINE_MAJOR : ROOT_OUTLINE_MINOR;
+  const otherStroke = isMajor ? VERTEX_OUTLINE_MAJOR : VERTEX_OUTLINE_MINOR;
+
+  const verts = triVertices(tri);
+  const rootIdx = rootVertexIndex(tri.orientation);
+
+  const circles: SVGCircleElement[] = [];
+  for (let i = 0; i < 3; i++) {
+    const w = latticeToWorld(verts[i].u, verts[i].v);
+    const isRoot = i === rootIdx;
+    circles.push(
+      svgEl("circle", {
+        cx: w.x,
+        cy: w.y,
+        r: VERTEX_MARKER_RADIUS,
+        fill: "none",
+        stroke: isRoot ? rootStroke : otherStroke,
+        "stroke-width": VERTEX_MARKER_STROKE_WIDTH,
+        "data-highlight": "true",
+        "data-highlight-element": isRoot ? "root-marker" : "vertex-marker",
+      }) as SVGCircleElement,
+    );
+  }
+  return circles;
+}
+
 // --- Public API ---
 
 /**
  * Highlight a triangle on the interaction layer.
  *
- * Creates a semi-transparent overlay polygon for visual feedback.
+ * Creates a semi-transparent overlay polygon with outline circles at each
+ * vertex (dark outline at root, lighter at other two vertices).
  * Returns a handle for clearing the highlight.
  *
  * @param layer The SVG group for highlights (layer-interaction)
  * @param triId The triangle ID to highlight
  * @param indices Window indices for triangle lookup
  * @param style Optional highlight styling
+ * @param colorOrientation Override orientation for color selection (used by
+ *        extension triangles so their markers match the main triad palette)
  */
 export function highlightTriangle(
   layer: SVGGElement,
   triId: TriId,
   indices: WindowIndices,
   style?: HighlightStyle,
+  colorOrientation?: "U" | "D",
 ): HighlightHandle {
   const triRef = indices.triIdToRef.get(triId);
   if (!triRef) {
-    // Triangle not in current window — return no-op handle
     return { clear: () => {} };
   }
 
-  const poly = createHighlightPolygon(triRef, style ?? {});
+  const elements: SVGElement[] = [];
+
+  const isExt = colorOrientation !== undefined;
+  const poly = createHighlightPolygon(triRef, style ?? {}, isExt);
   poly.setAttribute("data-tri-id", triId as string);
   layer.appendChild(poly);
+  elements.push(poly);
+
+  const markers = createVertexMarkers(triRef, colorOrientation);
+  for (const m of markers) {
+    layer.appendChild(m);
+    elements.push(m);
+  }
 
   return {
     clear(): void {
-      poly.remove();
+      for (const el of elements) {
+        el.remove();
+      }
+      elements.length = 0;
     },
   };
 }

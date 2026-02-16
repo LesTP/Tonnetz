@@ -3,7 +3,7 @@
  *
  * Phase 3a: Lazy audio initialization (createAppAudioState, ensureAudio)
  * Phase 3b: onPointerDown immediate audio (UX-D4)
- * Phase 3c: Post-classification wiring (select, drag-scrub, pointer-up, state gating)
+ * Phase 3c: Post-classification wiring (select, pointer-up, state gating)
  *
  * Strategy:
  * - Uses real HC functions (buildWindowIndices, getTrianglePcs, getEdgeUnionPcs)
@@ -259,52 +259,6 @@ describe("onPointerDown (Phase 3b)", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("Post-classification callbacks (Phase 3c)", () => {
-  it("onDragScrub triggers playPitchClasses when audio is initialized", async () => {
-    // Pre-initialize audio
-    await ensureAudio(audioState);
-    vi.clearAllMocks();
-
-    const callbacks = createInteractionWiring({
-      audioState,
-      uiState,
-      getIndices: () => indices,
-    });
-
-    callbacks.onDragScrub!("T:U:0,0" as any, [0, 4, 7]);
-
-    expect(mockPlayPitchClasses).toHaveBeenCalledOnce();
-    expect((mockPlayPitchClasses as Mock).mock.calls[0][1]).toEqual([0, 4, 7]);
-  });
-
-  it("onDragScrub does nothing when audio not yet initialized", () => {
-    const callbacks = createInteractionWiring({
-      audioState,
-      uiState,
-      getIndices: () => indices,
-    });
-
-    callbacks.onDragScrub!("T:U:0,0" as any, [0, 4, 7]);
-    expect(mockPlayPitchClasses).not.toHaveBeenCalled();
-  });
-
-  it("onDragScrub suppressed during playback-running (UX-D6)", async () => {
-    await ensureAudio(audioState);
-    vi.clearAllMocks();
-
-    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 } };
-    uiState.loadProgression([dummyShape]);
-    uiState.startPlayback();
-
-    const callbacks = createInteractionWiring({
-      audioState,
-      uiState,
-      getIndices: () => indices,
-    });
-
-    callbacks.onDragScrub!("T:U:0,0" as any, [0, 4, 7]);
-    expect(mockPlayPitchClasses).not.toHaveBeenCalled();
-  });
-
   it("onPointerUp calls stopAll when audio is initialized", async () => {
     await ensureAudio(audioState);
     vi.clearAllMocks();
@@ -348,7 +302,7 @@ describe("Post-classification callbacks (Phase 3c)", () => {
     expect(mockStopAll).toHaveBeenCalledOnce();
   });
 
-  it("idle state allows all callbacks (audio + selection)", async () => {
+  it("idle state allows pointer-down audio callback", async () => {
     await ensureAudio(audioState);
     vi.clearAllMocks();
 
@@ -360,12 +314,12 @@ describe("Post-classification callbacks (Phase 3c)", () => {
       getIndices: () => indices,
     });
 
-    // Drag scrub should work in idle
-    callbacks.onDragScrub!("T:U:0,0" as any, [0, 4, 7]);
-    expect(mockPlayPitchClasses).toHaveBeenCalledOnce();
+    // Pointer up (stop) should work in idle
+    callbacks.onPointerUp!();
+    expect(mockStopAll).toHaveBeenCalledOnce();
   });
 
-  it("chord-selected state allows all callbacks (audio + selection)", async () => {
+  it("chord-selected state allows pointer-down audio callback", async () => {
     await ensureAudio(audioState);
     vi.clearAllMocks();
 
@@ -379,7 +333,7 @@ describe("Post-classification callbacks (Phase 3c)", () => {
       getIndices: () => indices,
     });
 
-    callbacks.onDragScrub!("T:U:0,0" as any, [0, 4, 7]);
-    expect(mockPlayPitchClasses).toHaveBeenCalledOnce();
+    callbacks.onPointerUp!();
+    expect(mockStopAll).toHaveBeenCalledOnce();
   });
 });

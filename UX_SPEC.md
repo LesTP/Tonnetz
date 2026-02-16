@@ -1,6 +1,6 @@
 # UX_SPEC.md
 
-Version: Draft 0.4
+Version: Draft 0.5
 Date: 2026-02-13
 
 ---
@@ -19,12 +19,12 @@ Serves as the authoritative cross-module UX reference.
 All pointer/touch interactions are classified by movement:
 
 * **Tap/click** — pointer down + pointer up with movement below drag threshold (~5px or platform default). Eligible for triangle selection and edge-proximity selection.
-* **Drag** — pointer down + movement exceeds drag threshold. Always enters scrub or pan mode (drag starting on a triangle = scrub, drag starting on background = pan). Edge-proximity selection is suppressed during drag.
-* **Press-hold** — pointer down, chord plays immediately and sounds for the duration of the hold. There is no distinct sustain mode; "sustain" is simply the natural result of holding the pointer down. (UX-D4)
+* **Drag** — pointer down + movement exceeds drag threshold. Always triggers **camera pan** regardless of start position (triangle, edge, or background). Audio and selection events are not fired during drag.
+* **Press-hold** — pointer down, chord plays immediately and sounds for the duration of the hold. There is no distinct sustain mode; "sustain" is simply the natural result of holding the pointer down. If the user begins dragging after holding, pan begins once the drag threshold is exceeded and the chord stops on pointer-up. (UX-D4)
 
 ### Camera navigation
 
-* Drag background → pan
+* Drag (any start position) → pan
 * Scroll / pinch → zoom
 * Reset control → reset view
 
@@ -33,18 +33,19 @@ All pointer/touch interactions are classified by movement:
 * Hover triangle → highlight (desktop)
 * Tap/click triangle → play triad
 * Hold triangle → chord sounds for duration of hold (release stops)
-* Drag across triangles → scrub playback (trigger on triangle change; crossing an edge between two triangles plays two sequential triads, not a union chord) (UX-D3)
 * Tap/click near shared edge → play union chord (see Hit-Testing Model below) (UX-D1)
 * Node selection → single pitch preview (future)
 
 ### Hit-Testing Model (UX-D1)
 
-Interaction hit-testing uses a **proximity circle** centered on the pointer position. The circle radius is approximately half the triangle edge length.
+Interaction hit-testing uses a **proximity circle** centered on the pointer position. The circle radius is 0.12 world units (approximately 12% of the triangle edge length), sized to fit comfortably inside a triangle without reaching nearby edges.
 
 * If the circle is **entirely enclosed** by a single triangle → that triangle's triad is selected
 * If the circle **crosses a shared edge** between two triangles → union chord of both triangles (4 pitch classes) is selected
 * If the circle is **centered near a node** and overlaps three or more triangles → behavior is undefined for MVP (treat as nearest-triangle selection)
 * **Boundary edges** (only one adjacent triangle) never produce union chords — the circle must cross a shared interior edge
+
+The same proximity radius is used for **visual highlighting**, **audio hit-testing**, and the **proximity cursor** display — all three are synchronized.
 
 ### Progression interaction
 
@@ -57,14 +58,15 @@ Interaction hit-testing uses a **proximity circle** centered on the pointer posi
 
 ## 3. Visual Encoding Rules
 
-* Main triad → bright fill
-* Extension triangles → pale fill
+* Main triad → bright fill (red for major/Up, blue for minor/Down)
+* Extension triangles → pale fill (same color scheme, half intensity)
 * Non-triangulated tones → dot markers
 * Dot-only chords (e.g., diminished and augmented triads) → cluster of dot markers near focus
-* Selected chord → highlighted cluster
+* Selected chord → highlighted cluster (same color scheme as fills)
 * Root tone → distinct outline on root vertex
 * Progression path → centroid-connected overlay
 * Union chord (edge selection) → both adjacent triangles highlighted
+* Node labels → dark grey (`#555`); enharmonic nodes show sharp name on top, flat name on bottom (e.g., D# / Eb)
 
 ---
 
@@ -113,11 +115,9 @@ Audio and renderer must react deterministically to these states.
 
 ## 6. Interaction Timing Rules
 
-* Interactive playback: immediate (chord sounds on pointer-down, stops on pointer-up)
+* Interactive playback: immediate (chord sounds on pointer-down, stops on pointer-up; async race protection via generation counter)
 * Scheduled playback: shared transport timebase (see ARCH_AUDIO_ENGINE.md §5)
-* Pointer movement sampled per animation frame
-* Retrigger only on triangle change
-* Drag threshold: ~5px pointer movement or platform default; below threshold = tap, above = drag
+* Drag threshold: ~5px pointer movement or platform default; below threshold = tap, above = pan
 
 ---
 
@@ -232,19 +232,23 @@ in a future phase.
 ```
 
 ```
-UX-D3: Drag-scrub does not trigger union chords
-Date: 2026-02-13
-Status: Closed
+UX-D3: Drag-scrub removed — all drag is camera pan
+Date: 2026-02-16
+Status: Superseded
 Priority: Important
-Decision:
-Dragging across triangles plays sequential triads. Crossing an edge during drag
-produces two sequential triad triggers, not a union chord. Union chords are
-tap/click-only via the proximity-circle model.
+Original decision (2026-02-13):
+Dragging across triangles plays sequential triads (scrub mode). Drag starting on
+background pans the camera.
+Revised decision (2026-02-16):
+Scrub mode removed entirely. ALL drag gestures trigger camera pan, regardless of
+whether the pointer starts on a triangle, edge, or background. This makes panning
+reliable at every zoom level and removes the low-utility scrub feature.
 Rationale:
-Union chords during drag would be musically disruptive — every triangle-to-triangle
-scrub would produce a 4-note chord at each boundary. Sequential triads match the
-expected scrub behavior.
-Revisit if: Users request a modifier key/gesture to enable union chords during drag.
+User testing showed scrub was not useful in practice, and it competed with panning
+for the drag gesture — especially at high zoom where triangles cover most of the
+viewport, making it difficult to find empty background to start a pan.
+Revisit if: A future interaction design needs drag-to-play (e.g., mobile two-finger
+scrub while single-finger pans).
 ```
 
 ```
@@ -254,7 +258,7 @@ Status: Closed
 Priority: Important
 Decision:
 Press-hold is not a separate sustain mode. The chord sounds on pointer-down and
-stops on pointer-up. If the user begins dragging after holding, scrub mode begins
+stops on pointer-up. If the user begins dragging after holding, pan mode begins
 once the drag threshold is exceeded.
 Rationale:
 Simplest model. "Sustain" is the natural result of holding the pointer down.

@@ -66,8 +66,8 @@ describe("CameraController — initial state", () => {
     expect(vb.h).toBeGreaterThan(0);
   });
 
-  it("initial zoom is MAX_ZOOM (4)", () => {
-    expect(ctx.ctrl.getCamera().zoom).toBe(4);
+  it("initial zoom is DEFAULT_ZOOM (6)", () => {
+    expect(ctx.ctrl.getCamera().zoom).toBe(6);
   });
 
   it("getViewBox matches the SVG attribute", () => {
@@ -190,7 +190,7 @@ describe("CameraController — zoom", () => {
       }));
     }
     const cam = ctx.ctrl.getCamera();
-    expect(cam.zoom).toBeLessThanOrEqual(8);
+    expect(cam.zoom).toBeLessThanOrEqual(12);
   });
 
   it("zoom is clamped at minimum (repeated zoom-out)", () => {
@@ -246,18 +246,18 @@ describe("CameraController — reset", () => {
     expect(after.h).toBeCloseTo(initial.h, 5);
   });
 
-  it("reset restores zoom to initial (MAX_ZOOM=4) after zoom-out", () => {
-    // Zoom out first (since we start at max)
+  it("reset restores zoom to initial (DEFAULT_ZOOM=6) after zoom-out", () => {
+    // Zoom out first (since initial is already DEFAULT_ZOOM)
     for (let i = 0; i < 10; i++) {
       ctx.svg.dispatchEvent(new WheelEvent("wheel", {
         clientX: 400, clientY: 300, deltaY: 120, bubbles: true,
       }));
     }
-    expect(ctx.ctrl.getCamera().zoom).toBeLessThan(4);
+    expect(ctx.ctrl.getCamera().zoom).toBeLessThan(6);
 
     ctx.ctrl.reset();
 
-    expect(ctx.ctrl.getCamera().zoom).toBe(4);
+    expect(ctx.ctrl.getCamera().zoom).toBe(6);
   });
 });
 
@@ -304,19 +304,19 @@ describe("CameraController — updateDimensions", () => {
     expect(vbAfter.w).not.toBeCloseTo(vbBefore.w, 1);
   });
 
-  it("resets camera to initial zoom (MAX_ZOOM=4) after updateDimensions", () => {
-    // Zoom out first (since initial is already MAX_ZOOM)
+  it("resets camera to initial zoom (DEFAULT_ZOOM=6) after updateDimensions", () => {
+    // Zoom out first (since initial is already DEFAULT_ZOOM)
     for (let i = 0; i < 10; i++) {
       ctx.svg.dispatchEvent(new WheelEvent("wheel", {
         clientX: 400, clientY: 300, deltaY: 120, bubbles: true,
       }));
     }
-    expect(ctx.ctrl.getCamera().zoom).toBeLessThan(4);
+    expect(ctx.ctrl.getCamera().zoom).toBeLessThan(6);
 
     const newBounds: WindowBounds = { uMin: -3, uMax: 3, vMin: -3, vMax: 3 };
     ctx.ctrl.updateDimensions(1024, 768, newBounds);
 
-    expect(ctx.ctrl.getCamera().zoom).toBe(4);
+    expect(ctx.ctrl.getCamera().zoom).toBe(6);
   });
 
   it("resets camera center after updateDimensions (discards pan)", () => {

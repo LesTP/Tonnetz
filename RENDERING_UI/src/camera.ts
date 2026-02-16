@@ -17,8 +17,8 @@ export interface ViewBox {
 }
 
 const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 8;
-const DEFAULT_ZOOM = 4;
+const MAX_ZOOM = 12;
+const DEFAULT_ZOOM = 6;
 
 /**
  * Compute responsive window bounds based on container size and minimum

@@ -1,24 +1,31 @@
 import type { Shape, TriRef, WindowIndices, NodeCoord } from "harmony-core";
 import { triVertices, pc, parseNodeId } from "harmony-core";
 import { latticeToWorld, triPolygonPoints } from "./coords.js";
-import type { WorldPoint } from "./coords.js";
 import { svgEl } from "./svg-helpers.js";
 
 // --- Visual constants ---
 
-/** Main triangle fill colors by orientation. */
-const MAIN_TRI_FILL_MAJOR = "rgba(60, 120, 230, 0.55)";
-const MAIN_TRI_FILL_MINOR = "rgba(220, 60, 60, 0.55)";
+/** Main triangle fill colors by orientation (major=Up=red, minor=Down=blue). */
+const MAIN_TRI_FILL_MAJOR = "rgba(220, 60, 60, 0.55)";
+const MAIN_TRI_FILL_MINOR = "rgba(60, 120, 230, 0.55)";
 
 /** Extension triangle fill colors (half intensity). */
-const EXT_TRI_FILL_MAJOR = "rgba(60, 120, 230, 0.28)";
-const EXT_TRI_FILL_MINOR = "rgba(220, 60, 60, 0.28)";
+const EXT_TRI_FILL_MAJOR = "rgba(220, 60, 60, 0.28)";
+const EXT_TRI_FILL_MINOR = "rgba(60, 120, 230, 0.28)";
 
-/** Root vertex marker radius (world units). */
-const ROOT_MARKER_RADIUS = 0.12;
+/** Vertex marker radius — matches grid NODE_RADIUS so the ring wraps the node circle. */
+const VERTEX_MARKER_RADIUS = 0.15;
 
-/** Root vertex marker fill color. */
-const ROOT_MARKER_FILL = "#e63946";
+/** Vertex marker stroke width (world units). */
+const VERTEX_MARKER_STROKE_WIDTH = 0.035;
+
+/** Root vertex outline colors (dark, by orientation). */
+const ROOT_OUTLINE_MAJOR = "#8b1a1a";
+const ROOT_OUTLINE_MINOR = "#1a3c8b";
+
+/** Non-root vertex outline colors (light, by orientation). */
+const VERTEX_OUTLINE_MAJOR = "rgba(220, 60, 60, 0.45)";
+const VERTEX_OUTLINE_MINOR = "rgba(60, 120, 230, 0.45)";
 
 /** Dot cluster dot radius (world units). */
 const DOT_RADIUS = 0.1;
@@ -29,9 +36,9 @@ const DOT_FILL = "#457b9d";
 /** Stroke width for triangle fills. */
 const TRI_STROKE_WIDTH = 0.02;
 
-/** Triangle stroke colors by orientation. */
-const TRI_STROKE_MAJOR = "rgba(40, 90, 200, 0.8)";
-const TRI_STROKE_MINOR = "rgba(200, 40, 40, 0.8)";
+/** Triangle stroke colors by orientation (major=Up=red, minor=Down=blue). */
+const TRI_STROKE_MAJOR = "rgba(200, 40, 40, 0.8)";
+const TRI_STROKE_MINOR = "rgba(40, 90, 200, 0.8)";
 
 // --- Helpers for orientation-based colors ---
 
@@ -57,30 +64,17 @@ export interface ShapeHandle {
 
 /** Options for shape rendering. */
 export interface ShapeRenderOptions {
-  /** Main triangle fill color (default: semi-transparent blue). */
+  /** Main triangle fill color (default: orientation-based). */
   mainTriFill?: string;
-  /** Extension triangle fill color (default: lighter blue). */
+  /** Extension triangle fill color (default: orientation-based, lighter). */
   extTriFill?: string;
-  /** Root marker fill color (default: red). */
-  rootMarkerFill?: string;
   /** Dot fill color (default: blue). */
   dotFill?: string;
-  /** Whether to show root marker (default: true). */
+  /** Whether to show vertex markers (default: true). */
   showRootMarker?: boolean;
 }
 
 // --- Internal helpers ---
-
-/**
- * Get the world position of a specific vertex of a triangle.
- * @param tri Triangle reference
- * @param vertexIndex 0, 1, or 2
- */
-function getTriVertexWorld(tri: TriRef, vertexIndex: 0 | 1 | 2): WorldPoint {
-  const verts = triVertices(tri);
-  const v = verts[vertexIndex];
-  return latticeToWorld(v.u, v.v);
-}
 
 /**
  * Find the nearest node in the window that has a given pitch class.
@@ -134,9 +128,9 @@ export function renderShape(
 ): ShapeHandle {
   const elements: SVGElement[] = [];
 
-  const rootFill = options?.rootMarkerFill ?? ROOT_MARKER_FILL;
   const dotFillColor = options?.dotFill ?? DOT_FILL;
   const showRoot = options?.showRootMarker !== false;
+  const mainOrientation = shape.main_tri?.orientation ?? "U";
 
   // Use DocumentFragment for batched DOM insertion (avoid multiple reflows)
   const chordFrag = document.createDocumentFragment();
@@ -172,18 +166,48 @@ export function renderShape(
     elements.push(extPoly as SVGElement);
   }
 
-  // --- Render root vertex marker ---
-  if (showRoot && shape.main_tri !== null && shape.root_vertex_index !== null) {
-    const rootPos = getTriVertexWorld(shape.main_tri, shape.root_vertex_index);
-    const rootMarker = svgEl("circle", {
-      cx: rootPos.x,
-      cy: rootPos.y,
-      r: ROOT_MARKER_RADIUS,
-      fill: rootFill,
-      "data-shape-element": "root-marker",
-    });
-    chordFrag.appendChild(rootMarker);
-    elements.push(rootMarker as SVGElement);
+  // --- Render vertex markers (outline circles at all triangle vertices) ---
+  // Main triangle: all vertices with root=dark, others=light outline
+  if (showRoot && shape.main_tri !== null) {
+    const isMajor = mainOrientation === "U";
+    const rootStroke = isMajor ? ROOT_OUTLINE_MAJOR : ROOT_OUTLINE_MINOR;
+    const otherStroke = isMajor ? VERTEX_OUTLINE_MAJOR : VERTEX_OUTLINE_MINOR;
+    const verts = triVertices(shape.main_tri);
+
+    for (let i = 0; i < 3; i++) {
+      const w = latticeToWorld(verts[i].u, verts[i].v);
+      const isRoot = shape.root_vertex_index !== null && i === shape.root_vertex_index;
+      const marker = svgEl("circle", {
+        cx: w.x,
+        cy: w.y,
+        r: VERTEX_MARKER_RADIUS,
+        fill: "none",
+        stroke: isRoot ? rootStroke : otherStroke,
+        "stroke-width": VERTEX_MARKER_STROKE_WIDTH,
+        "data-shape-element": isRoot ? "root-marker" : "vertex-marker",
+      });
+      chordFrag.appendChild(marker);
+      elements.push(marker as SVGElement);
+    }
+
+    // Extension triangle vertices — use main triad's color palette
+    for (const ext of shape.ext_tris) {
+      const extVerts = triVertices(ext);
+      for (let i = 0; i < 3; i++) {
+        const w = latticeToWorld(extVerts[i].u, extVerts[i].v);
+        const marker = svgEl("circle", {
+          cx: w.x,
+          cy: w.y,
+          r: VERTEX_MARKER_RADIUS,
+          fill: "none",
+          stroke: otherStroke,
+          "stroke-width": VERTEX_MARKER_STROKE_WIDTH,
+          "data-shape-element": "vertex-marker",
+        });
+        chordFrag.appendChild(marker);
+        elements.push(marker as SVGElement);
+      }
+    }
   }
 
   // --- Render dot clusters ---
