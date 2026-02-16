@@ -1415,3 +1415,87 @@ Total: 936 passed (936) — 0 failures
 Design passes 1-4 complete. Next: playback and audio testing.
 
 ---
+
+## Entry 22 — Phase 8: User Testing — Playback Testing Session
+
+Date: 2026-02-16
+
+### Goal
+
+Code review of all playback-related code paths after the Design Pass 4 grid-highlighter rewrite. Verify the full scheduled playback lifecycle: load → play → chord-change highlighting → stop → clear, plus natural completion and UI state gating.
+
+### Test Baseline
+
+All test suites passing before and after changes:
+
+```
+HC:  168 passed (168)
+RU:  341 passed (341)
+AE:  172 passed (172)
+PD:  108 passed (108)
+INT: 141 passed (141)
+Total: 930 passed — 0 failures
+```
+
+**Note:** Prior DEVLOG entries reported 344 RU / 144 INT tests. No test files were modified; the actual counts have been 341 / 141. Prior entries slightly inflated the count. Corrected going forward.
+
+### Bugs Found & Fixed
+
+| # | Bug | Severity | Root Cause | Fix |
+|---|-----|----------|------------|-----|
+| 1 | Interactive grid highlight fires during playback (UX-D6 violation) | Medium | `onPointerDown` wrapper in main.ts activated grid highlights without checking UI state — only `baseInteractionCallbacks.onPointerDown` (interaction-wiring.ts) checked `isPlaybackSuppressed`. Visual highlight fired even though audio was suppressed. | Added UI state check at top of `onPointerDown` wrapper — early return to `baseInteractionCallbacks` (which handles its own gating) when state is `playback-running` or `progression-loaded`. |
+| 2 | `handleStop()` doesn't clear playback grid highlight | Medium | When user clicks Stop, `activeGridHandle` (from last `setActiveChord`) was not deactivated. Last chord's triangle stayed visually "playing" (deep fill, colored edges/nodes) even after stop. | Added `deactivateGridHighlight(activeGridHandle); activeGridHandle = null;` to `handleStop()`. |
+| 3 | Natural playback completion leaves last chord highlighted | Medium | Transport fires `onStateChange(playing: false)` on completion. `wireTransportToUIState` calls `uiState.stopPlayback()` but doesn't clear grid highlight. `setActiveChord(-1)` was only in `handleStop()`, not in the natural-completion path. | Added `transport.onStateChange()` listener in main.ts that clears `activeGridHandle` and resets path active chord on `playing: false`. Runs for both explicit stop and natural completion (idempotent with `handleStop` — safe to double-clear). |
+| 4 | Dual grid highlight handle conflict | Low | Two independent `GridHighlightHandle` variables (`interactiveGridHandle` for press/release, `activeGridHandle` for playback) could theoretically both be active on overlapping grid elements. | Moved `interactiveGridHandle` declaration to top-level state alongside `activeGridHandle`. Added explicit clear of both handles in `handlePlay()` before entering playback. BUG 1 fix prevents interactive highlights during playback, making runtime overlap impossible. |
+
+### Code Review Findings (No-Fix Items)
+
+| Finding | Assessment |
+|---------|-----------|
+| `createControlPanelCallbacks()` in transport-wiring.ts is defined but unused — main.ts wires buttons directly via `handlePlay`/`handleStop`/`handleClear` | Benign dead code. The function was designed for a callback-based wiring pattern but main.ts uses direct function refs instead. Not harmful; could be cleaned up in a future pass. |
+| `onTriangleSelect` and `onEdgeSelect` in interaction-wiring.ts are now no-ops (visual highlighting moved to `onPointerDown` wrapper) | Correct — audio plays from `onPointerDown` (UX-D4), visual highlight from `onPointerDown` wrapper. Post-classification callbacks have no remaining responsibility. Could be simplified but no functional impact. |
+| `transport.onStateChange()` listener added in main.ts runs alongside `wireTransportToUIState` — both fire on `playing: false` | Idempotent: `deactivateGridHighlight(null)` is a no-op, `setActiveChord(-1)` when already -1 is harmless. No race condition risk since both run in the same microtask. |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `INTEGRATION/src/main.ts` | **BUG 1:** Added UI state check in `onPointerDown` wrapper to suppress interactive highlights during playback/progression-loaded. **BUG 2:** Added grid highlight deactivation in `handleStop()`. **BUG 3:** Added `transport.onStateChange` listener to clear grid highlight on natural completion. **BUG 4:** Moved `interactiveGridHandle` to top-level state; clear both handles in `handlePlay()`. |
+
+### Playback Flow After Fixes
+
+```
+Load progression
+  → deactivateGridHighlight(both handles)
+  → render path + schedule events
+  → wire transport (once)
+
+Play button
+  → deactivate both grid highlights
+  → transport.play()
+  → onChordChange(0) → setActiveChord(0) → activateGridHighlight(chord 0)
+  → onChordChange(1) → deactivate(chord 0) → activateGridHighlight(chord 1)
+  → ...
+  → onChordChange(N) → activateGridHighlight(last chord)
+
+Stop button (explicit)
+  → transport.stop()
+  → handleStop() → deactivateGridHighlight + setActiveChord(-1)
+  → onStateChange(playing:false) → deactivate (idempotent no-op)
+
+Natural completion
+  → transport auto-stops
+  → onStateChange(playing:false) → deactivateGridHighlight + setActiveChord(-1)
+
+Interactive press during playback
+  → UI state check → early return (no visual or audio effect)
+
+Clear
+  → cancelSchedule + deactivate + clear path + reset state
+```
+
+### Phase 8 Status: In Progress
+
+Design passes 1-4 complete. Playback testing session complete — 4 bugs found and fixed. Next: audio quality testing (synthesis, voice-leading, timing).
+
+---

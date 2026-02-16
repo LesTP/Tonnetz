@@ -81,6 +81,9 @@ let currentShapes: readonly Shape[] = [];
 /** Active grid highlight handle during playback (deep fill on grid triangles). */
 let activeGridHandle: GridHighlightHandle | null = null;
 
+/** Active grid highlight handle during interactive press (restored on pointer-up). */
+let interactiveGridHandle: GridHighlightHandle | null = null;
+
 /**
  * PathHandle proxy for transport wiring.
  *
@@ -233,13 +236,23 @@ function loadProgressionFromChords(chords: string[]): boolean {
     transport.setTempo(persistence.settings.tempo_bpm);
     transport.scheduleProgression(result.events);
 
-    // Wire transport subscriptions once (first load)
+  // Wire transport subscriptions once (first load)
     if (!transportUnsub) {
       transportUnsub = wireAllTransportSubscriptions({
         transport,
         pathHandle: pathHandleProxy,
         uiState,
         controlPanel,
+      });
+
+      // Clear grid highlight on natural playback completion (BUG 3 fix).
+      // handleStop() covers explicit stop; this covers transport auto-stop.
+      transport.onStateChange((event) => {
+        if (!event.playing) {
+          deactivateGridHighlight(activeGridHandle);
+          activeGridHandle = null;
+          currentPathHandle?.setActiveChord(-1);
+        }
       });
     }
   });
@@ -273,7 +286,9 @@ function handleClear(): void {
 
 function handlePlay(): void {
   if (!audioState.transport) return;
-  // Deactivate any interactive grid highlight when entering playback mode
+  // Deactivate any interactive or playback grid highlight when entering playback mode
+  deactivateGridHighlight(interactiveGridHandle);
+  interactiveGridHandle = null;
   deactivateGridHighlight(activeGridHandle);
   activeGridHandle = null;
   audioState.transport.play();
@@ -284,6 +299,9 @@ function handleStop(): void {
   if (!audioState.transport) return;
   audioState.transport.stop();
   uiState.stopPlayback();
+  // Clear playback grid highlight (last chord's visual state)
+  deactivateGridHighlight(activeGridHandle);
+  activeGridHandle = null;
   if (currentPathHandle) {
     currentPathHandle.setActiveChord(-1);
   }
@@ -318,11 +336,17 @@ const baseInteractionCallbacks = createInteractionWiring({
 
 // Wrap callbacks to add visual highlighting on pointer-down (immediate feedback)
 // Uses grid-highlighter: mutates grid triangle fills directly instead of overlays
-let interactiveGridHandle: GridHighlightHandle | null = null;
 
 const interactionCallbacks = {
   ...baseInteractionCallbacks,
   onPointerDown: (world: { x: number; y: number }) => {
+    // Suppress interactive highlighting during playback or progression-loaded (UX-D6)
+    const state = uiState.getState();
+    if (state === "playback-running" || state === "progression-loaded") {
+      baseInteractionCallbacks.onPointerDown?.(world);
+      return;
+    }
+
     // Highlight immediately on press (before tap/drag classification)
     const indices = resizeCtrl.getIndices();
     const hit = hitTest(world.x, world.y, INTERACTION_PROXIMITY, indices);
