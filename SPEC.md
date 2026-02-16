@@ -43,6 +43,7 @@ Develop an interactive Tonnetz-based harmonic exploration application that allow
   * triads (maj, min, dim, aug)
   * 6, add9, 6/9
   * maj7, 7, m7
+  * dim7, m7b5 (half-diminished)
 * local progression save/load
 * URL-based progression sharing
 
@@ -165,7 +166,7 @@ Harmony Core is the first completed subsystem. Other modules consume it through 
 | `WindowBounds` | Rectangular lattice window bounds |
 | `WindowIndices` | Precomputed index maps for active window |
 | `Quality` | Chord quality (`"maj"`, `"min"`, `"dim"`, `"aug"`) |
-| `Extension` | Chord extension (`"6"`, `"7"`, `"maj7"`, `"add9"`, `"6/9"`) |
+| `Extension` | Chord extension (`"6"`, `"7"`, `"maj7"`, `"add9"`, `"6/9"`, `"dim7"`, `"m7b5"`) |
 | `Chord` | Parsed chord structure with pitch-class sets |
 | `Shape` | Decomposed chord on the lattice (triangles, dots, centroid, `root_vertex_index` nullable for dot-only shapes) |
 
@@ -679,11 +680,35 @@ Deliver playable harmonic instrument with progression visualization.
 
 # Known Limitations (v1)
 
-* limited chord grammar (no augmented extended chords)
+* limited chord grammar (no augmented extended chords; no 9/11/13 tensions)
 * diminished and augmented triads rendered as dot clusters, not triangles
 * no shared progression library
 * simple synthesis model
 * minimal voice-leading optimization
+
+---
+
+# Development Environment
+
+## Prerequisites
+
+* Node.js (LTS recommended)
+* npm (bundled with Node)
+
+## Gotchas
+
+* **Source control:** This project uses **Git**, not Sapling. Use `git` commands (`git status`, `git add`, `git commit`, etc.), not `sl`.
+* **TypeScript:** TypeScript is installed **per-module** as a devDependency, not globally. To type-check, `cd` into the module directory first:
+  ```bash
+  cd HARMONY_CORE && npx tsc --noEmit
+  cd RENDERING_UI && npx tsc --noEmit
+  ```
+  Running `npx tsc` from the project root will fail ("not the tsc command you are looking for").
+* **Test runner:** Each module uses Vitest. Run tests from the module directory:
+  ```bash
+  cd HARMONY_CORE && npx vitest run
+  ```
+* **No monorepo tool:** There is no Lerna/Nx/Turborepo. Each module under the project root is an independent npm package with its own `package.json`, `tsconfig.json`, and `vitest.config.ts`.
 
 ---
 

@@ -39,9 +39,11 @@ Top-level orchestrator for the Tonnetz Interactive Harmonic Explorer. Wires all 
 
 ## Current Status
 
-**Phase:** 8 — User Testing (In Progress)
-**Focus:** Design passes 1–4 complete (visual tuning, interaction fixes, colors/labels, triangle playing-state redesign). Scrub removed; all drag = pan. Grid-highlighter replaces overlay approach. Next: playback and audio testing.
-**Blocked/Broken:** INT-D8 (tempo control UI) deferred to UI testing phase — not blocking implementation
+**Phase:** CLOSED
+**Status:** Integration wiring complete. All subsystems operational. 930 tests passing.
+**Successor track:** `MVP_POLISH/DEVPLAN.md` — UI layout redesign, progression library, audio quality, mobile UAT.
+**Migration:** Phase 8 Entries 18–22 (Design Passes 1–4 + Playback Testing) migrated to MVP Polish DEVLOG as Entries 0a–0e.
+**Carried forward:** INT-D8 (tempo control UI) → resolved in MVP Polish Phase 1b.
 
 ---
 

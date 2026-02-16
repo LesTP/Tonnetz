@@ -31,9 +31,27 @@ const EXTENSION_INTERVALS: Record<Extension, number[]> = {
   maj7: [11],
   add9: [2],
   "6/9": [9, 2],
+  dim7: [9],
+  m7b5: [10],
 };
 
-const CHORD_RE = /^([A-G])(#|b)?(m(?!aj)|dim|aug)?(maj7|add9|6\/9|6|7)?$/;
+/**
+ * Chord symbol regex.
+ *
+ * Capture groups:
+ *   1: root letter  (A-G)
+ *   2: accidental    (# or b, optional)
+ *   3: compound suffix — dim7 or m7b5 (bypasses quality+extension split)
+ *   4: quality token  (m, dim, aug — optional; absent = major)
+ *   5: extension      (maj7, add9, 6/9, 6, 7 — optional)
+ *
+ * dim7 and m7b5 are captured as compound tokens in group 3 because:
+ *   - "Cdim7" must NOT be parsed as quality=dim + extension=7 (that's half-dim)
+ *   - "Cm7b5" can't be parsed as quality=m + extension=7b5 (7b5 isn't a token)
+ * When group 3 matches, groups 4/5 are empty. The parser infers quality+extension
+ * from the compound token.
+ */
+const CHORD_RE = /^([A-G])(#|b)?(?:(dim7|m7b5)|(m(?!aj)|dim|aug)?(maj7|add9|6\/9|6|7)?)?$/;
 
 const QUALITY_MAP: Record<string, Quality> = {
   m: "min",
@@ -59,20 +77,30 @@ export function parseChordSymbol(text: string): Chord {
     throw new Error(`Invalid chord symbol: "${text}"`);
   }
 
-  const [, rootLetter, accidental, qualityToken, extToken] = match;
+  const [, rootLetter, accidental, compound, qualityToken, extToken] = match;
   const rootName = rootLetter + (accidental ?? "");
   const rootPc = ROOT_MAP[rootName];
   if (rootPc === undefined) {
     throw new Error(`Unknown root note: "${rootName}"`);
   }
 
-  const quality: Quality = qualityToken ? QUALITY_MAP[qualityToken] : "maj";
-  const extension: Extension | null = (extToken as Extension) ?? null;
+  let quality: Quality;
+  let extension: Extension | null;
 
-  if (quality === "aug" && extension !== null) {
-    throw new Error(
-      `Augmented extended chords excluded from MVP: "${text}"`,
-    );
+  if (compound) {
+    // dim7 → diminished triad + diminished 7th (interval 9)
+    // m7b5 → diminished triad + minor 7th (interval 10)
+    quality = "dim";
+    extension = compound as Extension;
+  } else {
+    quality = qualityToken ? QUALITY_MAP[qualityToken] : "maj";
+    extension = (extToken as Extension) ?? null;
+
+    if (quality === "aug" && extension !== null) {
+      throw new Error(
+        `Augmented extended chords excluded from MVP: "${text}"`,
+      );
+    }
   }
 
   return computeChordPcs(rootPc, quality, extension);

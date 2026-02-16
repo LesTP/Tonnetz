@@ -70,6 +70,42 @@ describe("parseChordSymbol", () => {
     expect(() => parseChordSymbol("Caug7")).toThrow(/augmented extended/i);
   });
 
+  // Phase 0b: dim7 and m7b5
+  it('"Cdim7" → root_pc=0, quality=dim, extension=dim7', () => {
+    const c = parseChordSymbol("Cdim7");
+    expect(c.root_pc).toBe(0);
+    expect(c.quality).toBe("dim");
+    expect(c.extension).toBe("dim7");
+  });
+
+  it('"F#dim7" → root_pc=6, quality=dim, extension=dim7', () => {
+    const c = parseChordSymbol("F#dim7");
+    expect(c.root_pc).toBe(6);
+    expect(c.quality).toBe("dim");
+    expect(c.extension).toBe("dim7");
+  });
+
+  it('"Am7b5" → root_pc=9, quality=dim, extension=m7b5', () => {
+    const c = parseChordSymbol("Am7b5");
+    expect(c.root_pc).toBe(9);
+    expect(c.quality).toBe("dim");
+    expect(c.extension).toBe("m7b5");
+  });
+
+  it('"Cm7b5" → root_pc=0, quality=dim, extension=m7b5', () => {
+    const c = parseChordSymbol("Cm7b5");
+    expect(c.root_pc).toBe(0);
+    expect(c.quality).toBe("dim");
+    expect(c.extension).toBe("m7b5");
+  });
+
+  it('"Ebm7b5" → root_pc=3, quality=dim, extension=m7b5', () => {
+    const c = parseChordSymbol("Ebm7b5");
+    expect(c.root_pc).toBe(3);
+    expect(c.quality).toBe("dim");
+    expect(c.extension).toBe("m7b5");
+  });
+
   it('invalid input "XYZ" → error', () => {
     expect(() => parseChordSymbol("XYZ")).toThrow(/invalid chord symbol/i);
   });
@@ -147,6 +183,41 @@ describe("computeChordPcs", () => {
   it("C6/9: chord_pcs = {0,4,7,9,2}", () => {
     const c = computeChordPcs(0, "maj", "6/9");
     expect(new Set(c.chord_pcs)).toEqual(new Set([0, 4, 7, 9, 2]));
+  });
+
+  // Phase 0b: dim7 and m7b5 pitch-class correctness
+  it("Cdim7: chord_pcs = {0,3,6,9} (diminished triad + bb7)", () => {
+    const c = computeChordPcs(0, "dim", "dim7");
+    expect(c.main_triad_pcs).toEqual([0, 3, 6]);
+    expect(new Set(c.chord_pcs)).toEqual(new Set([0, 3, 6, 9]));
+  });
+
+  it("Adim7: chord_pcs = {9,0,3,6} (A-C-Eb-Gb)", () => {
+    const c = computeChordPcs(9, "dim", "dim7");
+    expect(c.main_triad_pcs).toEqual([9, 0, 3]);
+    expect(new Set(c.chord_pcs)).toEqual(new Set([9, 0, 3, 6]));
+  });
+
+  it("Cm7b5: chord_pcs = {0,3,6,10} (diminished triad + b7)", () => {
+    const c = computeChordPcs(0, "dim", "m7b5");
+    expect(c.main_triad_pcs).toEqual([0, 3, 6]);
+    expect(new Set(c.chord_pcs)).toEqual(new Set([0, 3, 6, 10]));
+  });
+
+  it("Am7b5: chord_pcs = {9,0,3,7} (A-C-Eb-G)", () => {
+    const c = computeChordPcs(9, "dim", "m7b5");
+    expect(c.main_triad_pcs).toEqual([9, 0, 3]);
+    expect(new Set(c.chord_pcs)).toEqual(new Set([9, 0, 3, 7]));
+  });
+
+  it("dim7 pcs form symmetric diminished pattern (minor 3rds)", () => {
+    const c = computeChordPcs(0, "dim", "dim7");
+    const pcs = c.chord_pcs.sort((a, b) => a - b);
+    expect(pcs).toEqual([0, 3, 6, 9]);
+    // All intervals are 3 semitones apart
+    for (let i = 0; i < pcs.length - 1; i++) {
+      expect(pcs[i + 1] - pcs[i]).toBe(3);
+    }
   });
 
   it("all pcs are in 0..11", () => {

@@ -101,18 +101,53 @@ The grid uses a **mutate-grid** approach: playing state is achieved by changing 
 
 ## 4. Layout Zones
 
-The interface is organized into three primary zones:
+The interface is organized into two primary zones with responsive behavior:
 
 | Zone           | Function                                    |
 | -------------- | ------------------------------------------- |
+| Sidebar        | Title/branding, progression input, library browser, playback controls + tempo, info/about button |
 | Central Canvas | Tonnetz lattice, interaction surface        |
-| Control Panel  | progression input, playback controls, tempo |
-| Toolbar        | view reset, optional overlays, mode toggles |
 
-Layout must remain responsive:
+### Responsive Behavior
 
-* control panel collapsible on small screens
-* canvas remains primary focus element
+| Breakpoint | Sidebar | Canvas |
+|------------|---------|--------|
+| Desktop (≥768px) | Permanent left panel, always visible | Fills remaining width |
+| Mobile (<768px) | Hidden by default; revealed via hamburger (☰) button as overlay/dropdown | Full width; interaction unaffected by sidebar state |
+
+- Hamburger button positioned at top-left corner on mobile
+- Sidebar dismisses on: outside tap, hamburger tap, or Escape key
+- Canvas viewport dynamically resizes when sidebar appears/disappears on desktop
+- Mobile sidebar overlays the canvas without resizing it
+
+### Sidebar Content Order (top to bottom)
+
+1. **Title / branding** — app title ("Tone Nets" tentative, see POL-D2)
+2. **Progression input** — textarea for paste/type, Load button
+3. **Library browser** — curated progression library with three views (All, By Genre, By Harmonic Feature); see §4b
+4. **Playback controls** — Play, Stop, Clear buttons + tempo controller (slider or input, ~40–240 BPM)
+5. **Info buttons** — two buttons triggering separate modals:
+   - `?` / "How to Use" → practical guide: interaction, keyboard shortcuts, supported chord symbols, input tips, library usage
+   - `ⓘ` / "About" → conceptual: Tonnetz history & theory, harmonic geometry explanation, credits/author (POL-D8)
+
+### 4b. Progression Library
+
+Bundled library of ~25 curated progressions. Static data (not user-generated; user save/load is PD's domain).
+
+**Three browsing views:**
+1. **All (alphabetical)** — flat list sorted by title
+2. **By genre** — grouped/filtered by genre tag
+3. **By harmonic feature** — grouped/filtered by harmonic feature tag (e.g., "ii-V-I", "chromatic mediant", "tritone sub")
+
+**Per-entry display:** title, composer (if present), genre badge, first few chords as preview, comment (expandable or tooltip).
+
+**Interaction:** selecting an entry loads the progression into the pipeline (same as paste).
+
+---
+
+### Legacy Layout (superseded)
+
+The previous three-zone layout (Toolbar, Canvas, Control Panel) implemented via `createLayoutManager()` and `createControlPanel()` in RU is superseded by the sidebar design. See POL-D1 for implementation approach.
 
 ---
 

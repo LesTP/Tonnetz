@@ -10,16 +10,18 @@
 export { gridToBeatsPerChord, collapseRepeatedChords } from "./grid-to-beats.js";
 export type { CollapsedChord } from "./grid-to-beats.js";
 
-// Progression pipeline (Phase 2b/2c)
+// Progression pipeline (Phase 2b/2c + Phase 0b input cleaning)
 export {
   parseProgressionInput,
   loadProgressionPipeline,
+  cleanChordSymbol,
 } from "./progression-pipeline.js";
 export type {
   PipelineSuccess,
   PipelineError,
   PipelineResult,
   PipelineArgs,
+  CleanResult,
 } from "./progression-pipeline.js";
 
 // Interaction wiring (Phase 3)

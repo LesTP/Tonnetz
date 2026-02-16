@@ -58,7 +58,7 @@ export interface WindowIndices {
 export type Quality = "maj" | "min" | "dim" | "aug";
 
 /** Single chord extension (MVP grammar allows at most one). */
-export type Extension = "6" | "7" | "maj7" | "add9" | "6/9";
+export type Extension = "6" | "7" | "maj7" | "add9" | "6/9" | "dim7" | "m7b5";
 
 /** Parsed chord structure. */
 export interface Chord {
