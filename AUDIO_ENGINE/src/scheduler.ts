@@ -167,7 +167,9 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
   if (slot.scheduled) return;
   slot.scheduled = true;
 
-  const pcs = [...slot.event.shape.covered_pcs];
+  // Use the full chord pitch classes for audio when available. Fall back
+  // to covered_pcs for backward compatibility with tests/mocks.
+  const pcs = slot.event.shape.chord?.chord_pcs ?? [...slot.event.shape.covered_pcs];
   if (pcs.length === 0) return;
 
   // Voice with voice-leading continuity

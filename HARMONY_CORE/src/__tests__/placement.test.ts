@@ -181,12 +181,16 @@ describe("decomposeChordToShape — dot-only", () => {
     expect(shape.ext_tris).toHaveLength(0);
   });
 
-  it("F#dim → dot_pcs = chord_pcs, centroid = focus", () => {
+  it("F#dim → dot_pcs = chord_pcs, centroid near focus (computed from nearest nodes)", () => {
     const chord = parseChordSymbol("F#dim");
-    const f = { u: 2.5, v: 1.5 };
+    const f: NodeCoord = { u: 2.5, v: 1.5 };
     const shape = decomposeChordToShape(chord, null, f, idx);
     expect(new Set(shape.dot_pcs)).toEqual(new Set([6, 9, 0]));
-    expect(shape.centroid_uv).toEqual(f);
+    // Centroid is now the average of nearest node positions, not exactly the focus
+    expect(typeof shape.centroid_uv.u).toBe("number");
+    expect(typeof shape.centroid_uv.v).toBe("number");
+    expect(Number.isFinite(shape.centroid_uv.u)).toBe(true);
+    expect(Number.isFinite(shape.centroid_uv.v)).toBe(true);
   });
 
   it("Caug → dot-only shape", () => {

@@ -1,6 +1,6 @@
 # Progression Library — Content Reference
 
-28 curated progressions for the Tonnetz Interactive Harmonic Explorer.
+29 curated progressions for the Tonnetz Interactive Harmonic Explorer.
 This document is the authoritative content source for Phase 2a implementation.
 
 **Chord symbol convention:** All symbols must parse through HC `parseChordSymbol()` after Phase 0b grammar expansion (dim7, m7b5) and input cleaning (slash stripping). Slash chords in the `chords[]` array are listed WITHOUT the bass note — input cleaning handles this at load time. Roman numeral analysis is display-only metadata (shown in the card comment).
@@ -19,6 +19,7 @@ This document is the authoritative content source for Phase 2a implementation.
 | Jazz | 11, 12, 15, 16, 17, 18, 19 |
 | Pop / Rock | 13, 14, 20, 21, 22, 23, 24 |
 | Post-Punk | 28 |
+| Reference / Educational | 29 |
 
 ## Harmonic Feature Index
 
@@ -38,6 +39,7 @@ This document is the authoritative content source for Phase 2a implementation.
 | Harmonic ambiguity | 24, 27 |
 | Key center modulation | 16, 18 |
 | Parallel motion | 26 |
+| Chord type showcase | 29 |
 
 ---
 
@@ -603,6 +605,24 @@ Fm Fm Fm Fm | E7 E7 E7 E7 | Dm Dm Dm Dm | E7 E7 E7 E7 | Am Am Am Am
 **Chords:**
 ```
 Am Am Am Am | Dm Dm Dm Dm | E E E E | Am Am Am Am
+```
+
+---
+
+### 29. Chord Forms Demo
+
+**Composer:** —
+**Key:** — (multi-key, non-functional)
+**Genre:** Reference / Educational
+**Harmonic feature:** Chord type showcase
+**Tempo:** 80 BPM
+**Grid:** `"1/4"`
+
+**Comment:** Not a real composition — a purpose-built sequence that exercises every chord type supported by the Tonnetz parser: major and minor triads, dominant and major 7ths, minor 7th, half-diminished (m7b5), diminished 7th, augmented triad, added 6th, and a final dominant cadence. Useful for verifying rendering, highlighting, and playback across all shape types (triangles, triangle+extension, triangle+dot, dot-only).
+
+**Chords:**
+```
+Dm7 Dm7 Dm7 Dm7 | G7 G7 G7 G7 | Cmaj7 Cmaj7 Cmaj7 Cmaj7 | Am7 Am7 Am7 Am7 | Fm7b5 Fm7b5 Fm7b5 Fm7b5 | Bb7 Bb7 Bb7 Bb7 | Ebmaj7 Ebmaj7 Ebmaj7 Ebmaj7 | Abdim7 Abdim7 Abdim7 Abdim7 | Dbaug Dbaug Dbaug Dbaug | Gb6 Gb6 Gb6 Gb6 | Bm Bm Bm Bm | E7 E7 E7 E7
 ```
 
 ---

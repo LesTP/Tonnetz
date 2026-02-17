@@ -1,5 +1,6 @@
 import type { Chord, NodeCoord, Shape, TriId, TriRef, WindowIndices } from "./types.js";
 import { pc } from "./coords.js";
+import { parseNodeId } from "./coords.js";
 import { triId, triVertices, getTrianglePcs } from "./triangles.js";
 import { getAdjacentTriangles } from "./indexing.js";
 
@@ -101,6 +102,27 @@ export function decomposeChordToShape(
 ): Shape {
   // Dot-only path
   if (mainTri === null) {
+    // Centroid = nearest lattice node matching the root pitch class.
+    // This places the path marker on the root note (musically intuitive)
+    // and aligns with the grid-highlighter's greedy chain anchor.
+    const SQRT3_2 = Math.sqrt(3) / 2;
+    const focusWx = focus.u + focus.v * 0.5;
+    const focusWy = focus.v * SQRT3_2;
+
+    let bestCoord: NodeCoord = focus;
+    let bestDist = Infinity;
+    for (const nid of indices.nodeToTris.keys()) {
+      const coord = parseNodeId(nid);
+      if (pc(coord.u, coord.v) !== chord.root_pc) continue;
+      const wx = coord.u + coord.v * 0.5;
+      const wy = coord.v * SQRT3_2;
+      const d = (wx - focusWx) ** 2 + (wy - focusWy) ** 2;
+      if (d < bestDist) {
+        bestDist = d;
+        bestCoord = coord;
+      }
+    }
+
     return {
       chord,
       main_tri: null,
@@ -108,7 +130,7 @@ export function decomposeChordToShape(
       dot_pcs: [...chord.chord_pcs],
       covered_pcs: new Set(),
       root_vertex_index: null,
-      centroid_uv: focus,
+      centroid_uv: bestCoord,
     };
   }
 

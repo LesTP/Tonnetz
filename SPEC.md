@@ -330,11 +330,12 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 ## Responsibilities
 
 * Initialize Audio Engine (`initAudio()`, `createImmediatePlayback()`)
-* Initialize Rendering/UI (scaffold, camera, interaction controller, layout, control panel)
+* Initialize Rendering/UI (scaffold, camera, interaction controller)
+* Build sidebar layout (two-tab Play/Library panel, responsive hamburger overlay)
 * Initialize Persistence/Data (load settings, detect URL-shared progression)
 * Wire interaction events to audio playback
 * Wire AudioTransport events to rendering animation
-* Wire ControlPanel save/load/share actions to Persistence/Data
+* Wire sidebar controls to transport (tempo, loop, play/stop/clear)
 * Bridge PD grid notation to AE beat-based scheduling
 * Enforce UI state constraints (e.g., suppress interactive playback during scheduled playback per UX-D6)
 

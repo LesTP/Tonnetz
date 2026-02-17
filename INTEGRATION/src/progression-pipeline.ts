@@ -76,6 +76,11 @@ export function cleanChordSymbol(raw: string): CleanResult {
     s = s.replace(/sus[24]?/, "");
   }
 
+  // 7. Strip extension from augmented chords: Gaug7 → Gaug (aug+ext excluded from MVP, SPEC D-8)
+  if (/^[A-Ga-g][#b]?aug(maj7|add9|6\/9|6|7)$/.test(s)) {
+    s = s.replace(/(aug)(maj7|add9|6\/9|6|7)$/, "$1");
+  }
+
   return { cleaned: s, warning };
 }
 
@@ -106,6 +111,8 @@ export interface PipelineSuccess {
   readonly shapes: Shape[];
   readonly events: ChordEvent[];
   readonly collapsed: CollapsedChord[];
+  /** Cleaned chord symbols (after input normalization). Same length as collapsed. */
+  readonly cleanedSymbols: string[];
   /** Warnings from input cleaning (e.g., sus stripped). Empty if no warnings. */
   readonly warnings: string[];
 }
@@ -145,7 +152,7 @@ export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
   const { chords, grid, focus, indices } = args;
 
   if (chords.length === 0) {
-    return { ok: true, shapes: [], events: [], collapsed: [], warnings: [] };
+    return { ok: true, shapes: [], events: [], collapsed: [], cleanedSymbols: [], warnings: [] };
   }
 
   // Step 1: collapse consecutive identical symbols
@@ -155,10 +162,12 @@ export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
   const parsedChords: Chord[] = [];
   const failedSymbols: string[] = [];
   const warnings: string[] = [];
+  const cleanedSymbols: string[] = [];
 
   for (const entry of collapsed) {
     const { cleaned, warning } = cleanChordSymbol(entry.symbol);
     if (warning) warnings.push(warning);
+    cleanedSymbols.push(cleaned);
     try {
       parsedChords.push(parseChordSymbol(cleaned));
     } catch {
@@ -192,5 +201,5 @@ export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
     startBeat += durationBeats;
   }
 
-  return { ok: true, shapes, events, collapsed, warnings };
+  return { ok: true, shapes, events, collapsed, cleanedSymbols, warnings };
 }

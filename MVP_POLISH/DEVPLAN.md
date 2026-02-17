@@ -32,9 +32,11 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. The te
 
 ## Current Status
 
-**Phase:** 0b — Pre-Polish Bug Fixes (complete)
-**Focus:** Chord grammar expansion — dim7/m7b5 in HC (Layer 2) + input cleaning in Integration (Layer 1).
+**Phase:** 1 complete. Ready for Phase 2 (Library) or further testing.
+**Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign.
 **Blocked/Broken:** Nothing
+**Known visual TODO:** Header triangle buttons extend slightly past the separator line — needs CSS investigation (triangle SVGs are wider than the border-bottom boundary). Low priority.
+**Decisions closed:** POL-D2, D9, D10, D11, D12, D13. POL-D14 open (m7b5 triangle placement — deferred).
 
 ---
 
@@ -150,126 +152,386 @@ Decision: Option B. Layer 2 (HC grammar: dim7, m7b5) implemented.
 
 ### Phase 1: UI Layout Redesign
 
-**Objective:** Unify sidebar/palette into a single panel. Desktop: permanent left sidebar. Mobile: hamburger menu dropdown. Add tempo controller, app title, info/about button. Redesign button styling.
+**Objective:** Replace the three-zone layout (toolbar, canvas, control panel) with a two-tab sidebar (Play | Library) plus floating canvas controls. Desktop: permanent left sidebar. Mobile: hamburger overlay. Add tempo controller, active chord display, loop toggle, info overlays. Use standard transport icons.
 
-#### 1a: Layout architecture decision & sidebar shell
+**Information architecture** (POL-D9):
 
-Decide and implement the panel container structure:
-- **Desktop (≥768px):** permanent left sidebar, always visible. Canvas fills remaining width.
-- **Mobile (<768px):** sidebar hidden by default. Hamburger button (☰) in top-left corner reveals sidebar as an overlay/dropdown. Tap outside or hamburger again to dismiss.
-- Sidebar contains (top to bottom): title/branding, progression input, library browser (Phase 2), playback controls + tempo, info/about button.
-- `createLayoutManager()` in RU currently implements a three-zone layout (toolbar, canvas, control panel). This needs to be reworked or replaced.
+The sidebar content is organized into three tiers based on usage pattern:
 
-**Decision needed:**
+1. **Header (always visible):** title/subtitle + `?` (How to Use) and `ⓘ` (What This Is) buttons + tab bar
+2. **Tab: Play (doing):** active chord display, progression input + Load, playback controls (▶ ■ 🔁) + tempo, Clear
+3. **Tab: Library (choosing):** genre/feature filter tabs, scrollable entry list with expandable detail cards
+
+How to Use and What This Is open as **full-viewport overlay modals**, not sidebar content — they're reference material best read at full width.
+
+**DOM structure:**
+
 ```
-POL-D1: Sidebar implementation approach
-Date: 2026-02-16
-Status: Closed — Option B
-Priority: Critical
-Options:
-A) Modify existing createLayoutManager() + createControlPanel() in RU — preserves test coverage
-B) Replace with new sidebar component in Integration ← CHOSEN
-C) New sidebar component in RU, deprecate old layout/panel
-Decision: Option B. Build new sidebar in Integration module.
-  RU layout/panel become unused; retired in Phase 5b.
+#app
+└── div.tonnetz-app (flex-row on desktop, full-width on mobile)
+    ├── div.sidebar-backdrop.tonnetz-hidden (mobile: semi-transparent click-to-dismiss)
+    ├── aside.tonnetz-sidebar (300px desktop / position:fixed overlay mobile)
+    │   ├── header.sidebar-header
+    │   │   ├── div.sidebar-title-row
+    │   │   │   ├── h1 "Tone Nets"
+    │   │   │   │   └── small.subtitle "an interactive Tonnetz explorer"
+    │   │   │   └── div.sidebar-info-btns
+    │   │   │       ├── button "?" (→ How to Use overlay)
+    │   │   │       └── button "ⓘ" (→ What This Is overlay)
+    │   │   └── nav.sidebar-tabs
+    │   │       ├── button.tab-btn[data-tab="play"] "▶ Play" (active by default)
+    │   │       └── button.tab-btn[data-tab="library"] "📚 Library"
+    │   ├── section.tab-panel[data-tab="play"]
+    │   │   ├── div.chord-display (shows active chord name, e.g., "Am7")
+    │   │   ├── div.progression-input
+    │   │   │   ├── textarea (placeholder, rows ~3)
+    │   │   │   └── button "Load"
+    │   │   └── div.playback-controls
+    │   │       ├── div.transport-buttons
+    │   │       │   ├── button ▶ Play (disabled until progression loaded)
+    │   │       │   ├── button ■ Stop (disabled until playing)
+    │   │       │   ├── button 🔁 Loop (toggle, disabled until progression loaded)
+    │   │       │   └── button ✕ Clear (disabled until progression loaded)
+    │   │       └── div.tempo-control
+    │   │           ├── input[type=range] (40–240, default 120)
+    │   │           └── span "120 BPM"
+    │   └── section.tab-panel.tonnetz-hidden[data-tab="library"]
+    │       ├── nav.library-filters
+    │       │   ├── button "All"
+    │       │   ├── button "Genre"
+    │       │   └── button "Feature"
+    │       └── div.library-list (scrollable)
+    │           └── div.library-entry (repeated)
+    │               ├── div.entry-summary (title, composer, genre badge, chord preview)
+    │               └── div.entry-detail.tonnetz-hidden (comment, roman numerals, tempo)
+    └── main.tonnetz-canvas-area (flex:1)
+        ├── button.hamburger.tonnetz-hidden (mobile only: ☰, top-left, position:absolute)
+        ├── button.reset-view (top-right, position:absolute, always visible)
+        └── <svg> + 5 layer <g> groups
 ```
+
+**Responsive breakpoints:**
+
+| Breakpoint | Sidebar | Canvas | Hamburger |
+|------------|---------|--------|-----------|
+| Desktop (≥768px) | Permanent left, 300px, always visible | `calc(100% - 300px)` | Hidden |
+| Mobile (<768px) | Hidden by default; `position: fixed` overlay on left | Full width, unaffected by sidebar open/close | Visible, top-left corner |
+
+Mobile sidebar dismiss triggers: backdrop tap, hamburger tap, Escape key.
+
+**Canvas area floating controls:**
+
+- **Reset View** button: `position: absolute; top: 8px; right: 8px` — replaces the old toolbar entirely.
+- **Hamburger** (☰): `position: absolute; top: 8px; left: 8px` — mobile only, hidden on desktop via media query.
+
+Both use `z-index` above the SVG but below the sidebar/backdrop.
+
+#### 1a: Sidebar shell + responsive layout
+
+Build the DOM structure and CSS. Wire into `main.ts` replacing old layout/panel/toolbar.
+
+**Implementation approach:**
+
+New file `INTEGRATION/src/sidebar.ts` exports `createSidebar(options)` returning:
+
+```ts
+interface SidebarOptions {
+  root: HTMLElement;
+  onLoadProgression: (text: string) => void;
+  onPlay: () => void;
+  onStop: () => void;
+  onClear: () => void;
+  onResetView: () => void;
+  onTempoChange: (bpm: number) => void;
+  onLoopToggle: (enabled: boolean) => void;
+  initialTempo: number;
+}
+
+interface Sidebar {
+  getCanvasContainer(): HTMLElement;
+  setProgressionLoaded(loaded: boolean): void;
+  setPlaybackRunning(running: boolean): void;
+  setActiveChord(symbol: string | null): void;
+  setTempo(bpm: number): void;
+  setLoopEnabled(enabled: boolean): void;
+  isLoopEnabled(): boolean;
+  switchToTab(tab: "play" | "library"): void;
+  destroy(): void;
+}
+```
+
+**Changes to `main.ts`:**
+
+Replace:
+```ts
+const layout = createLayoutManager({ root: appEl });
+const controlPanel = createControlPanel({ container: layout.getControlPanelContainer(), ... });
+const toolbar = createToolbar({ container: layout.getToolbarContainer(), ... });
+```
+
+With:
+```ts
+const sidebar = createSidebar({ root: appEl, onLoadProgression, onPlay, onStop, onClear, onResetView, onTempoChange, onLoopToggle, initialTempo });
+const canvasContainer = sidebar.getCanvasContainer();
+```
+
+All downstream code (`scaffold`, `resizeCtrl`, `camera`, `interactionCtrl`, `proximityCursor`) uses `canvasContainer` from sidebar — same variable, different source.
+
+RU imports removed: `createLayoutManager`, `createControlPanel`, `createToolbar` (and their types). These become dead code in RU, retired in Phase 5b.
 
 **Tests (1a):**
-- [ ] Desktop: sidebar visible, canvas fills remaining space
-- [ ] Mobile: sidebar hidden, hamburger button visible
-- [ ] Hamburger tap → sidebar appears as overlay
-- [ ] Outside tap / hamburger tap → sidebar dismisses
-- [ ] Canvas interaction (pan/zoom/tap) works alongside sidebar on desktop
-- [ ] ResizeObserver fires on sidebar show/hide → canvas recomputes viewport
+- [ ] Desktop: sidebar visible at 300px, canvas fills remaining width
+- [ ] Mobile: sidebar hidden by default, hamburger button visible
+- [ ] Hamburger tap → sidebar appears as overlay with backdrop
+- [ ] Backdrop tap / hamburger tap / Escape → sidebar dismisses
+- [ ] Tab switching: Play tab ↔ Library tab, correct panel visible
+- [ ] Canvas interaction (pan/zoom/tap) works with sidebar present on desktop
+- [ ] ResizeObserver fires on container resize → canvas recomputes viewport
+- [ ] `destroy()` removes all DOM elements and event listeners
 
-#### 1b: Tempo controller
+#### 1b: Playback controls + transport icons + loop toggle
 
-Resolves INT-D8 (Open → Closed).
-- Slider or number input with range ~40–240 BPM, default 120
-- Lives in the sidebar playback controls section
-- Wired to `AudioTransport.setTempo(bpm)` and `PD.saveSettings({ tempo_bpm })`
-- Shows current BPM value as label
+- **Play** (▶), **Stop** (■): standard tape-recorder Unicode symbols
+- **Loop** (🔁): toggle button — visually distinct active state (highlighted/pressed)
+- **Clear** (✕): text or icon, danger-styled
+- All disabled until progression loaded; Stop disabled until playing
+- Loop wired to transport: when enabled, playback auto-restarts on natural completion
+
+```
+POL-D11: Playback control set
+Date: 2026-02-17
+Status: Closed
+Priority: Important
+Decision: Play (▶), Stop (■), Loop (🔁 toggle), Clear (✕). No Pause button.
+  Loop is a toggle — when active, transport auto-restarts on completion.
+  Standard tape-recorder iconography for immediate recognition.
+Rationale:
+  Pause adds state complexity (paused vs stopped, resume position tracking)
+  for minimal value in a progression explorer. Stop + replay is sufficient.
+  Loop is essential for studying harmonic patterns by repeated listening.
+Revisit if: Users request pause for long progressions.
+```
 
 **Tests (1b):**
-- [ ] Tempo change → `transport.setTempo()` called with correct value
-- [ ] Tempo change → `PD.saveSettings()` called
-- [ ] Tempo from PD settings → slider/input reflects saved value on load
-- [ ] Range clamped to valid BPM (no negative, no zero, no absurd values)
+- [ ] Play button shows ▶, triggers `onPlay`
+- [ ] Stop button shows ■, triggers `onStop`
+- [ ] Loop button shows 🔁, toggles on/off, triggers `onLoopToggle(boolean)`
+- [ ] Loop active state visually distinct (e.g., highlighted background)
+- [ ] Clear button triggers `onClear`
+- [ ] Button disabled states: Play/Loop/Clear disabled when no progression; Stop disabled when not playing
+- [ ] Loop enabled + playback completes naturally → transport auto-restarts
 
-#### 1c: Button visual redesign
+#### 1c: Tempo controller
 
-- Play, Stop, Clear buttons styled consistently
-- Load/paste area styled
-- Disabled state visually distinct
-- Touch-friendly sizing (min 44×44px tap target)
+Resolves INT-D8 (Open → Closed).
+- Range slider: 40–240 BPM, default 120
+- BPM value displayed as label next to slider, updates live during drag
+- Lives in Play tab, below transport buttons
+- Wired to `AudioTransport.setTempo(bpm)` and persistence `saveSettings({ tempo_bpm })`
+- Initial value loaded from persistence settings
 
 **Tests (1c):**
-- [ ] All buttons have min 44×44px touch target
-- [ ] Disabled buttons have distinct visual treatment
-- [ ] Button states (normal/hover/active/disabled) all defined
+- [ ] Tempo slider change → `onTempoChange(bpm)` fires with correct value
+- [ ] `sidebar.setTempo(bpm)` → slider and label update
+- [ ] Range clamped: values below 40 → 40, above 240 → 240
+- [ ] Initial tempo from persistence reflected on load
 
-#### 1d: Title & branding
+#### 1d: Active chord display
 
-- App title displayed at top of sidebar
-- Working title: "Tone Nets" (pending final decision)
-- Minimal branding — title text, possibly a small geometric icon
+Compact display in the Play tab showing the currently sounding chord name.
+
+- During interactive exploration: shows chord symbol from hit-test (e.g., `Am`, `C | E edge`)
+- During playback: shows current chord from progression (e.g., `Cm7`, `Am7b5`)
+- When idle: empty or shows placeholder (e.g., "Tap a triangle to play")
+- Driven by `sidebar.setActiveChord(symbol)` called from `main.ts`
+
+```
+POL-D10: Active chord display
+Date: 2026-02-17
+Status: Closed
+Priority: Normal
+Decision: Show active chord name in Play tab, compact single line.
+  Interactive exploration: chord symbol from hit-test result.
+  Playback: current chord from progression.
+  Idle: placeholder text.
+Rationale:
+  Particularly valuable for 4-note chords (7ths, dim7, m7b5) and edge
+  unions where the sounding pitch classes aren't obvious from the grid.
+  Compact enough to not compete with playback controls for space.
+Revisit if: Display needs to show more detail (e.g., pitch-class list,
+  interval labels). Could expand to a multi-line display in future.
+```
+
+**Tests (1d):**
+- [ ] `setActiveChord("Am7")` → display shows "Am7"
+- [ ] `setActiveChord(null)` → display shows placeholder
+- [ ] Display updates in real-time during playback chord changes
+- [ ] Display doesn't overflow sidebar width for long chord names
+
+#### 1e: Title, branding, info buttons
+
+- **Title:** "Tone Nets" (POL-D2, still tentative)
+- **Subtitle:** "an interactive Tonnetz explorer"
+- **Page `<title>`:** matches sidebar title
+- **Info buttons** (`?` and `ⓘ`) in the header row, right-aligned next to title
+- Buttons trigger overlay modals (modal content is Phase 1f)
 
 ```
 POL-D2: Application title
 Date: 2026-02-16
-Status: Open
+Status: Closed
 Priority: Minor
-Decision: "Tone Nets" (tentative)
+Decision: "Tone Nets" with subtitle "an interactive Tonnetz explorer"
 Revisit if: Better name emerges before deployment.
 ```
 
-**Tests (1d):**
-- [ ] Title visible in sidebar header
-- [ ] Title visible in mobile hamburger header
+**Tests (1e):**
+- [ ] Title and subtitle visible in sidebar header
+- [ ] Title visible in mobile sidebar overlay
 - [ ] Page `<title>` matches
+- [ ] `?` button and `ⓘ` button present and clickable
 
-#### 1e: Info popups (two separate modals)
+#### 1f: Info overlay modals
 
-Two distinct info modals, each triggered from a button in the sidebar:
+Two full-viewport overlay modals, triggered from sidebar header buttons:
 
-**"How to Use" popup** (triggered by `?` or "How to Use" button):
+**"How to Use" overlay** (triggered by `?`):
 - Interaction guide: tap triangle → triad, tap near edge → union chord, drag → pan, scroll → zoom
 - Keyboard shortcuts: Space = play/stop, Escape = clear
-- **Supported chord symbols** reference table (see §Supported Chord Reference below)
-- Input tips: paste or type, pipe or space delimited
+- **Supported chord symbols** reference table (see §Supported Chord Reference)
+- Input tips: paste or type, pipe `|` or space delimited
 - Library: how to browse and load
 
-**"What This Is" popup** (triggered by `ⓘ` or "About" button):
+**"What This Is" overlay** (triggered by `ⓘ`):
 - What is a Tonnetz — history, theory, geometric meaning
 - How harmonic relationships map to spatial proximity
 - Voice-leading as geometric distance
 - Credits / author
 - Link to source or further reading
 
-Both popups:
-- Dismissible via close button, Escape key, or outside click
-- Scrollable if content exceeds viewport on mobile
+Both overlays:
+- Full viewport width (not constrained to sidebar width) — better for reading
+- Dismissible via close button (✕, top-right), Escape key, or outside click
+- Scrollable if content exceeds viewport
+- Semi-transparent backdrop behind content
 
 ```
-POL-D8: Two info popups (How to Use vs What This Is)
-Date: 2026-02-16
+POL-D8: Two info overlays (How to Use vs What This Is)
+Date: 2026-02-16 (revised 2026-02-17)
 Status: Closed
 Priority: Normal
-Decision: Split into two separate modals rather than one combined popup.
+Decision: Full-viewport overlay modals, not sidebar content.
   - "How to Use" — practical: interaction, shortcuts, supported chords, input tips
   - "What This Is" — conceptual: Tonnetz history, theory, credits
 Rationale:
-Different audiences and purposes. A musician wanting to know which chords work
-shouldn't have to scroll past theory history. A curious user wanting to understand
-the Tonnetz shouldn't wade through input syntax.
+  Different audiences and purposes. Reference text benefits from full viewport
+  width. Overlays don't compete with sidebar tabs for space.
 ```
 
-**Tests (1e):**
-- [ ] "How to Use" button opens correct popup with interaction guide + chord table
-- [ ] "What This Is" button opens correct popup with theory + credits
-- [ ] Both dismiss via close/Escape/outside click
+**Tests (1f):**
+- [ ] `?` button opens How to Use overlay with interaction guide + chord table
+- [ ] `ⓘ` button opens What This Is overlay with theory + credits
+- [ ] Both dismiss via close button / Escape / outside click
 - [ ] Both scrollable on mobile
-- [ ] Only one popup visible at a time (opening one closes the other)
+- [ ] Only one overlay visible at a time (opening one closes the other)
+- [ ] Overlays use full viewport width, not sidebar width
+
+#### 1g: Button visual redesign
+
+- All buttons (transport, Load, Clear, tab buttons, info buttons) styled consistently
+- Touch-friendly sizing: min 44×44px tap target
+- Disabled state visually distinct (muted color + `cursor: not-allowed`)
+- Active/toggle state for Loop button (highlighted background when loop enabled)
+- Transport buttons use Unicode symbols: ▶ ■ 🔁
+- Hover/active/focus states for desktop
+
+**Tests (1g):**
+- [ ] All interactive buttons have min 44×44px tap target
+- [ ] Disabled buttons have distinct visual treatment
+- [ ] Loop toggle has distinct active vs inactive appearance
+- [ ] Button states (normal/hover/active/disabled) all defined in CSS
+
+#### Phase 1 build order
+
+| Step | Sub-phase | Regime | Dependencies |
+|------|-----------|--------|-------------|
+| 1 | **1a** Sidebar shell + responsive layout | Build | None — foundational |
+| 2 | **1b** Playback controls + loop | Build | 1a (needs sidebar DOM) |
+| 3 | **1c** Tempo controller | Build | 1a (needs sidebar DOM), INT-D8 |
+| 4 | **1d** Active chord display | Build | 1a (needs sidebar DOM) |
+| 5 | **1e** Title, branding, info buttons | Build | 1a (needs sidebar DOM) |
+| 6 | **1g** Button visual redesign | Refine | 1a–1e complete (needs all buttons present) |
+| 7 | **1f** Info overlay modals | Build | 1e (needs trigger buttons) |
+
+Steps 1–5 can be built incrementally in a single `sidebar.ts` file. Step 6 is a visual tuning pass (Refine regime — needs human feedback). Step 7 is content-heavy but structurally independent.
+
+#### Library tab placeholder (Phase 2 prep)
+
+The Library tab panel is created in Phase 1a as an empty container. Phase 2 populates it with data, filters, and entry cards. The tab switching mechanism is built in 1a so Phase 2 only adds content, no structural changes.
+
+#### Library data architecture (Phase 2 prep)
+
+```
+INTEGRATION/src/library/
+  library-data.ts        ← static array of LibraryEntry[], one entry per progression
+  library-types.ts       ← LibraryEntry interface (extends PD ProgressionRecord with metadata)
+  library-validation.ts  ← test-time check: all entries parse via parseChordSymbol()
+```
+
+Adding a progression = append to the array in `library-data.ts`. Validation test catches unparseable chord symbols. Data file is isolated from UI rendering code.
+
+```
+POL-D12: Library progression detail display
+Date: 2026-02-17
+Status: Closed
+Priority: Normal
+Decision: Expandable card within the library list.
+  Summary row: title, composer, genre badge, first few chord symbols as preview.
+  Expanded: full comment, roman numeral analysis, tempo, complete chord list.
+  Tapping the summary row toggles expansion (accordion-style, one open at a time).
+  Selecting "Load" from expanded detail → loads progression + auto-switches to Play tab.
+Rationale:
+  User is browsing and comparing — expandable cards let them peek at details
+  without losing their place in the list. Auto-switch to Play tab after load
+  eliminates the extra tap to reach playback controls.
+Revisit if: Detail content exceeds what fits in an expanded card (e.g., if we
+  add audio preview or visual path thumbnail).
+```
+
+```
+POL-D13: Dot-only shape centroid = root node
+Date: 2026-02-17
+Status: Closed
+Priority: Important
+Decision: For dot-only shapes (dim, aug), centroid_uv = nearest lattice node
+  matching the root pitch class. Not the average of all dot nodes, not the focus.
+Rationale:
+  Averaging dot node positions gave centroids in empty space (not on any edge or
+  node). Using the root node is musically intuitive (the chord is named after its
+  root), deterministic, always on a real lattice node, and aligns with the grid-
+  highlighter's greedy chain anchor (which also starts from the centroid).
+Revisit if: A different anchor point (e.g., cluster visual center) proves more
+  useful for progression path rendering.
+```
+
+```
+POL-D14: Non-root triangle placement for m7b5 chords (DEFERRED)
+Date: 2026-02-17
+Status: Open — future work
+Priority: Nice-to-have
+Decision: Deferred. Currently m7b5 chords (e.g., Gm7b5 = G, Bb, Db, F) are
+  treated as fully dot-only because the root triad (Gdim) is diminished. However,
+  these chords contain a valid non-root minor triad (Bbm = Bb, Db, F) that could
+  be placed as a triangle with the remaining note (G) as a dot.
+Proposed approach:
+  In decomposeChordToShape, when mainTri is null (root triad is dim/aug), scan
+  all 3-note subsets of chord_pcs for a match in sigToTris. If found, place that
+  as the main triangle and treat remaining PCs as dots. This gives m7b5 chords a
+  filled triangle + connecting dot, matching user expectations.
+  Note: dim7 chords (all subsets are diminished) would still be fully dot-only.
+Revisit if: Library progressions with m7b5 chords look visually wrong during
+  playback (triangle not filled, notes scattered).
+```
 
 ---
 
@@ -531,10 +793,10 @@ Decision: Option B. Build new sidebar component in Integration module.
 
 ```
 POL-D2: Application title
-Date: 2026-02-16
-Status: Open
+Date: 2026-02-16 (closed 2026-02-17)
+Status: Closed
 Priority: Minor
-Decision: "Tone Nets" (tentative)
+Decision: "Tone Nets" with subtitle "an interactive Tonnetz explorer"
 Revisit if: Better name emerges before deployment.
 ```
 
@@ -606,4 +868,75 @@ grammar. Slash chord bass voicing is a future concern; stripping the bass note
 is acceptable for MVP.
 Revisit if: Library progressions require chord types beyond dim7/m7b5 (e.g., sus,
 9, 11, 13) — at that point reconsider Option C.
+```
+
+```
+POL-D9: Sidebar information architecture
+Date: 2026-02-17
+Status: Closed
+Priority: Critical
+Decision: Two-tab sidebar (Play | Library) with persistent header above tabs.
+  Header: title/subtitle + info buttons (? and ⓘ).
+  Play tab: active chord display, progression input, transport controls + tempo.
+  Library tab: genre/feature filter tabs, scrollable entry list with expandable cards.
+  How to Use and What This Is as full-viewport overlay modals (not sidebar content).
+Rationale:
+  "Doing" (playback controls) and "Choosing" (library browsing) are distinct
+  usage modes that compete for sidebar space. Tabs separate them cleanly — each
+  gets full sidebar height. Library scales to 50+ entries without squeezing controls.
+  Reference content (How/What) benefits from full-viewport reading width and is
+  used infrequently — overlays are appropriate.
+  Auto-switch to Play tab on library selection eliminates the extra-tap concern.
+Revisit if: A third usage mode emerges (e.g., analysis/annotation) that needs
+  its own tab.
+```
+
+```
+POL-D10: Active chord display
+Date: 2026-02-17
+Status: Closed
+Priority: Normal
+Decision: Show active chord name in Play tab, compact single line.
+  Interactive exploration: chord symbol from hit-test result.
+  Playback: current chord from progression.
+  Idle: placeholder text.
+Rationale:
+  Particularly valuable for 4-note chords (7ths, dim7, m7b5) and edge
+  unions where the sounding pitch classes aren't obvious from the grid.
+  Compact enough to not compete with playback controls for space.
+Revisit if: Display needs to show more detail (e.g., pitch-class list,
+  interval labels). Could expand to a multi-line display in future.
+```
+
+```
+POL-D11: Playback control set
+Date: 2026-02-17
+Status: Closed
+Priority: Important
+Decision: Play (▶), Stop (■), Loop (🔁 toggle), Clear (✕). No Pause button.
+  Loop is a toggle — when active, transport auto-restarts on completion.
+  Standard tape-recorder iconography for immediate recognition.
+Rationale:
+  Pause adds state complexity (paused vs stopped, resume position tracking)
+  for minimal value in a progression explorer. Stop + replay is sufficient.
+  Loop is essential for studying harmonic patterns by repeated listening.
+Revisit if: Users request pause for long progressions.
+```
+
+```
+POL-D12: Library progression detail display
+Date: 2026-02-17
+Status: Closed
+Priority: Normal
+Decision: Expandable card within the library list (accordion-style).
+  Summary row: title, composer, genre badge, first few chord symbols as preview.
+  Expanded: full comment, roman numeral analysis, tempo, complete chord list.
+  One card open at a time. "Load" button in expanded detail → loads progression +
+  auto-switches to Play tab.
+Rationale:
+  User is browsing and comparing — expandable cards let them peek at details
+  without losing their place in the list. Auto-switch to Play tab after load
+  eliminates the extra tap to reach playback controls.
+Revisit if: Detail content exceeds what fits in an expanded card (e.g., if we
+  add audio preview or visual path thumbnail).
 ```

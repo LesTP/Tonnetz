@@ -66,6 +66,8 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 * Root tone → distinct outline on root vertex (bold, darker shade)
 * Progression path → centroid-connected overlay
 * Union chord (edge selection) → both adjacent triangles highlighted
+* **Dot-only chords** (dim, aug, m7b5, dim7): highlighted as node circle strokes + connecting edge strokes using the **greedy chain** nearest-node algorithm (nearest to shape centroid, then each subsequent dot nearest to already-picked nodes). Only one node per pitch class highlighted.
+* **Dot-only color rule:** dim/m7b5 (minor 3rd) → blue (minor palette); aug (major 3rd) → red (major palette)
 * Node labels → dark grey (`#555`); enharmonic nodes show sharp name on top, flat name on bottom (e.g., D# / Eb)
 
 ### At-Rest vs Playing States
@@ -122,13 +124,28 @@ The interface is organized into two primary zones with responsive behavior:
 
 ### Sidebar Content Order (top to bottom)
 
-1. **Title / branding** — app title ("Tone Nets" tentative, see POL-D2)
-2. **Progression input** — textarea for paste/type, Load button
-3. **Library browser** — curated progression library with three views (All, By Genre, By Harmonic Feature); see §4b
-4. **Playback controls** — Play, Stop, Clear buttons + tempo controller (slider or input, ~40–240 BPM)
-5. **Info buttons** — two buttons triggering separate modals:
-   - `?` / "How to Use" → practical guide: interaction, keyboard shortcuts, supported chord symbols, input tips, library usage
-   - `ⓘ` / "About" → conceptual: Tonnetz history & theory, harmonic geometry explanation, credits/author (POL-D8)
+1. **Header (persistent across tabs)**
+   - **Title / branding** — "Tone Nets" with subtitle "an interactive Tonnetz explorer" (POL-D2)
+   - **Info buttons** — `?` (How to Use) and `ⓘ` (What This Is), right-aligned next to title → open full-viewport overlay modals (POL-D8)
+   - **Tab bar** — two tabs: `▶ Play` (default) | `📚 Library`
+
+2. **Tab: Play** (doing — active controls)
+   - **Active chord display** — compact single-line showing current chord name (POL-D10)
+   - **Progression input** — textarea for paste/type, Load button
+   - **Playback controls** — standard transport icons (POL-D11):
+     - ▶ Play, ■ Stop, 🔁 Loop (toggle), ✕ Clear
+   - **Tempo controller** — slider (40–240 BPM) + BPM display + Italian tempo marking (Largo, Adagio, Andante, Moderato, Allegro, Vivace, Presto, Prestissimo — updates dynamically with BPM)
+
+3. **Tab: Library** (choosing — browse and select)
+   - **Filter tabs** — All | By Genre | By Harmonic Feature
+   - **Scrollable entry list** — expandable accordion cards (POL-D12):
+     - Summary: title, composer, genre badge, chord preview
+     - Detail (expanded): comment, roman numerals, tempo, full chords, Load button
+   - Selecting "Load" from a card → loads progression + auto-switches to Play tab
+
+4. **Info overlay modals** (full-viewport, not sidebar content; POL-D8)
+   - `?` → "How to Use": interaction guide, keyboard shortcuts, supported chord symbols, input tips, library usage
+   - `ⓘ` → "What This Is": Tonnetz history & theory, harmonic geometry, credits/author
 
 ### 4b. Progression Library
 

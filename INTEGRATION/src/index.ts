@@ -43,7 +43,7 @@ export {
   wireAllTransportSubscriptions,
   createControlPanelCallbacks,
 } from "./transport-wiring.js";
-export type { ControlPanelWiringOptions } from "./transport-wiring.js";
+export type { ControlPanelWiringOptions, PlaybackStateTarget } from "./transport-wiring.js";
 
 // Persistence wiring (Phase 5)
 export {
@@ -72,6 +72,10 @@ export type { KeyboardShortcutOptions } from "./keyboard-shortcuts.js";
 
 // Debug logger (Phase 7c)
 export { log } from "./logger.js";
+
+// Sidebar (Phase 1a: MVP Polish)
+export { createSidebar } from "./sidebar.js";
+export type { Sidebar, SidebarOptions } from "./sidebar.js";
 
 // Application assembly (Phase 6) — destroyApp from main.ts
 // Note: destroyApp is exported from main.ts directly (side-effecting entry point).

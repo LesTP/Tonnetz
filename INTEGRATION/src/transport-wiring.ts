@@ -12,7 +12,16 @@
  */
 
 import type { AudioTransport } from "audio-engine";
-import type { PathHandle, UIStateController, ControlPanel } from "rendering-ui";
+import type { PathHandle, UIStateController } from "rendering-ui";
+
+/**
+ * Minimal interface for components that track playback running state.
+ * Satisfied by both RU's ControlPanel and Integration's Sidebar.
+ */
+export interface PlaybackStateTarget {
+  setPlaybackRunning(running: boolean): void;
+  setProgressionLoaded(loaded: boolean): void;
+}
 
 // ── Phase 4a: Transport → Rendering ─────────────────────────────────
 
@@ -69,7 +78,7 @@ export function wireTransportToUIState(
  */
 export function wireTransportToControlPanel(
   transport: AudioTransport,
-  controlPanel: ControlPanel,
+  controlPanel: PlaybackStateTarget,
 ): () => void {
   return transport.onStateChange((event) => {
     controlPanel.setPlaybackRunning(event.playing);
@@ -87,7 +96,7 @@ export function wireAllTransportSubscriptions(options: {
   transport: AudioTransport;
   pathHandle: PathHandle;
   uiState: UIStateController;
-  controlPanel: ControlPanel;
+  controlPanel: PlaybackStateTarget;
 }): () => void {
   const { transport, pathHandle, uiState, controlPanel } = options;
 
@@ -112,8 +121,8 @@ export interface ControlPanelWiringOptions {
   transport: AudioTransport;
   /** UI state controller for state transitions. */
   uiState: UIStateController;
-  /** Control panel for updating button states. */
-  controlPanel: ControlPanel;
+  /** Control panel or sidebar for updating button states. */
+  controlPanel: PlaybackStateTarget;
   /** Active PathHandle (may be null if no progression loaded). */
   getPathHandle: () => PathHandle | null;
   /**

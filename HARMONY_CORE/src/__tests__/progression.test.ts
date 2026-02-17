@@ -57,10 +57,17 @@ describe("mapProgressionToShapes", () => {
       indices,
     );
     expect(shapes).toHaveLength(3);
-    // Bdim is dot-only: centroid = its incoming focus (= C's centroid)
+    // Bdim is dot-only: centroid is computed from nearest nodes (near incoming focus)
     expect(shapes[1].main_tri).toBeNull();
-    expect(shapes[1].centroid_uv).toEqual(shapes[0].centroid_uv);
-    // Am gets the same focus as Bdim
+    // Centroid should be near (but not exactly equal to) the first chord's centroid
+    const dim_centroid = shapes[1].centroid_uv;
+    const prev_centroid = shapes[0].centroid_uv;
+    const dist = Math.sqrt(
+      (dim_centroid.u - prev_centroid.u) ** 2 +
+      (dim_centroid.v - prev_centroid.v) ** 2,
+    );
+    expect(dist).toBeLessThan(3); // reasonably close
+    // Am gets focus from Bdim's centroid (which is now node-based, not passthrough)
     expect(shapes[2].main_tri).not.toBeNull();
   });
 

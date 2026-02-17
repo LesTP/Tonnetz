@@ -170,13 +170,9 @@ Status: Closed
 ## 8. Layout Integration
 
 **RU-D6: Layout zone awareness**
-Status: Closed
+Status: Closed (superseded by POL-D1/POL-D9)
 
-Renderer must support the layout zones defined in UX_SPEC:
-
-* Central Canvas — Tonnetz interaction surface
-* Control Panel — playback and progression input (includes Clear button for progression dismissal, UX-D5)
-* Toolbar — view and overlay controls
+Renderer must support the layout zones. The original three-zone layout (Toolbar, Canvas, Control Panel) via `createLayoutManager()`, `createControlPanel()`, and `createToolbar()` is superseded by the Integration module's `createSidebar()` (two-tab sidebar: Play | Library, with responsive hamburger overlay). The RU layout components remain exported for backward compatibility but are unused in the current application.
 
 Canvas viewport must dynamically resize when panels expand or collapse. Renderer re-renders on container resize (via internal `ResizeObserver`). If container resize crosses a responsive window breakpoint, the renderer may rebuild window indices with new bounds (RU-D10).
 
