@@ -77,6 +77,12 @@ export { log } from "./logger.js";
 export { createSidebar } from "./sidebar.js";
 export type { Sidebar, SidebarOptions } from "./sidebar.js";
 
+// Library (Phase 2: MVP Polish)
+export { createLibraryUI } from "./library/library-ui.js";
+export type { LibraryUI, LibraryUIOptions } from "./library/library-ui.js";
+export type { LibraryEntry } from "./library/library-types.js";
+export { LIBRARY, getGenres, getFeatures } from "./library/library-data.js";
+
 // Application assembly (Phase 6) — destroyApp from main.ts
 // Note: destroyApp is exported from main.ts directly (side-effecting entry point).
 // It is not re-exported here to avoid triggering app initialization on import.

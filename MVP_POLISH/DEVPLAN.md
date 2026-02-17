@@ -36,7 +36,46 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. The te
 **Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign.
 **Blocked/Broken:** Nothing
 **Known visual TODO:** Header triangle buttons extend slightly past the separator line — needs CSS investigation (triangle SVGs are wider than the border-bottom boundary). Low priority.
+**Open design TODO:** Library → textarea chord display format (see below).
 **Decisions closed:** POL-D2, D9, D10, D11, D12, D13. POL-D14 open (m7b5 triangle placement — deferred).
+
+### Open TODO: Library Textarea Display Format
+
+**Problem:** Chord durations are encoded by repetition (PD-D2). A chord lasting 4 beats at `grid="1/4"` appears 4 times: `["Cm7", "Cm7", "Cm7", "Cm7"]`. The pipeline's `collapseRepeatedChords()` groups these into `{ symbol: "Cm7", count: 4 }` → 4 beats.
+
+When loading from the library, the textarea needs to display the chords. Two options:
+
+**Option A (current implementation): Show full repetitions grouped by bar.**
+```
+Cm7 Cm7 Cm7 Cm7 | F7 F7 F7 F7 | Bbmaj7 Bbmaj7 Bbmaj7 Bbmaj7 | ...
+```
+- ✅ Round-trip safe: user can click Load on the textarea and get identical durations
+- ✅ Accurate: shows exactly what the pipeline receives
+- ❌ Verbose and noisy — looks like data, not music
+- ❌ Fills the textarea with repetitive content
+
+**Option B: Show unique symbols only (collapsed).**
+```
+Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm
+```
+- ✅ Clean and readable — looks like a chord chart
+- ❌ Not round-trip safe: re-loading gives 1 beat per chord (4× too fast)
+- Could be made round-trip safe if the pipeline assumed "1 symbol = 1 bar" when no repetitions are present, but this changes the input semantics
+
+**Option C: Show unique symbols, but store the library entry ID so re-load uses original data.**
+- ✅ Clean display + correct re-load
+- ❌ More complex: requires tracking "this textarea content came from library entry X"
+- ❌ Breaks if user edits the textarea (hybrid state: library entry + manual edits)
+
+**Option D: Show unique symbols with explicit duration notation.**
+```
+Cm7 x4 | F7 x4 | Bbmaj7 x4 | Ebmaj7 x4 | Am7b5 x4 | D7 x4 | Gm x8
+```
+- ✅ Compact and informative
+- ❌ Requires parser changes to understand `x4` notation
+- Could be a nice future enhancement
+
+**Current state:** Option A is implemented. Decision deferred — user to review and choose.
 
 ---
 

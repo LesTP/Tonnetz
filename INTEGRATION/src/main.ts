@@ -62,6 +62,8 @@ import { createKeyboardShortcuts } from "./keyboard-shortcuts.js";
 import { log } from "./logger.js";
 import { createSidebar } from "./sidebar.js";
 import type { Sidebar } from "./sidebar.js";
+import { createLibraryUI } from "./library/library-ui.js";
+import type { LibraryEntry } from "./library/library-types.js";
 import type { GridValue } from "persistence-data";
 
 // ── Application State ───────────────────────────────────────────────
@@ -163,6 +165,23 @@ function edgeLabel(
   const pcs = getEdgeUnionPcs(edgeId, indices);
   if (!pcs || pcs.length === 0) return "";
   return identifyFourNoteChord(pcs);
+}
+
+/** Format chords array into grouped display: "Cm7 Cm7 Cm7 Cm7 | F7 F7 F7 F7" */
+function formatChordsGrouped(chords: readonly string[]): string {
+  const groups: string[][] = [];
+  let current: string[] = [];
+  let prev = "";
+  for (const c of chords) {
+    if (c !== prev && current.length > 0) {
+      groups.push(current);
+      current = [];
+    }
+    current.push(c);
+    prev = c;
+  }
+  if (current.length > 0) groups.push(current);
+  return groups.map((g) => g.join(" ")).join(" | ");
 }
 
 // ── Step 1: Persistence ─────────────────────────────────────────────
@@ -398,6 +417,30 @@ const sidebar: Sidebar = createSidebar({
   initialTempo: persistence.settings.tempo_bpm,
 });
 const canvasContainer = sidebar.getCanvasContainer();
+
+// ── Step 2b: Library UI ─────────────────────────────────────────────
+
+const libraryUI = createLibraryUI({
+  container: sidebar.getLibraryListContainer(),
+  onLoad: (entry: LibraryEntry) => {
+    // Stop any current playback
+    if (audioState.transport?.isPlaying()) {
+      handleStop();
+    }
+    // Apply library entry settings
+    activeGrid = entry.grid;
+    persistence.settings = { ...persistence.settings, tempo_bpm: entry.tempo };
+    updateSettings(persistence, { tempo_bpm: entry.tempo });
+    sidebar.setTempo(entry.tempo);
+    // Load progression
+    const chords = [...entry.chords];
+    if (loadProgressionFromChords(chords)) {
+      // Show full repeated chords grouped by bar (round-trip safe)
+      sidebar.setInputText(formatChordsGrouped(chords));
+      sidebar.switchToTab("play");
+    }
+  },
+});
 
 // ── Step 3: SVG Scaffold ────────────────────────────────────────────
 
