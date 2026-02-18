@@ -104,8 +104,7 @@ describe("loadProgressionPipeline", () => {
     it("produces shapes + events for a valid ii–V–I", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "G7", "Cmaj7"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -114,79 +113,68 @@ describe("loadProgressionPipeline", () => {
       expect(success.shapes).toHaveLength(3);
       expect(success.events).toHaveLength(3);
 
-      // Each chord = 1 beat at "1/4" grid, no repeats
+      // POL-D17: each chord = 4 beats, no grid
       expect(success.events[0].startBeat).toBe(0);
-      expect(success.events[0].durationBeats).toBe(1);
-      expect(success.events[1].startBeat).toBe(1);
-      expect(success.events[1].durationBeats).toBe(1);
-      expect(success.events[2].startBeat).toBe(2);
-      expect(success.events[2].durationBeats).toBe(1);
+      expect(success.events[0].durationBeats).toBe(4);
+      expect(success.events[1].startBeat).toBe(4);
+      expect(success.events[1].durationBeats).toBe(4);
+      expect(success.events[2].startBeat).toBe(8);
+      expect(success.events[2].durationBeats).toBe(4);
     });
 
-    it("collapses repeated chords and extends durations", () => {
+    it("repeated chords produce separate shapes (POL-D17: no collapsing)", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "Dm7", "G7", "Cmaj7", "Cmaj7"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
       expect(result.ok).toBe(true);
       const success = result as PipelineSuccess;
-      // 3 unique chords after collapse
-      expect(success.shapes).toHaveLength(3);
-      expect(success.events).toHaveLength(3);
+      // POL-D17: no collapsing — 5 chords = 5 shapes
+      expect(success.shapes).toHaveLength(5);
+      expect(success.events).toHaveLength(5);
 
-      // Dm7: 2 slots × 1 beat = 2 beats
-      expect(success.events[0].durationBeats).toBe(2);
+      // Each chord = 4 beats
+      expect(success.events[0].durationBeats).toBe(4);
       expect(success.events[0].startBeat).toBe(0);
-
-      // G7: 1 slot × 1 beat = 1 beat
-      expect(success.events[1].durationBeats).toBe(1);
-      expect(success.events[1].startBeat).toBe(2);
-
-      // Cmaj7: 2 slots × 1 beat = 2 beats
-      expect(success.events[2].durationBeats).toBe(2);
-      expect(success.events[2].startBeat).toBe(3);
+      expect(success.events[1].startBeat).toBe(4);
+      expect(success.events[4].startBeat).toBe(16);
     });
 
-    it("applies eighth-note grid correctly", () => {
+    it("all chords get uniform 4-beat durations (POL-D17)", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "G7", "Cmaj7"],
-        grid: "1/8",
         focus: defaultFocus,
         indices,
       });
 
       expect(result.ok).toBe(true);
       const success = result as PipelineSuccess;
-      expect(success.events[0].durationBeats).toBe(0.5);
-      expect(success.events[1].startBeat).toBe(0.5);
-      expect(success.events[1].durationBeats).toBe(0.5);
-      expect(success.events[2].startBeat).toBe(1);
+      expect(success.events[0].durationBeats).toBe(4);
+      expect(success.events[1].durationBeats).toBe(4);
+      expect(success.events[1].startBeat).toBe(4);
+      expect(success.events[2].startBeat).toBe(8);
     });
 
-    it("applies triplet grid correctly", () => {
+    it("uniform 4-beat durations for triads too", () => {
       const result = loadProgressionPipeline({
         chords: ["Am", "Dm", "Em"],
-        grid: "1/3",
         focus: defaultFocus,
         indices,
       });
 
       expect(result.ok).toBe(true);
       const success = result as PipelineSuccess;
-      const beatsPerChord = 4 / 3;
-      expect(success.events[0].durationBeats).toBeCloseTo(beatsPerChord, 10);
-      expect(success.events[1].startBeat).toBeCloseTo(beatsPerChord, 10);
-      expect(success.events[2].startBeat).toBeCloseTo(beatsPerChord * 2, 10);
+      expect(success.events[0].durationBeats).toBe(4);
+      expect(success.events[1].startBeat).toBe(4);
+      expect(success.events[2].startBeat).toBe(8);
     });
 
     it("returns empty shapes + events for empty chords array", () => {
       const result = loadProgressionPipeline({
         chords: [],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -199,8 +187,7 @@ describe("loadProgressionPipeline", () => {
     it("preserves shape object identity between shapes[] and events[]", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "G7", "Cmaj7"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -214,24 +201,24 @@ describe("loadProgressionPipeline", () => {
     it("exposes collapsed array in success result", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "Dm7", "G7"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
       expect(result.ok).toBe(true);
       const success = result as PipelineSuccess;
-      expect(success.collapsed).toEqual([
-        { symbol: "Dm7", count: 2 },
-        { symbol: "G7", count: 1 },
-      ]);
+      // POL-D17: no collapsing — each chord token = one shape, 4 beats
+      expect(success.shapes).toHaveLength(3);
+      expect(success.events).toHaveLength(3);
+      expect(success.events[0].durationBeats).toBe(4);
+      expect(success.events[1].durationBeats).toBe(4);
+      expect(success.events[2].durationBeats).toBe(4);
     });
 
     it("shapes have expected HC Shape properties", () => {
       const result = loadProgressionPipeline({
         chords: ["C"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -245,20 +232,19 @@ describe("loadProgressionPipeline", () => {
       expect(shape.chord.root_pc).toBe(0); // C = 0
     });
 
-    it("handles single chord with repeated slots", () => {
+    it("repeated chord produces multiple shapes (POL-D17: no collapsing)", () => {
       const result = loadProgressionPipeline({
         chords: ["Am", "Am", "Am", "Am"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
       expect(result.ok).toBe(true);
       const success = result as PipelineSuccess;
-      expect(success.shapes).toHaveLength(1);
-      expect(success.events).toHaveLength(1);
+      expect(success.shapes).toHaveLength(4);
+      expect(success.events).toHaveLength(4);
       expect(success.events[0].durationBeats).toBe(4);
-      expect(success.events[0].startBeat).toBe(0);
+      expect(success.events[3].startBeat).toBe(12);
     });
   });
 
@@ -266,8 +252,7 @@ describe("loadProgressionPipeline", () => {
     it("returns error for invalid chord symbol", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "INVALID", "Cmaj7"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -280,8 +265,7 @@ describe("loadProgressionPipeline", () => {
     it("reports all failed symbols (not just first)", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "NOPE", "G7", "ALSO_BAD"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -295,8 +279,7 @@ describe("loadProgressionPipeline", () => {
     it("does not include valid symbols in failedSymbols", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "INVALID"],
-        grid: "1/4",
-        focus: defaultFocus,
+            focus: defaultFocus,
         indices,
       });
 
@@ -491,8 +474,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("slash chord parses successfully after cleaning", () => {
     const result = loadProgressionPipeline({
       chords: ["C/E", "Dm7/A", "G7"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -503,8 +485,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("half-diminished ø parses as m7b5 after cleaning", () => {
     const result = loadProgressionPipeline({
       chords: ["Bø7", "E7", "Am"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -516,8 +497,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("triangle Δ parses as maj7 after cleaning", () => {
     const result = loadProgressionPipeline({
       chords: ["CΔ7"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -528,8 +508,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("dash-as-minor parses after cleaning", () => {
     const result = loadProgressionPipeline({
       chords: ["D-7", "G7", "C"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -541,8 +520,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("sus chord cleaned to bare triad with warning in result", () => {
     const result = loadProgressionPipeline({
       chords: ["Csus4", "G", "Am"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -556,8 +534,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("parenthesized alterations stripped and chord parses", () => {
     const result = loadProgressionPipeline({
       chords: ["C7(b9)", "F7(#11)"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -572,8 +549,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
         "Cm7", "F7", "Bbmaj7", "Ebmaj7",
         "Am7b5", "D7", "Gm", "Gm",
       ],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -589,8 +565,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("no warnings when no cleaning needed", () => {
     const result = loadProgressionPipeline({
       chords: ["Dm7", "G7", "Cmaj7"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);
@@ -601,8 +576,7 @@ describe("loadProgressionPipeline with input cleaning", () => {
   it("6/9 extension preserved through cleaning (not treated as slash)", () => {
     const result = loadProgressionPipeline({
       chords: ["C6/9"],
-      grid: "1/4",
-      focus: defaultFocus,
+        focus: defaultFocus,
       indices,
     });
     expect(result.ok).toBe(true);

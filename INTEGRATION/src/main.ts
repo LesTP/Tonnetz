@@ -13,7 +13,7 @@
  */
 
 import type { CentroidCoord, Shape, TriRef, TriId, EdgeId, WindowIndices } from "harmony-core";
-import { triId, getTrianglePcs, getEdgeUnionPcs, pc } from "harmony-core";
+import { triId, triVertices, getTrianglePcs, getEdgeUnionPcs, pc } from "harmony-core";
 
 import {
   createSvgScaffold,
@@ -55,7 +55,6 @@ import { wireAllTransportSubscriptions } from "./transport-wiring.js";
 import {
   initPersistence,
   checkUrlHash,
-  DEFAULT_GRID,
   updateSettings,
 } from "./persistence-wiring.js";
 import { createKeyboardShortcuts } from "./keyboard-shortcuts.js";
@@ -64,7 +63,6 @@ import { createSidebar } from "./sidebar.js";
 import type { Sidebar } from "./sidebar.js";
 import { createLibraryUI } from "./library/library-ui.js";
 import type { LibraryEntry } from "./library/library-types.js";
-import type { GridValue } from "persistence-data";
 
 // ── Application State ───────────────────────────────────────────────
 
@@ -74,7 +72,6 @@ if (!appEl) throw new Error("Missing #app container");
 // Mutable application-level state
 let currentPathHandle: PathHandle | null = null;
 let transportUnsub: (() => void) | null = null;
-let activeGrid: GridValue = DEFAULT_GRID;
 
 /** Currently loaded progression shapes (for playback highlighting). */
 let currentShapes: readonly Shape[] = [];
@@ -225,7 +222,7 @@ const pathHandleProxy: PathHandle = {
           dotPcs: shape.dot_pcs,
           centroid: shape.centroid_uv,
           orientation: shape.main_tri?.orientation ?? (shape.chord.quality === "aug" ? "U" : "D"),
-          rootVertexIndex: shape.root_vertex_index,
+          rootPc: shape.chord.root_pc,
         },
       );
     }
@@ -250,7 +247,6 @@ function loadProgressionFromChords(chords: string[]): boolean {
 
   const result = loadProgressionPipeline({
     chords,
-    grid: activeGrid,
     focus,
     indices,
   });
@@ -371,14 +367,15 @@ function handleClear(): void {
 }
 
 function handlePlay(): void {
-  if (!audioState.transport) return;
   // Deactivate any interactive or playback grid highlight when entering playback mode
   deactivateGridHighlight(interactiveGridHandle);
   interactiveGridHandle = null;
   deactivateGridHighlight(activeGridHandle);
   activeGridHandle = null;
-  audioState.transport.play();
-  uiState.startPlayback();
+  void ensureAudio(audioState).then(({ transport }) => {
+    transport.play();
+    uiState.startPlayback();
+  });
 }
 
 function handleStop(): void {
@@ -451,15 +448,13 @@ const libraryUI = createLibraryUI({
       handleStop();
     }
     // Apply library entry settings
-    activeGrid = entry.grid;
     persistence.settings = { ...persistence.settings, tempo_bpm: entry.tempo };
     updateSettings(persistence, { tempo_bpm: entry.tempo });
     sidebar.setTempo(entry.tempo);
     // Load progression
     const chords = [...entry.chords];
     if (loadProgressionFromChords(chords)) {
-      // Show full repeated chords grouped by bar (round-trip safe)
-      sidebar.setInputText(formatChordsGrouped(chords));
+      sidebar.setInputText(chords.join(" | "));
       sidebar.switchToTab("play");
     }
   },
@@ -557,7 +552,7 @@ const interactionCallbacks = {
         {
           mainTriId: hit.triId,
           orientation: triRef?.orientation ?? "U",
-          rootVertexIndex: triRef?.orientation === "U" ? 0 : 2,
+          rootPc: triRef ? pc(triVertices(triRef)[triRef.orientation === "U" ? 0 : 2].u, triVertices(triRef)[triRef.orientation === "U" ? 0 : 2].v) : null,
         },
       );
       // Show chord name during interactive exploration
@@ -572,7 +567,7 @@ const interactionCallbacks = {
           mainTriId: hit.triIds[0],
           extTriIds: [hit.triIds[1]],
           orientation: mainRef?.orientation ?? "U",
-          rootVertexIndex: mainRef?.orientation === "U" ? 0 : 2,
+          rootPc: mainRef ? pc(triVertices(mainRef)[mainRef.orientation === "U" ? 0 : 2].u, triVertices(mainRef)[mainRef.orientation === "U" ? 0 : 2].v) : null,
         },
       );
       // Show union chord name
@@ -627,10 +622,8 @@ const keyboardShortcuts = createKeyboardShortcuts({
 
 const urlCheck = checkUrlHash(location.hash);
 if (urlCheck.found) {
-  const { chords, tempo_bpm, grid } = urlCheck.payload;
-  // Apply URL payload settings
+  const { chords, tempo_bpm } = urlCheck.payload;
   persistence.settings = { ...persistence.settings, tempo_bpm };
-  activeGrid = grid;
   sidebar.setTempo(tempo_bpm);
   loadProgressionFromChords([...chords]);
 }

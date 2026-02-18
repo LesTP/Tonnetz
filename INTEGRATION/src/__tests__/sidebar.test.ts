@@ -124,15 +124,11 @@ describe("createSidebar", () => {
       expect(display!.classList.contains("tonnetz-sidebar-chord-display--placeholder")).toBe(true);
     });
 
-    it("creates progression input textarea and Load button", () => {
+    it("creates progression input textarea", () => {
       sidebar = createSidebar(opts);
       const textarea = q(root, "progression-input") as HTMLTextAreaElement;
       expect(textarea).not.toBeNull();
       expect(textarea.tagName).toBe("TEXTAREA");
-
-      const loadBtn = q(root, "load-btn");
-      expect(loadBtn).not.toBeNull();
-      expect(loadBtn!.textContent).toBe("Load");
     });
 
     it("creates transport buttons (Play, Stop, Loop, Clear)", () => {
@@ -155,8 +151,8 @@ describe("createSidebar", () => {
 
       expect(slider).not.toBeNull();
       expect(slider.value).toBe("140");
-      expect(slider.min).toBe("40");
-      expect(slider.max).toBe("240");
+      expect(slider.min).toBe("20");
+      expect(slider.max).toBe("960");
       expect(label!.textContent).toBe("140 BPM");
     });
 
@@ -309,20 +305,23 @@ describe("createSidebar", () => {
   // ── Callbacks ──────────────────────────────────────────────────────
 
   describe("callbacks", () => {
-    it("Load button fires onLoadProgression with textarea content", () => {
+    it("Play button auto-loads from textarea when no progression loaded", () => {
       sidebar = createSidebar(opts);
       const textarea = q(root, "progression-input") as HTMLTextAreaElement;
       textarea.value = "Dm7 | G7 | Cmaj7";
-      q(root, "load-btn")!.click();
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      q(root, "play-btn")!.click();
 
       expect(opts.onLoadProgression).toHaveBeenCalledWith("Dm7 | G7 | Cmaj7");
+      expect(opts.onPlay).toHaveBeenCalled();
     });
 
-    it("Load button does not fire for empty textarea", () => {
+    it("Load button does not fire for empty textarea (via Play)", () => {
       sidebar = createSidebar(opts);
       const textarea = q(root, "progression-input") as HTMLTextAreaElement;
       textarea.value = "   ";
-      q(root, "load-btn")!.click();
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      q(root, "play-btn")!.click();
 
       expect(opts.onLoadProgression).not.toHaveBeenCalled();
     });
@@ -443,55 +442,40 @@ describe("createSidebar", () => {
       expect(q(root, "tempo-label")!.textContent).toBe("88 BPM");
     });
 
-    it("tempo is clamped to 40–240 range", () => {
+    it("tempo is clamped to 20–960 range", () => {
       sidebar = createSidebar({ ...opts, initialTempo: 10 });
       const slider = q(root, "tempo-slider") as HTMLInputElement;
-      expect(slider.value).toBe("40");
+      expect(slider.value).toBe("20");
 
-      sidebar.setTempo(999);
-      expect(slider.value).toBe("240");
-      expect(q(root, "tempo-label")!.textContent).toBe("240 BPM");
+      sidebar.setTempo(9999);
+      expect(slider.value).toBe("960");
+      expect(q(root, "tempo-label")!.textContent).toBe("960 BPM");
     });
 
-    it("shows tempo marking that updates with BPM", () => {
+    it("tempo label updates without marking (POL-D17)", () => {
       sidebar = createSidebar({ ...opts, initialTempo: 120 });
-      const marking = q(root, "tempo-marking")!;
-      expect(marking.textContent).toBe("Allegro");
+      const label = q(root, "tempo-label")!;
+      expect(label.textContent).toBe("120 BPM");
 
       sidebar.setTempo(50);
-      expect(marking.textContent).toBe("Largo");
+      expect(label.textContent).toBe("50 BPM");
 
-      sidebar.setTempo(66);
-      expect(marking.textContent).toBe("Adagio");
-
-      sidebar.setTempo(90);
-      expect(marking.textContent).toBe("Andante");
-
-      sidebar.setTempo(110);
-      expect(marking.textContent).toBe("Moderato");
-
-      sidebar.setTempo(170);
-      expect(marking.textContent).toBe("Vivace");
-
-      sidebar.setTempo(180);
-      expect(marking.textContent).toBe("Presto");
-
-      sidebar.setTempo(220);
-      expect(marking.textContent).toBe("Prestissimo");
+      sidebar.setTempo(200);
+      expect(label.textContent).toBe("200 BPM");
     });
 
-    it("tempo marking updates on slider input", () => {
+    it("tempo label updates on slider input", () => {
       sidebar = createSidebar(opts);
       const slider = q(root, "tempo-slider") as HTMLInputElement;
-      const marking = q(root, "tempo-marking")!;
+      const label = q(root, "tempo-label")!;
 
       slider.value = "55";
       slider.dispatchEvent(new Event("input", { bubbles: true }));
-      expect(marking.textContent).toBe("Largo");
+      expect(label.textContent).toBe("55 BPM");
 
-      slider.value = "140";
+      slider.value = "400";
       slider.dispatchEvent(new Event("input", { bubbles: true }));
-      expect(marking.textContent).toBe("Allegro");
+      expect(label.textContent).toBe("400 BPM");
     });
   });
 

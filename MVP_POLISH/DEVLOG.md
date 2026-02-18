@@ -5,6 +5,50 @@ Started: 2026-02-16
 
 ---
 
+## Entry 11 — POL-D17: Simplify Duration Model + Load→Play Merge
+
+**Date:** 2026-02-18
+
+### Summary
+
+Simplified the entire duration/playback model. Removed grid-based timing, chord collapsing, Load button, and Italian tempo markings. Unified root identification in the grid-highlighter.
+
+### Duration Model (POL-D17)
+
+**Before:** Each chord token = 1 beat at grid `"1/4"`. Duration by repetition (`Dm7 Dm7 Dm7 Dm7` = 4 beats). `collapseRepeatedChords()` merged repeats into one shape. Library entries stored 4× repeats per chord. Tempo range 40–240 BPM with Italian markings (Largo, Adagio, etc.).
+
+**After:** Each chord token = 4 beats (one bar). No collapsing — `Dm7 Dm7` = two shapes, 8 beats. Library entries de-duplicated to one token per bar. Tempo range 20–960 BPM, no markings. For >1 chord per bar: repeat chords and increase tempo.
+
+### Load→Play Merge
+
+Removed the Load button entirely. Play now auto-loads from textarea if text is present. Always reloads on each press (changing text + pressing Play immediately reloads). `handlePlay` uses `ensureAudio().then()` so first click initializes audio + plays (no second click needed). Textarea `input` event enables the Play button when content is present.
+
+### Unified Root Identification
+
+Grid-highlighter previously used two mechanisms: `rootVertexIndex` (index 0/1/2) for triangulated shapes, `rootPc` (pitch class) for dot-only shapes. Now uses `rootPc` uniformly for all chord types — main triangle vertices, extension triangle vertices, and dot nodes all check `pc(vertex.u, vertex.v) === rootPc`. Fixes m7b5/dim7 missing bold root node.
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `INT/src/progression-pipeline.ts` | Removed grid param, collapsing, GridValue import. Hardcoded 4 beats/chord. |
+| `INT/src/sidebar.ts` | Removed Load button DOM/events, tempoMarking function/DOM, expanded tempo 20–960, Play auto-loads, textarea input listener, How to Use updated |
+| `INT/src/main.ts` | Removed grid state/imports, Play uses ensureAudio().then(), rootPc replaces rootVertexIndex in all activateGridHighlight calls |
+| `RU/src/grid-highlighter.ts` | Added rootPc option, unified root check across main/ext/dot paths |
+| `INT/src/library/library-types.ts` | Removed grid field from LibraryEntry |
+| `INT/src/library/library-data.ts` | De-duplicated chords (one per bar), removed grid |
+| `INT/src/__tests__/*.ts` | Updated all test expectations for new duration model |
+
+### Decisions
+
+- **POL-D17** (Closed): 4 beats per chord, no collapsing, no grid, Load→Play merge, rootPc unification
+
+### Test Results
+
+HC 178, RU 341, INT 244 — all passing, 0 type errors.
+
+---
+
 ## Entry 10 — POL-D16: Root Motion vs Tonal Centroid Toggle
 
 **Date:** 2026-02-18

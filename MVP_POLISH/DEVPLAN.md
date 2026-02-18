@@ -33,7 +33,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. The te
 ## Current Status
 
 **Phase:** 1 complete. Ready for Phase 2 (Library) or further testing.
-**Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign. Post-Phase 1 improvements: centroid = root vertex (POL-D15), drag bug fix (text selection / browser gesture interference).
+**Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign. Post-Phase 1 improvements: centroid = root vertex (POL-D15), drag bug fix, tonal centroid toggle (POL-D16), duration simplification + Load→Play merge + rootPc unification (POL-D17).
 **Blocked/Broken:** Nothing
 **Known visual TODO:** Header triangle buttons extend slightly past the separator line — needs CSS investigation (triangle SVGs are wider than the border-bottom boundary). Low priority.
 **Open design TODO:** Library → textarea chord display format (see below).
@@ -535,6 +535,27 @@ Rationale:
   eliminates the extra tap to reach playback controls.
 Revisit if: Detail content exceeds what fits in an expanded card (e.g., if we
   add audio preview or visual path thumbnail).
+```
+
+```
+POL-D17: Simplify duration model — 4 beats per chord, merge Load into Play
+Date: 2026-02-18
+Status: Closed
+Priority: Important
+Decision: Every chord token = 4 beats (one bar). No collapsing, no grid
+  parameter. Play button auto-loads from textarea (Load button removed).
+  Tempo range expanded to 20–960 BPM. Italian tempo markings removed.
+  For >1 chord per bar: write each chord multiple times and increase tempo.
+  Grid-highlighter root identification unified: rootPc (pitch class 0–11)
+  replaces rootVertexIndex for all chord types (triangulated + dot-only).
+Rationale:
+  The grid-based duration model (1 beat per slot, duration by repetition,
+  collapsing logic) was unnecessarily complex. Users had to type "Dm7 Dm7
+  Dm7 Dm7" to get a normal playback speed. Separate Load and Play buttons
+  added friction — users expected Play to just work. Unifying root styling
+  via rootPc eliminates the dot-only root bug (m7b5 missing bold root).
+Revisit if: Users need sub-bar timing precision (e.g., syncopation,
+  pickup notes). At that point, consider a per-chord duration field.
 ```
 
 ```

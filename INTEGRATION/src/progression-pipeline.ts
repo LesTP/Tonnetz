@@ -12,13 +12,6 @@
 import type { Chord, Shape, CentroidCoord, WindowIndices } from "harmony-core";
 import { parseChordSymbol, mapProgressionToShapes } from "harmony-core";
 import type { ChordEvent } from "audio-engine";
-import type { GridValue } from "persistence-data";
-
-import {
-  gridToBeatsPerChord,
-  collapseRepeatedChords,
-  type CollapsedChord,
-} from "./grid-to-beats.js";
 
 // ── Phase 0b Layer 1: Input Cleaning ─────────────────────────────
 
@@ -110,8 +103,7 @@ export interface PipelineSuccess {
   readonly ok: true;
   readonly shapes: Shape[];
   readonly events: ChordEvent[];
-  readonly collapsed: CollapsedChord[];
-  /** Cleaned chord symbols (after input normalization). Same length as collapsed. */
+  /** Cleaned chord symbols (after input normalization). One per chord. */
   readonly cleanedSymbols: string[];
   /** Warnings from input cleaning (e.g., sus stripped). Empty if no warnings. */
   readonly warnings: string[];
@@ -129,7 +121,6 @@ export type PipelineResult = PipelineSuccess | PipelineError;
 /** Arguments for the progression load pipeline. */
 export interface PipelineArgs {
   readonly chords: readonly string[];
-  readonly grid: GridValue;
   readonly focus: CentroidCoord;
   readonly indices: WindowIndices;
 }
@@ -137,11 +128,12 @@ export interface PipelineArgs {
 /**
  * Full progression load pipeline: chord strings → Shape[] + ChordEvent[].
  *
+ * Duration model (POL-D17): every chord = 4 beats (one bar). No collapsing.
+ *
  * Steps:
- * 1. Collapse consecutive identical chord symbols (INT-D4)
- * 2. Parse each unique symbol via HC parseChordSymbol()
- * 3. Map parsed chords to Shapes via HC mapProgressionToShapes()
- * 4. Build ChordEvent[] manually with variable per-chord durations (INT-D5)
+ * 1. Clean + parse each symbol via HC parseChordSymbol()
+ * 2. Map parsed chords to Shapes via HC mapProgressionToShapes()
+ * 3. Build ChordEvent[] with uniform 4-beat durations
  *
  * Returns a discriminated union: `{ ok: true, shapes, events }` on success,
  * or `{ ok: false, error, failedSymbols }` if any symbol fails to parse.
@@ -149,29 +141,26 @@ export interface PipelineArgs {
  * Empty input produces an empty success result (not an error).
  */
 export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
-  const { chords, grid, focus, indices } = args;
+  const { chords, focus, indices } = args;
 
   if (chords.length === 0) {
-    return { ok: true, shapes: [], events: [], collapsed: [], cleanedSymbols: [], warnings: [] };
+    return { ok: true, shapes: [], events: [], cleanedSymbols: [], warnings: [] };
   }
 
-  // Step 1: collapse consecutive identical symbols
-  const collapsed = collapseRepeatedChords(chords);
-
-  // Step 2: clean + parse each unique symbol
+  // Step 1: clean + parse each symbol
   const parsedChords: Chord[] = [];
   const failedSymbols: string[] = [];
   const warnings: string[] = [];
   const cleanedSymbols: string[] = [];
 
-  for (const entry of collapsed) {
-    const { cleaned, warning } = cleanChordSymbol(entry.symbol);
+  for (const raw of chords) {
+    const { cleaned, warning } = cleanChordSymbol(raw);
     if (warning) warnings.push(warning);
     cleanedSymbols.push(cleaned);
     try {
       parsedChords.push(parseChordSymbol(cleaned));
     } catch {
-      failedSymbols.push(entry.symbol);
+      failedSymbols.push(raw);
     }
   }
 
@@ -183,23 +172,22 @@ export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
     };
   }
 
-  // Step 3: map to shapes via chain-focus placement (HC-D11)
+  // Step 2: map to shapes via chain-focus placement (HC-D11)
   const shapes = mapProgressionToShapes(parsedChords, focus, indices);
 
-  // Step 4: build ChordEvent[] with variable durations (INT-D5)
-  const beatsPerSlot = gridToBeatsPerChord(grid);
+  // Step 3: build ChordEvent[] — uniform 4 beats per chord (POL-D17)
+  const BEATS_PER_CHORD = 4;
   const events: ChordEvent[] = [];
   let startBeat = 0;
 
   for (let i = 0; i < shapes.length; i++) {
-    const durationBeats = collapsed[i].count * beatsPerSlot;
     events.push({
       shape: shapes[i],
       startBeat,
-      durationBeats,
+      durationBeats: BEATS_PER_CHORD,
     });
-    startBeat += durationBeats;
+    startBeat += BEATS_PER_CHORD;
   }
 
-  return { ok: true, shapes, events, collapsed, cleanedSymbols, warnings };
+  return { ok: true, shapes, events, cleanedSymbols, warnings };
 }

@@ -49,7 +49,7 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 
 ### Progression interaction
 
-* Paste progression → render path
+* Paste progression → press Play → render path + start playback (POL-D17: no separate Load step)
 * Play/Stop/Loop progression
 * Step forward/back through chords
 * Clear button → dismiss progression and return to Idle Exploration (UX-D5)
@@ -134,8 +134,8 @@ The interface is organized into two primary zones with responsive behavior:
    - **Active chord display** — compact single-line showing current chord name (POL-D10)
    - **Progression input** — textarea for paste/type, Load button
    - **Playback controls** — standard transport icons (POL-D11):
-     - ▶ Play, ■ Stop, 🔁 Loop (toggle), ✕ Clear
-   - **Tempo controller** — slider (40–240 BPM) + BPM display + Italian tempo marking (Largo, Adagio, Andante, Moderato, Allegro, Vivace, Presto, Prestissimo — updates dynamically with BPM)
+     - ▶ Play (auto-loads from textarea if needed), ■ Stop, 🔁 Loop (toggle), ✕ Clear
+   - **Tempo controller** — slider (20–960 BPM) + BPM display (POL-D17: no Italian markings)
 
 3. **Tab: Library** (choosing — browse and select)
    - **Filter tabs** — All | By Genre | By Harmonic Feature

@@ -4,8 +4,6 @@
  * Phase 2a: Data model for bundled library entries.
  */
 
-import type { GridValue } from "persistence-data";
-
 /** A single progression library entry with metadata. */
 export interface LibraryEntry {
   /** Unique identifier (slug-style, e.g., "autumn-leaves"). */
@@ -22,8 +20,6 @@ export interface LibraryEntry {
   readonly comment: string;
   /** Tempo in BPM. */
   readonly tempo: number;
-  /** Grid value for beat conversion. */
-  readonly grid: GridValue;
-  /** Chord symbols (one per grid slot, repeated for duration). */
+  /** Chord symbols — one per bar (each chord = 4 beats). */
   readonly chords: readonly string[];
 }

@@ -181,7 +181,6 @@ async function loadAndWire(text: string) {
 
   const result = loadProgressionPipeline({
     chords,
-    grid: DEFAULT_GRID,
     focus,
     indices,
   });
@@ -238,29 +237,25 @@ describe("Full progression lifecycle: load → play → stop → clear", () => {
       expect(events).toHaveLength(3);
     });
 
-    it("events have correct startBeat progression at 1/4 grid", async () => {
+    it("events have correct startBeat progression (POL-D17: 4 beats each)", async () => {
       const result = await loadAndWire("Dm7 G7 Cmaj7");
       const success = result as PipelineSuccess;
 
       expect(success.events[0].startBeat).toBe(0);
-      expect(success.events[1].startBeat).toBe(1);
-      expect(success.events[2].startBeat).toBe(2);
-      expect(success.events[0].durationBeats).toBe(1);
+      expect(success.events[1].startBeat).toBe(4);
+      expect(success.events[2].startBeat).toBe(8);
+      expect(success.events[0].durationBeats).toBe(4);
     });
 
-    it("repeated chords produce longer durations", async () => {
+    it("repeated chords produce separate shapes (POL-D17: no collapsing)", async () => {
       const result = await loadAndWire("Dm7 Dm7 G7 Cmaj7 Cmaj7 Cmaj7");
       const success = result as PipelineSuccess;
 
-      // Dm7×2 collapsed → 2 beats, G7×1 → 1 beat, Cmaj7×3 → 3 beats
-      expect(success.shapes).toHaveLength(3);
-      expect(success.events).toHaveLength(3);
-      expect(success.events[0].durationBeats).toBe(2);
-      expect(success.events[1].durationBeats).toBe(1);
-      expect(success.events[2].durationBeats).toBe(3);
-      expect(success.events[0].startBeat).toBe(0);
-      expect(success.events[1].startBeat).toBe(2);
-      expect(success.events[2].startBeat).toBe(3);
+      // POL-D17: no collapsing — 6 tokens = 6 shapes
+      expect(success.shapes).toHaveLength(6);
+      expect(success.events).toHaveLength(6);
+      expect(success.events[0].durationBeats).toBe(4);
+      expect(success.events[5].startBeat).toBe(20);
     });
 
     it("sets tempo on transport from persistence settings", async () => {
@@ -288,7 +283,6 @@ describe("Full progression lifecycle: load → play → stop → clear", () => {
       const chords = parseProgressionInput("Dm7 | Xbad | Cmaj7");
       const result = loadProgressionPipeline({
         chords,
-        grid: DEFAULT_GRID,
         focus: { u: 0, v: 0 },
         indices,
       });
@@ -465,7 +459,6 @@ describe("Full progression lifecycle: load → play → stop → clear", () => {
       const chords2 = parseProgressionInput("Am | F | C | G");
       const result2 = loadProgressionPipeline({
         chords: chords2,
-        grid: DEFAULT_GRID,
         focus: { u: 0, v: 0 },
         indices,
       });
@@ -543,7 +536,7 @@ describe("Persistence integration", () => {
     const encoded = encodeShareUrl({
       chords: ["Am", "Dm", "G7", "Cmaj7"],
       tempo_bpm: 100,
-      grid: "1/8",
+      grid: "1/4",
     });
     const hash = `#p=${encoded}`;
 
@@ -553,7 +546,6 @@ describe("Persistence integration", () => {
 
     const result = loadProgressionPipeline({
       chords: [...check.payload.chords],
-      grid: check.payload.grid,
       focus: { u: 0, v: 0 } as CentroidCoord,
       indices,
     });
@@ -561,12 +553,12 @@ describe("Persistence integration", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // 4 chords at 1/8 grid → 0.5 beats each
+    // POL-D17: 4 beats per chord
     expect(result.shapes).toHaveLength(4);
     expect(result.events).toHaveLength(4);
-    expect(result.events[0].durationBeats).toBe(0.5);
-    expect(result.events[1].startBeat).toBe(0.5);
-    expect(result.events[3].startBeat).toBe(1.5);
+    expect(result.events[0].durationBeats).toBe(4);
+    expect(result.events[1].startBeat).toBe(4);
+    expect(result.events[3].startBeat).toBe(12);
   });
 
   it("checkUrlHash returns found:false for missing hash", () => {
@@ -667,11 +659,10 @@ describe("Cross-module data integrity", () => {
     }
   });
 
-  it("pipeline produces valid beat timing for triplet grid", () => {
+  it("pipeline produces uniform 4-beat timing (POL-D17)", () => {
     const chords = parseProgressionInput("C Am F G");
     const result = loadProgressionPipeline({
       chords,
-      grid: "1/3",
       focus: { u: 0, v: 0 },
       indices,
     });
@@ -679,12 +670,10 @@ describe("Cross-module data integrity", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // 1/3 grid → 4/3 beats per chord
-    const bpc = 4 / 3;
-    expect(result.events[0].durationBeats).toBeCloseTo(bpc);
-    expect(result.events[1].startBeat).toBeCloseTo(bpc);
-    expect(result.events[2].startBeat).toBeCloseTo(bpc * 2);
-    expect(result.events[3].startBeat).toBeCloseTo(bpc * 3);
+    expect(result.events[0].durationBeats).toBe(4);
+    expect(result.events[1].startBeat).toBe(4);
+    expect(result.events[2].startBeat).toBe(8);
+    expect(result.events[3].startBeat).toBe(12);
   });
 
   it("chain-focus placement produces different centroids for each chord", async () => {

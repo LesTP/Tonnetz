@@ -655,8 +655,8 @@ const STYLES = `
 
 // ── Tempo constants ──────────────────────────────────────────────────
 
-const TEMPO_MIN = 40;
-const TEMPO_MAX = 240;
+const TEMPO_MIN = 20;
+const TEMPO_MAX = 960;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -679,16 +679,7 @@ function clampTempo(bpm: number): number {
   return Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round(bpm)));
 }
 
-function tempoMarking(bpm: number): string {
-  if (bpm < 60)  return "Largo";
-  if (bpm < 73)  return "Adagio";
-  if (bpm < 108) return "Andante";
-  if (bpm < 120) return "Moderato";
-  if (bpm < 168) return "Allegro";
-  if (bpm < 176) return "Vivace";
-  if (bpm < 200) return "Presto";
-  return "Prestissimo";
-}
+// ── Factory
 
 // ── Factory ──────────────────────────────────────────────────────────
 
@@ -780,11 +771,8 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     "data-testid": "progression-input",
   });
   textarea.rows = 3;
-  const loadBtn = el("button", C.loadBtn, { "data-testid": "load-btn" });
-  loadBtn.textContent = "Load";
   inputGroup.appendChild(inputLabel);
   inputGroup.appendChild(textarea);
-  inputGroup.appendChild(loadBtn);
 
   // Transport buttons
   const transportRow = el("div", C.transport);
@@ -814,11 +802,8 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   // Tempo control
   const tempoSection = el("div", C.tempoSection);
   const tempoHeader = el("div", C.tempoHeader);
-  const tempoMarkingEl = el("span", C.tempoMarking, { "data-testid": "tempo-marking" });
-  tempoMarkingEl.textContent = tempoMarking(clampTempo(initialTempo));
   const tempoLabel = el("span", C.tempoLabel, { "data-testid": "tempo-label" });
   tempoLabel.textContent = `${clampTempo(initialTempo)} BPM`;
-  tempoHeader.appendChild(tempoMarkingEl);
   tempoHeader.appendChild(tempoLabel);
 
   const tempoSlider = el("input", C.tempoSlider, {
@@ -937,8 +922,13 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     </ul>
 
     <h2>Loading a Progression</h2>
-    <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem. Type or paste chord symbols into the text field and click Load.</p>
+    <p>Type or paste chord symbols into the text field and press <strong>▶ Play</strong>.</p>
     <p>Supported formats: <code>Dm7 | G7 | Cmaj7</code> or <code>Dm7 G7 Cmaj7</code></p>
+    <p>Each chord plays for one bar (4 beats). Use the tempo slider to control speed.</p>
+
+    <h2>Multiple Chords per Bar</h2>
+    <p>To play two chords in one bar, write each chord twice and double the tempo. For example:</p>
+    <p><code>Dm7 Dm7 G7 G7 Cmaj7 Cmaj7</code> at 240 BPM sounds the same as <code>Dm7 G7 Cmaj7</code> at 120 BPM — but with two chord changes per bar.</p>
 
     <h2>Supported Chord Types</h2>
     <p>Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis.</p>
@@ -995,7 +985,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   // ── Button state management ────────────────────────────────────────
 
   function updateButtonStates(): void {
-    playBtn.disabled = !progressionLoaded || playbackRunning;
+    playBtn.disabled = playbackRunning || (!progressionLoaded && !textarea.value.trim());
     stopBtn.disabled = !playbackRunning;
     loopBtn.disabled = !progressionLoaded;
     clearBtn.disabled = !progressionLoaded;
@@ -1040,14 +1030,13 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   // ── Event handlers ─────────────────────────────────────────────────
 
-  function handleLoad(): void {
+  function handlePlay(): void {
     const text = textarea.value.trim();
     if (text) {
       onLoadProgression(text);
     }
+    onPlay();
   }
-
-  function handlePlay(): void { onPlay(); }
   function handleStop(): void { onStop(); }
   function handleClear(): void { onClear(); }
   function handleResetView(): void { onResetView(); }
@@ -1078,7 +1067,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   function handleTempoInput(): void {
     const bpm = clampTempo(Number(tempoSlider.value));
     tempoLabel.textContent = `${bpm} BPM`;
-    tempoMarkingEl.textContent = tempoMarking(bpm);
     onTempoChange(bpm);
   }
 
@@ -1117,13 +1105,12 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   function handleTextareaKeydown(e: KeyboardEvent): void {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleLoad();
+      handlePlay();
     }
   }
 
   // ── Attach listeners ───────────────────────────────────────────────
 
-  loadBtn.addEventListener("click", handleLoad);
   playBtn.addEventListener("click", handlePlay);
   stopBtn.addEventListener("click", handleStop);
   clearBtn.addEventListener("click", handleClear);
@@ -1139,6 +1126,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   hamburgerBtn.addEventListener("click", handleHamburger);
   backdrop.addEventListener("click", handleBackdropClick);
   textarea.addEventListener("keydown", handleTextareaKeydown);
+  textarea.addEventListener("input", updateButtonStates);
   document.addEventListener("keydown", handleKeydown);
 
   // ── Public interface ───────────────────────────────────────────────
@@ -1176,7 +1164,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       const clamped = clampTempo(bpm);
       tempoSlider.value = String(clamped);
       tempoLabel.textContent = `${clamped} BPM`;
-      tempoMarkingEl.textContent = tempoMarking(clamped);
     },
 
     setLoopEnabled(enabled: boolean): void {
@@ -1209,7 +1196,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
     destroy(): void {
       // Remove listeners
-      loadBtn.removeEventListener("click", handleLoad);
       playBtn.removeEventListener("click", handlePlay);
       stopBtn.removeEventListener("click", handleStop);
       clearBtn.removeEventListener("click", handleClear);

@@ -71,6 +71,8 @@ export interface GridHighlightOptions {
   orientation?: "U" | "D";
   /** Index of the root vertex within the main triangle (0, 1, or 2). Null if unknown. */
   rootVertexIndex?: number | null;
+  /** Root pitch class (0–11). Used to apply bold root styling on all node types. Preferred over rootVertexIndex. */
+  rootPc?: number | null;
 }
 
 // --- Internal helpers ---
@@ -186,26 +188,25 @@ export function activateGridHighlight(
         }
       }
 
-      // Vertex node circles
-      const verts = triVertices(triRef);
-      const rootIdx = options.rootVertexIndex ?? null;
+      // Vertex node circles — use rootPc for uniform root identification
+        const verts = triVertices(triRef);
+        const rootPcVal = options.rootPc ?? null;
 
-      for (let i = 0; i < 3; i++) {
-        const nid = nodeId(verts[i].u, verts[i].v) as string;
-        const circle = findNodeCircle(gridLayer, nid);
-        if (circle && saveOnce(circle, ["stroke", "stroke-width"])) {
-          const isRoot = rootIdx !== null && i === rootIdx;
-          const nidStr = nid;
-          highlightedNodeIds.add(nidStr);
-          if (isRoot) {
-            circle.setAttribute("stroke", isMajor ? ROOT_STROKE_MAJOR : ROOT_STROKE_MINOR);
-            circle.setAttribute("stroke-width", ACTIVE_ROOT_WIDTH);
-          } else {
-            circle.setAttribute("stroke", isMajor ? NODE_STROKE_MAJOR : NODE_STROKE_MINOR);
-            circle.setAttribute("stroke-width", ACTIVE_NODE_WIDTH);
+        for (let i = 0; i < 3; i++) {
+          const nid = nodeId(verts[i].u, verts[i].v) as string;
+          const circle = findNodeCircle(gridLayer, nid);
+          if (circle && saveOnce(circle, ["stroke", "stroke-width"])) {
+            const isRoot = rootPcVal !== null && pc(verts[i].u, verts[i].v) === rootPcVal;
+            highlightedNodeIds.add(nid);
+            if (isRoot) {
+              circle.setAttribute("stroke", isMajor ? ROOT_STROKE_MAJOR : ROOT_STROKE_MINOR);
+              circle.setAttribute("stroke-width", ACTIVE_ROOT_WIDTH);
+            } else {
+              circle.setAttribute("stroke", isMajor ? NODE_STROKE_MAJOR : NODE_STROKE_MINOR);
+              circle.setAttribute("stroke-width", ACTIVE_NODE_WIDTH);
+            }
           }
         }
-      }
     }
   }
 
@@ -232,17 +233,24 @@ export function activateGridHighlight(
           }
         }
 
-        // Vertex node circles — all get non-root stroke
-        const verts = triVertices(triRef);
-        for (let i = 0; i < 3; i++) {
-          const nid = nodeId(verts[i].u, verts[i].v) as string;
-          const circle = findNodeCircle(gridLayer, nid);
-          if (circle && saveOnce(circle, ["stroke", "stroke-width"])) {
-            highlightedNodeIds.add(nid);
-            circle.setAttribute("stroke", isMajor ? NODE_STROKE_MAJOR : NODE_STROKE_MINOR);
-            circle.setAttribute("stroke-width", ACTIVE_NODE_WIDTH);
+        // Vertex node circles — use rootPc for root identification
+          const extVerts = triVertices(triRef);
+          const extRootPc = options.rootPc ?? null;
+          for (let i = 0; i < 3; i++) {
+            const nid = nodeId(extVerts[i].u, extVerts[i].v) as string;
+            const circle = findNodeCircle(gridLayer, nid);
+            if (circle && saveOnce(circle, ["stroke", "stroke-width"])) {
+              highlightedNodeIds.add(nid);
+              const isRoot = extRootPc !== null && pc(extVerts[i].u, extVerts[i].v) === extRootPc;
+              if (isRoot) {
+                circle.setAttribute("stroke", isMajor ? ROOT_STROKE_MAJOR : ROOT_STROKE_MINOR);
+                circle.setAttribute("stroke-width", ACTIVE_ROOT_WIDTH);
+              } else {
+                circle.setAttribute("stroke", isMajor ? NODE_STROKE_MAJOR : NODE_STROKE_MINOR);
+                circle.setAttribute("stroke-width", ACTIVE_NODE_WIDTH);
+              }
+            }
           }
-        }
       }
     }
   }
@@ -320,13 +328,21 @@ export function activateGridHighlight(
       }
     }
 
-    // Highlight all picked dot nodes
+    // Highlight all picked dot nodes (root gets bold styling)
+    const rootPc = options.rootPc ?? null;
     for (const node of pickedNodes) {
       const circle = findNodeCircle(gridLayer, node.nid);
       if (circle && saveOnce(circle, ["stroke", "stroke-width"])) {
         highlightedNodeIds.add(node.nid);
-        circle.setAttribute("stroke", isMajor ? NODE_STROKE_MAJOR : NODE_STROKE_MINOR);
-        circle.setAttribute("stroke-width", ACTIVE_NODE_WIDTH);
+        const coord = parseNodeId(node.nid as NodeId);
+        const isRoot = rootPc !== null && pc(coord.u, coord.v) === rootPc;
+        if (isRoot) {
+          circle.setAttribute("stroke", isMajor ? ROOT_STROKE_MAJOR : ROOT_STROKE_MINOR);
+          circle.setAttribute("stroke-width", ACTIVE_ROOT_WIDTH);
+        } else {
+          circle.setAttribute("stroke", isMajor ? NODE_STROKE_MAJOR : NODE_STROKE_MINOR);
+          circle.setAttribute("stroke-width", ACTIVE_NODE_WIDTH);
+        }
       }
     }
 
