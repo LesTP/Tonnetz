@@ -559,6 +559,75 @@ Revisit if: Extended chords with large triangle clusters produce paths that
 ```
 
 ```
+POL-D16: Progression path mode — Root Motion vs Tonal Centroid
+Date: 2026-02-18
+Status: Open (Explore)
+Priority: Important
+
+Context:
+  POL-D15 set centroid_uv = root vertex for all shapes. This traces root motion
+  on the progression path (orange dots sit on root notes). But an alternative
+  representation — the geometric centroid of all pitch positions in the shape
+  ("tonal centroid") — captures a different musical truth: where the *sound mass*
+  sits in pitch space, regardless of which note is named as root.
+
+  Key example: Adim (A C Eb) is embedded inside F7 (F A C Eb) — they share 3/4
+  pitch classes. Root motion places them far apart (A and F are distant on the
+  Tonnetz). Tonal centroid places them nearly on top of each other, reflecting
+  the aural overlap. Similar for chromatic mediants, common-tone modulations,
+  and any progression where voice-leading proximity diverges from root distance.
+
+  Both representations are computable from existing Shape data. The question is
+  which is more musically informative — or whether both should be available.
+
+Options:
+  A) Root Motion only (current, POL-D15). Path = root vertex positions.
+     Pros: matches how musicians name/think about progressions, tracks bass line.
+     Cons: misses voice-leading proximity, shared-tone relationships invisible.
+
+  B) Tonal Centroid only. Path = mean of all vertex world-coordinates in the shape.
+     For triangulated shapes: mean of unique vertices across main_tri + ext_tris.
+     For dot-only shapes: mean of nearest-node positions for each dot_pc.
+     Pros: captures sonic similarity, voice-leading proximity, shared-tone overlap.
+     Cons: loses root motion directionality, functional harmony less visible.
+
+  C) Toggle (recommended). UI toggle in sidebar: "Root Motion" | "Tonal Centroid".
+     Both computed per shape; switching swaps which centroid feeds the path renderer.
+     Shape type gains a second centroid field or a computed accessor.
+     Default: Root Motion (matches current behavior).
+
+Implementation sketch (Option C):
+  1. HC Shape gains `tonal_centroid_uv: NodeCoord` alongside existing `centroid_uv`
+     - Triangulated: mean of unique vertices (the old clusterCentroid computation)
+     - Dot-only: mean of nearest-node positions for each dot_pc
+  2. Integration path renderer reads a `pathMode: "root" | "tonal"` setting
+     - "root" → uses shape.centroid_uv (current)
+     - "tonal" → uses shape.tonal_centroid_uv
+  3. Sidebar toggle in Play tab (below tempo? above progression input?)
+  4. Chain focus (HC-D11) always uses root centroid for placement — the tonal
+     centroid is a *display* alternative, not a placement alternative. Placement
+     by tonal centroid would lose the musically coherent root-to-root chaining.
+
+Terminology:
+  "Tonal centroid" — from Harte et al. (2006) and Krumhansl's tonal pitch space
+  work. Refers to the center of mass of pitch classes in a geometric tonal space.
+  UI label: "Root Motion" vs "Tonal Centroid".
+
+Test cases for visual comparison:
+  - Autumn Leaves (ii-V-I with m7b5): root path shows clear fifth-motion;
+    tonal centroid should show tight clustering in shared-tone regions
+  - Cycle of fifths: root path = large circle; tonal centroid = smaller circle
+    (adjacent fifths share 2/3 notes in their triads)
+  - Chord Forms Demo (#29): root path jumps around; tonal centroid should show
+    which chord types occupy similar tonal space
+
+Decision: Deferred — implement Option C toggle, evaluate visually with library
+  progressions, then decide on default and whether to keep both.
+Revisit if: Implementation reveals the tonal centroid path is always visually
+  similar to root motion (making the toggle pointless).
+```
+
+```
 POL-D13: Dot-only shape centroid = root node
 Date: 2026-02-17
 Status: Closed
