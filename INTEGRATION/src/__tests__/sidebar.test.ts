@@ -32,6 +32,7 @@ function defaultOptions(
     onResetView: vi.fn(),
     onTempoChange: vi.fn(),
     onLoopToggle: vi.fn(),
+    onPathModeChange: vi.fn(),
     initialTempo: 120,
     ...overrides,
   };

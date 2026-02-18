@@ -87,5 +87,21 @@ export interface Shape {
   readonly dot_pcs: number[];
   readonly covered_pcs: ReadonlySet<number>;
   readonly root_vertex_index: 0 | 1 | 2 | null;
+  /** Centroid = root vertex position (POL-D15). Used for path rendering by default. */
   readonly centroid_uv: NodeCoord;
+  /**
+   * Tonal centroid = geometric center of mass of all pitch positions (POL-D16).
+   * Computed as the mean of `placed_nodes`.
+   */
+  readonly tonal_centroid_uv: NodeCoord;
+  /**
+   * Resolved lattice coordinates for each chord tone (POL-D16).
+   *
+   * Triangulated shapes: unique triangle vertices + nearest nodes for dot_pcs.
+   * Dot-only shapes: nodes resolved via greedy chain (root → expand outward).
+   *
+   * Length = number of unique pitch positions (≤ chord_pcs.length, since two
+   * chord tones may share a lattice node in some voicings).
+   */
+  readonly placed_nodes: readonly NodeCoord[];
 }

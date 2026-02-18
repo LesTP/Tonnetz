@@ -102,26 +102,60 @@ export function decomposeChordToShape(
 ): Shape {
   // Dot-only path
   if (mainTri === null) {
-    // Centroid = nearest lattice node matching the root pitch class.
-    // This places the path marker on the root note (musically intuitive)
-    // and aligns with the grid-highlighter's greedy chain anchor.
+    // Resolve node positions via GREEDY CHAIN (matches grid-highlighter algorithm).
+    // 1. Find root node nearest to focus
+    // 2. For each remaining pc, find node nearest to ANY already-placed node
+    // This produces the same tight cluster the grid-highlighter displays.
     const SQRT3_2 = Math.sqrt(3) / 2;
-    const focusWx = focus.u + focus.v * 0.5;
-    const focusWy = focus.v * SQRT3_2;
 
-    let bestCoord: NodeCoord = focus;
-    let bestDist = Infinity;
+    function worldDist2(a: NodeCoord, b: NodeCoord): number {
+      const ax = a.u + a.v * 0.5, ay = a.v * SQRT3_2;
+      const bx = b.u + b.v * 0.5, by = b.v * SQRT3_2;
+      return (ax - bx) ** 2 + (ay - by) ** 2;
+    }
+
+    // Collect all nodes grouped by pc for efficient lookup
+    const nodesByPc = new Map<number, NodeCoord[]>();
+    const targetPcs = new Set(chord.chord_pcs);
+    for (const targetPc of targetPcs) {
+      nodesByPc.set(targetPc, []);
+    }
     for (const nid of indices.nodeToTris.keys()) {
       const coord = parseNodeId(nid);
-      if (pc(coord.u, coord.v) !== chord.root_pc) continue;
-      const wx = coord.u + coord.v * 0.5;
-      const wy = coord.v * SQRT3_2;
-      const d = (wx - focusWx) ** 2 + (wy - focusWy) ** 2;
-      if (d < bestDist) {
-        bestDist = d;
-        bestCoord = coord;
-      }
+      const nodePc = pc(coord.u, coord.v);
+      const arr = nodesByPc.get(nodePc);
+      if (arr) arr.push(coord);
     }
+
+    // Step 1: root node nearest to focus
+    let rootCoord: NodeCoord = focus;
+    let rootDist = Infinity;
+    for (const coord of nodesByPc.get(chord.root_pc) ?? []) {
+      const d = worldDist2(coord, focus);
+      if (d < rootDist) { rootDist = d; rootCoord = coord; }
+    }
+
+    // Step 2: greedy chain — each remaining pc nearest to any placed node
+    const placed: NodeCoord[] = [rootCoord];
+    const remainingPcs = [...targetPcs].filter((p) => p !== chord.root_pc);
+
+    for (const targetPc of remainingPcs) {
+      let bestCoord: NodeCoord = rootCoord;
+      let bestDist = Infinity;
+      for (const candidate of nodesByPc.get(targetPc) ?? []) {
+        // Distance to nearest already-placed node
+        for (const p of placed) {
+          const d = worldDist2(candidate, p);
+          if (d < bestDist) { bestDist = d; bestCoord = candidate; }
+        }
+      }
+      placed.push(bestCoord);
+    }
+
+    // Tonal centroid = mean of placed nodes
+    let sumU = 0, sumV = 0;
+    for (const p of placed) { sumU += p.u; sumV += p.v; }
+    const tonalCentroid: NodeCoord = { u: sumU / placed.length, v: sumV / placed.length };
 
     return {
       chord,
@@ -130,7 +164,9 @@ export function decomposeChordToShape(
       dot_pcs: [...chord.chord_pcs],
       covered_pcs: new Set(),
       root_vertex_index: null,
-      centroid_uv: bestCoord,
+      centroid_uv: rootCoord,
+      tonal_centroid_uv: tonalCentroid,
+      placed_nodes: placed,
     };
   }
 
@@ -198,9 +234,49 @@ export function decomposeChordToShape(
   );
 
   // Centroid = root vertex position (not cluster geometric center).
-  // This makes the progression path trace root motion, and is consistent
-  // with dot-only shapes which also use the root node position.
   const rootVertex = rootIdx >= 0 ? mainVerts[rootIdx] : clusterCentroid(cluster);
+
+  // Build placed_nodes: all unique cluster vertices + dot node coordinates
+  const placedNodes: NodeCoord[] = [];
+  for (const tri of cluster) {
+    for (const v of triVertices(tri)) {
+      if (!placedNodes.some((e) => e.u === v.u && e.v === v.v)) placedNodes.push(v);
+    }
+  }
+
+  let tonalCentroid: NodeCoord;
+  if (dot_pcs.length === 0) {
+    // No dots — tonal centroid is just mean of triangle vertices
+    let sumU = 0, sumV = 0;
+    for (const p of placedNodes) { sumU += p.u; sumV += p.v; }
+    tonalCentroid = { u: sumU / placedNodes.length, v: sumV / placedNodes.length };
+  } else {
+    // Find nearest lattice node for each dot_pc relative to cluster center
+    const SQRT3_2 = Math.sqrt(3) / 2;
+    const clusterCenter = clusterCentroid(cluster);
+    const refWx = clusterCenter.u + clusterCenter.v * 0.5;
+    const refWy = clusterCenter.v * SQRT3_2;
+
+    for (const dotPc of dot_pcs) {
+      let bestCoord: NodeCoord = clusterCenter;
+      let bestDist = Infinity;
+      for (const nid of indices.nodeToTris.keys()) {
+        const coord = parseNodeId(nid);
+        if (pc(coord.u, coord.v) !== dotPc) continue;
+        const wx = coord.u + coord.v * 0.5;
+        const wy = coord.v * SQRT3_2;
+        const d = (wx - refWx) ** 2 + (wy - refWy) ** 2;
+        if (d < bestDist) { bestDist = d; bestCoord = coord; }
+      }
+      if (!placedNodes.some((e) => e.u === bestCoord.u && e.v === bestCoord.v)) {
+        placedNodes.push(bestCoord);
+      }
+    }
+
+    let sumU = 0, sumV = 0;
+    for (const p of placedNodes) { sumU += p.u; sumV += p.v; }
+    tonalCentroid = { u: sumU / placedNodes.length, v: sumV / placedNodes.length };
+  }
 
   return {
     chord,
@@ -210,5 +286,7 @@ export function decomposeChordToShape(
     covered_pcs: covered,
     root_vertex_index: (rootIdx >= 0 ? rootIdx : null) as 0 | 1 | 2 | null,
     centroid_uv: rootVertex,
+    tonal_centroid_uv: tonalCentroid,
+    placed_nodes: placedNodes,
   };
 }

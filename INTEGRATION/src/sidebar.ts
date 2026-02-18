@@ -27,12 +27,14 @@ export interface SidebarOptions {
   onResetView: () => void;
   /** Callback when tempo slider changes. */
   onTempoChange: (bpm: number) => void;
+  /** Callback when path mode toggle changes. */
+  onPathModeChange: (mode: "root" | "tonal") => void;
   /** Callback when loop toggle changes. */
   onLoopToggle: (enabled: boolean) => void;
-  /** Callback when "How to Use" info button is clicked. */
-  onHowToUse?: () => void;
   /** Callback when "What This Is" info button is clicked. */
   onAbout?: () => void;
+  /** Callback when "How to Use" info button is clicked. */
+  onHowToUse?: () => void;
   /** Initial tempo BPM value. */
   initialTempo: number;
 }
@@ -54,6 +56,8 @@ export interface Sidebar {
   setLoopEnabled(enabled: boolean): void;
   /** Query the loop toggle state. */
   isLoopEnabled(): boolean;
+  /** Get the current path display mode. */
+  getPathMode(): "root" | "tonal";
   /** Programmatically switch to a tab. */
   switchToTab(tab: "play" | "library"): void;
   /** Get the library list container (for Phase 2 population). */
@@ -98,6 +102,9 @@ const C = {
   tempoMarking: "tonnetz-sidebar-tempo-marking",
   tempoSlider: "tonnetz-sidebar-tempo-slider",
   tempoLabel: "tonnetz-sidebar-tempo-label",
+  pathToggle: "tonnetz-sidebar-path-toggle",
+  pathToggleBtn: "tonnetz-sidebar-path-toggle-btn",
+  pathToggleBtnActive: "tonnetz-sidebar-path-toggle-btn--active",
   loadBtn: "tonnetz-sidebar-load-btn",
   clearBtn: "tonnetz-sidebar-clear-btn",
   libraryList: "tonnetz-sidebar-library-list",
@@ -453,6 +460,36 @@ const STYLES = `
   text-align: right;
 }
 
+/* Path mode toggle */
+.${C.pathToggle} {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  padding: 2px;
+}
+.${C.pathToggleBtn} {
+  flex: 1;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  color: #888;
+  transition: background 0.15s, color 0.15s;
+}
+.${C.pathToggleBtn}:hover {
+  color: #555;
+}
+.${C.pathToggleBtnActive} {
+  background: #fff;
+  color: #222;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
 /* Library list (Phase 2 placeholder) */
 .${C.libraryList} {
   flex: 1;
@@ -669,6 +706,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onResetView,
     onTempoChange,
     onLoopToggle,
+    onPathModeChange,
     onHowToUse,
     onAbout,
     initialTempo,
@@ -794,11 +832,21 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   tempoSection.appendChild(tempoHeader);
   tempoSection.appendChild(tempoSlider);
 
+  // Path mode toggle (Root Motion vs Tonal Centroid)
+  const pathToggle = el("div", C.pathToggle, { "data-testid": "path-toggle" });
+  const rootBtn = el("button", `${C.pathToggleBtn} ${C.pathToggleBtnActive}`, { "data-testid": "path-mode-root" });
+  rootBtn.textContent = "Root Motion";
+  const tonalBtn = el("button", C.pathToggleBtn, { "data-testid": "path-mode-tonal" });
+  tonalBtn.textContent = "Tonal Centroid";
+  pathToggle.appendChild(rootBtn);
+  pathToggle.appendChild(tonalBtn);
+
   // Assemble play panel
   playPanel.appendChild(chordDisplay);
   playPanel.appendChild(inputGroup);
   playPanel.appendChild(transportRow);
   playPanel.appendChild(tempoSection);
+  playPanel.appendChild(pathToggle);
 
   // ── Library Tab Panel ──────────────────────────────────────────────
 
@@ -1018,6 +1066,15 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onLoopToggle(loopEnabled);
   }
 
+  let pathMode: "root" | "tonal" = "root";
+  function handlePathToggle(mode: "root" | "tonal"): void {
+    if (mode === pathMode) return;
+    pathMode = mode;
+    rootBtn.className = `${C.pathToggleBtn} ${mode === "root" ? C.pathToggleBtnActive : ""}`;
+    tonalBtn.className = `${C.pathToggleBtn} ${mode === "tonal" ? C.pathToggleBtnActive : ""}`;
+    onPathModeChange(mode);
+  }
+
   function handleTempoInput(): void {
     const bpm = clampTempo(Number(tempoSlider.value));
     tempoLabel.textContent = `${bpm} BPM`;
@@ -1071,6 +1128,8 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   stopBtn.addEventListener("click", handleStop);
   clearBtn.addEventListener("click", handleClear);
   loopBtn.addEventListener("click", handleLoopToggle);
+  rootBtn.addEventListener("click", () => handlePathToggle("root"));
+  tonalBtn.addEventListener("click", () => handlePathToggle("tonal"));
   resetBtn.addEventListener("click", handleResetView);
   howBtn.addEventListener("click", handleHowToUse);
   aboutBtn.addEventListener("click", handleAbout);
@@ -1127,6 +1186,9 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
     isLoopEnabled(): boolean {
       return loopEnabled;
+    },
+    getPathMode(): "root" | "tonal" {
+      return pathMode;
     },
 
     switchToTab(tab: "play" | "library"): void {

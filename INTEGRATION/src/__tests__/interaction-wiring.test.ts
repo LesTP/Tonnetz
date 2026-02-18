@@ -201,10 +201,10 @@ describe("onPointerDown (Phase 3b)", () => {
 
   it("suppresses audio during playback-running state (UX-D6)", async () => {
     // Load a dummy progression to get to progression-loaded state
-    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 } };
-    uiState.loadProgression([dummyShape]);
-    uiState.startPlayback();
-    expect(uiState.getState()).toBe("playback-running");
+    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
+      uiState.loadProgression([dummyShape]);
+      uiState.startPlayback();
+      expect(uiState.getState()).toBe("playback-running");
 
     const callbacks = createInteractionWiring({
       audioState,
@@ -219,7 +219,8 @@ describe("onPointerDown (Phase 3b)", () => {
   });
 
   it("suppresses audio during progression-loaded state (INT-D6)", async () => {
-    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 } };
+    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
+      uiState.selectChord(dummyShape);
     uiState.loadProgression([dummyShape]);
     expect(uiState.getState()).toBe("progression-loaded");
 
@@ -288,7 +289,7 @@ describe("Post-classification callbacks (Phase 3c)", () => {
     await ensureAudio(audioState);
     vi.clearAllMocks();
 
-    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 } };
+    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
     uiState.loadProgression([dummyShape]);
     uiState.startPlayback();
 
@@ -323,7 +324,7 @@ describe("Post-classification callbacks (Phase 3c)", () => {
     await ensureAudio(audioState);
     vi.clearAllMocks();
 
-    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 } };
+    const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
     uiState.selectChord(dummyShape);
     expect(uiState.getState()).toBe("chord-selected");
 

@@ -277,10 +277,14 @@ function loadProgressionFromChords(chords: string[]): boolean {
     currentPathHandle.clear();
   }
 
-  // Render progression path
+  // Render progression path (respecting current path mode toggle)
+  const pathMode = sidebar.getPathMode();
+  const shapesForPath = pathMode === "tonal"
+    ? result.shapes.map((s) => ({ ...s, centroid_uv: s.tonal_centroid_uv }))
+    : result.shapes;
   currentPathHandle = renderProgressionPath(
     scaffold.layers["layer-path"],
-    result.shapes,
+    shapesForPath,
   );
 
   // Update UI state (synchronous — immediate visual feedback)
@@ -403,6 +407,24 @@ function handleLoopToggle(enabled: boolean): void {
   log.info("playback", `Loop ${enabled ? "enabled" : "disabled"}`);
 }
 
+function handlePathModeChange(mode: "root" | "tonal"): void {
+  log.info("display", `Path mode: ${mode}`);
+  if (!currentPathHandle || currentShapes.length === 0) return;
+
+  // Re-render the path using the selected centroid
+  currentPathHandle.clear();
+  const shapesForPath = mode === "tonal"
+    ? currentShapes.map((s) => ({
+        ...s,
+        centroid_uv: s.tonal_centroid_uv,
+      }))
+    : currentShapes;
+  currentPathHandle = renderProgressionPath(
+    scaffold.layers["layer-path"],
+    shapesForPath,
+  );
+}
+
 // ── Step 2: Sidebar + Layout ────────────────────────────────────────
 
 const sidebar: Sidebar = createSidebar({
@@ -414,6 +436,7 @@ const sidebar: Sidebar = createSidebar({
   onResetView: () => camera!.reset(),
   onTempoChange: handleTempoChange,
   onLoopToggle: handleLoopToggle,
+  onPathModeChange: handlePathModeChange,
   initialTempo: persistence.settings.tempo_bpm,
 });
 const canvasContainer = sidebar.getCanvasContainer();

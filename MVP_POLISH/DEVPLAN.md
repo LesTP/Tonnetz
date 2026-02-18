@@ -561,7 +561,7 @@ Revisit if: Extended chords with large triangle clusters produce paths that
 ```
 POL-D16: Progression path mode — Root Motion vs Tonal Centroid
 Date: 2026-02-18
-Status: Open (Explore)
+Status: Closed
 Priority: Important
 
 Context:
@@ -621,8 +621,13 @@ Test cases for visual comparison:
   - Chord Forms Demo (#29): root path jumps around; tonal centroid should show
     which chord types occupy similar tonal space
 
-Decision: Deferred — implement Option C toggle, evaluate visually with library
-  progressions, then decide on default and whether to keep both.
+Decision: Option C — Toggle. Shape gains `tonal_centroid_uv` and `placed_nodes`
+  fields. `placed_nodes` contains the resolved lattice coordinates for each chord
+  tone (greedy chain for dot-only, triangle vertices + dot nodes for triangulated).
+  `tonal_centroid_uv = mean(placed_nodes)`. UI toggle in sidebar Play tab lets
+  user switch path display between root motion and tonal centroid. Default: Root
+  Motion. Chain focus (HC-D11) always uses root centroid for placement — tonal
+  centroid is display-only. Loading a new progression respects the current toggle.
 Revisit if: Implementation reveals the tonal centroid path is always visually
   similar to root motion (making the toggle pointless).
 ```

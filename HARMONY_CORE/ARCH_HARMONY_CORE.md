@@ -258,9 +258,15 @@ Shape:
   covered_pcs: Set<int>
   root_vertex_index: 0|1|2 | null
   centroid_uv: (u,v)
+  tonal_centroid_uv: (u,v)
+  placed_nodes: NodeCoord[]
 ```
 
 `main_tri` and `root_vertex_index` are `null` for dot-only shapes (e.g., diminished and augmented triads).
+
+`placed_nodes` contains the resolved lattice coordinates for each chord tone:
+- **Triangulated shapes:** unique triangle vertices from `main_tri` + `ext_tris`, plus nearest lattice nodes for any `dot_pcs` (extension notes not covered by triangles).
+- **Dot-only shapes:** nodes resolved via greedy chain (root node nearest to focus, then each subsequent pc nearest to any already-placed node). This matches the grid-highlighter's display algorithm.
 
 ### HC-D9: Centroid computation
 

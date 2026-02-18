@@ -5,6 +5,69 @@ Started: 2026-02-16
 
 ---
 
+## Entry 10 — POL-D16: Root Motion vs Tonal Centroid Toggle
+
+**Date:** 2026-02-18
+
+### Summary
+
+Added a `tonal_centroid_uv` field to the HC `Shape` type and a UI toggle in the sidebar to switch the progression path display between **Root Motion** (default, POL-D15) and **Tonal Centroid** (geometric center of mass of all pitch positions).
+
+### HC Changes
+
+`Shape` gains two new fields:
+- `tonal_centroid_uv: NodeCoord` — geometric center of mass of all chord tone positions
+- `placed_nodes: readonly NodeCoord[]` — the actual resolved lattice coordinates for each chord tone
+
+`tonal_centroid_uv` is always computed as `mean(placed_nodes)`.
+
+| Shape type | `placed_nodes` source | `centroid_uv` (root) | `tonal_centroid_uv` |
+|---|---|---|---|
+| Triangulated (maj, min, dom7, m7…) | Unique triangle vertices + nearest nodes for dot_pcs | Root vertex position | mean(placed_nodes) |
+| Dot-only (dim, aug, m7b5, dim7) | Greedy chain: root nearest to focus, then each pc nearest to any already-placed node | Root node position | mean(placed_nodes) |
+
+**Greedy chain algorithm** (dot-only shapes): matches the grid-highlighter's display algorithm. Collects all window nodes grouped by pc, places root first (nearest to focus), then for each remaining pc finds the candidate node nearest to any already-placed node. This produces a tight cluster matching the displayed dots, fixing the earlier bug where independently-searched nodes could scatter across the lattice.
+
+Chain focus (HC-D11) always uses `centroid_uv` (root) for placement. `tonal_centroid_uv` is display-only.
+
+### Sidebar Changes
+
+Added "Root Motion | Tonal Centroid" segmented toggle below the tempo section in the Play tab. Pill-style buttons with active state highlight. Fires `onPathModeChange(mode)` callback.
+
+### Integration Wiring
+
+`handlePathModeChange(mode)` in `main.ts`:
+- Clears current path
+- If mode is "tonal", maps shapes with `centroid_uv` swapped to `tonal_centroid_uv`
+- Re-renders path via `renderProgressionPath()`
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `HC/src/types.ts` | Added `tonal_centroid_uv: NodeCoord` and `placed_nodes: readonly NodeCoord[]` to `Shape` |
+| `HC/src/placement.ts` | Dot-only: greedy chain node placement. Triangulated: collect placed_nodes (vertices + dot nodes). Both: `tonal_centroid_uv = mean(placed_nodes)` |
+| `INT/src/sidebar.ts` | Path toggle DOM + CSS + `getPathMode()` + `onPathModeChange` callback |
+| `INT/src/main.ts` | `handlePathModeChange()` + `loadProgressionFromChords` respects toggle state |
+| `INT/src/__tests__/sidebar.test.ts` | Added `onPathModeChange` to mock options |
+| `INT/src/__tests__/interaction-wiring.test.ts` | Added `tonal_centroid_uv` and `placed_nodes` to all mock Shape objects |
+
+### Decisions
+
+- **POL-D16** (Closed): Option C — toggle between Root Motion and Tonal Centroid
+
+### Test Results
+
+```
+HC:  178 passed
+RU:  341 passed
+INT: 244 passed
+Total: 763 passed — 0 failures
+tsc --noEmit: 0 errors (all modules)
+```
+
+---
+
 ## Entry 9 — Post-Phase 1: Centroid = Root Vertex + Drag Bug Fix
 
 **Date:** 2026-02-18
