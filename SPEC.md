@@ -347,10 +347,10 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 |-----------|-----------|-----------|---------|
 | Interaction → Audio | RU → AE | `InteractionCallbacks` → `playPitchClasses(state, pcs)`, `stopAll(state)` | Interactive chord playback on tap/click (AE-D9) |
 | Transport → Animation | AE → RU | `AudioTransport.onChordChange()` → `PathHandle.setActiveChord(index)` | Progression highlight sync |
-| Transport → UI | AE → RU | `AudioTransport.onStateChange()` → `ControlPanel` state update | Play/stop button state |
+| Transport → UI | AE → RU | `AudioTransport.onStateChange()` → sidebar state update | Play/stop button state |
 | Transport → Animation | AE → RU | `AudioTransport.getTime()` in rAF loop | Smooth path progress animation |
-| UI → Audio | RU → AE | `ControlPanel` callbacks → `AudioTransport.play()` / `.stop()` / `.pause()` | Transport control buttons |
-| UI → Audio | RU → AE | `ControlPanel` tempo input → `AudioTransport.setTempo(bpm)` | Tempo control |
+| UI → Audio | RU → AE | Sidebar callbacks → `AudioTransport.play()` / `.stop()` | Transport control buttons |
+| UI → Audio | RU → AE | Sidebar tempo slider → `AudioTransport.setTempo(bpm)` | Tempo control (POL-D1, resolves INT-D8) |
 
 ### Persistence ↔ Other Modules
 
@@ -359,8 +359,8 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 | Startup → Settings | PD → AE + RU | `loadSettings()` → `setTempo(bpm)`, apply view prefs | Restore user preferences on page load |
 | URL → Progression | PD → HC → RU + AE | `decodeShareUrl(hash)` → `parseChordSymbol()` each → `mapProgressionToShapes()` → `UIState.loadProgression()` | Auto-load shared progression from URL fragment |
 | Load → Progression | PD → HC → RU + AE | `loadProgression(id)` → same parse pipeline | Load saved progression from local storage |
-| Save ← UI | RU → PD | ControlPanel save action → `saveProgression({ title, tempo_bpm, grid, chords })` | Persist current progression locally |
-| Share ← UI | RU → PD | ControlPanel share action → `encodeShareUrl(prog)` → clipboard / URL bar | Generate shareable URL |
+| Save ← UI | RU → PD | Sidebar save action → `saveProgression({ title, tempo_bpm, grid, chords })` | Persist current progression locally |
+| Share ← UI | RU → PD | Sidebar share action → `encodeShareUrl(prog)` → clipboard / URL bar | Generate shareable URL |
 | Settings ← UI | RU → PD | Tempo change, view prefs → `saveSettings(partial)` | Persist user preferences |
 | Grid → Beats | PD → AE (bridged) | Integration converts PD grid notation (e.g., `"1/4"`) + `tempo_bpm` → AE `beatsPerChord` for `shapesToChordEvents()` | Bridge PD's time model to AE's beat model |
 
@@ -414,7 +414,7 @@ Audio Engine is stateless with respect to UI state (see ARCH_AUDIO_ENGINE.md §4
 
 * **Idle / Chord Selected:** immediate playback permitted via `playPitchClasses()`
 * **Playback Running:** interactive playback suppressed (UX-D6); only `AudioTransport` controls active
-* **Progression Loaded:** ready for scheduled playback; interactive playback permitted
+* **Progression Loaded:** ready for scheduled playback; interactive playback suppressed (INT-D6) — user clears progression first to return to exploration
 
 ## Grid-to-Beat Bridging
 

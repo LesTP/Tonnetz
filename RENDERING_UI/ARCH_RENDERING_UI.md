@@ -127,14 +127,12 @@ See UX-D1 in UX_SPEC.md §11.
 
 ### Drag vs Tap Distinction (UX-D3)
 
-Edge-proximity selection is **suppressed during drag**:
+All drag gestures trigger **camera pan**, regardless of start position (triangle, edge, or background). Audio and selection events are not fired during drag.
 
 * **Tap/click** (pointer movement < ~5px threshold): eligible for both triangle selection and edge-proximity union chord
-* **Drag** (pointer movement ≥ threshold): always triangle-scrub mode; crossing an edge during drag triggers two sequential triads, not a union chord
+* **Drag** (pointer movement ≥ threshold): always camera pan — no audio, no selection events
 
-This prevents musically disruptive 4-note union chords from firing at every triangle boundary during scrub playback.
-
-See UX-D3 in UX_SPEC.md §11.
+See UX-D3 (Superseded) in UX_SPEC.md §11.
 
 ---
 
@@ -265,12 +263,12 @@ Actual exported API surface from `src/index.ts`:
 | `InteractionController` | Type | `interaction-controller.ts` | `{ destroy }` |
 | `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types |
 
-### Planned — Phase 4b+ (Draft)
+### Resolved — Phase 4b+ (originally deferred, now wired in Integration)
 
-| Function | Description |
-|----------|-------------|
-| Playback animation integration | Subscribe to AudioTransport for chord changes (deferred until Audio Engine) |
-| Clear button wiring | Wire to Control Panel UI (deferred until Layout integration) |
+| Function | Resolution |
+|----------|------------|
+| Playback animation integration | ✅ Wired in `INTEGRATION/src/transport-wiring.ts`: `AudioTransport.onChordChange()` → `PathHandle.setActiveChord(index)` |
+| Clear button wiring | ✅ Wired in `INTEGRATION/src/sidebar.ts`: Clear → `transport.cancelSchedule()` + `uiState.clearProgression()` + clear path + panel update |
 
 ### Implemented — Phase 5
 

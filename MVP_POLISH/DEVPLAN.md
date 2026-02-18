@@ -33,7 +33,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. The te
 ## Current Status
 
 **Phase:** 1 complete. Ready for Phase 2 (Library) or further testing.
-**Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign.
+**Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign. Post-Phase 1 improvements: centroid = root vertex (POL-D15), drag bug fix (text selection / browser gesture interference).
 **Blocked/Broken:** Nothing
 **Known visual TODO:** Header triangle buttons extend slightly past the separator line — needs CSS investigation (triangle SVGs are wider than the border-bottom boundary). Low priority.
 **Open design TODO:** Library → textarea chord display format (see below).
@@ -535,6 +535,27 @@ Rationale:
   eliminates the extra tap to reach playback controls.
 Revisit if: Detail content exceeds what fits in an expanded card (e.g., if we
   add audio preview or visual path thumbnail).
+```
+
+```
+POL-D15: Centroid = root vertex for all shapes
+Date: 2026-02-18
+Status: Closed
+Priority: Important
+Decision: For triangulated shapes, centroid_uv is the root vertex position
+  (mainVerts[root_vertex_index]) instead of the cluster geometric center
+  (mean of unique vertices). Falls back to cluster centroid only if the root
+  vertex cannot be found (should not occur for valid chords).
+  Dot-only shapes already used root-node position (POL-D13); this extends the
+  same rule to triangulated shapes.
+Rationale:
+  Root vertex position produces musically coherent progression paths — the
+  orange dots sit on root vertices, path traces root motion. Chain focus
+  (HC-D11) now propagates root-to-root, producing tighter, more predictable
+  placements. All centroids are now integer lattice coordinates (not fractional
+  cluster centers), which simplifies the grid-highlighter's anchor logic.
+Revisit if: Extended chords with large triangle clusters produce paths that
+  feel disconnected from the visual shape center.
 ```
 
 ```

@@ -197,6 +197,11 @@ export function decomposeChordToShape(
     (v) => pc(v.u, v.v) === chord.root_pc,
   );
 
+  // Centroid = root vertex position (not cluster geometric center).
+  // This makes the progression path trace root motion, and is consistent
+  // with dot-only shapes which also use the root node position.
+  const rootVertex = rootIdx >= 0 ? mainVerts[rootIdx] : clusterCentroid(cluster);
+
   return {
     chord,
     main_tri: mainTri,
@@ -204,6 +209,6 @@ export function decomposeChordToShape(
     dot_pcs,
     covered_pcs: covered,
     root_vertex_index: (rootIdx >= 0 ? rootIdx : null) as 0 | 1 | 2 | null,
-    centroid_uv: clusterCentroid(cluster),
+    centroid_uv: rootVertex,
   };
 }

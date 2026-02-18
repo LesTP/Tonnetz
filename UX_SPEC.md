@@ -66,7 +66,8 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 * Root tone → distinct outline on root vertex (bold, darker shade)
 * Progression path → centroid-connected overlay
 * Union chord (edge selection) → both adjacent triangles highlighted
-* **Dot-only chords** (dim, aug, m7b5, dim7): highlighted as node circle strokes + connecting edge strokes using the **greedy chain** nearest-node algorithm (nearest to shape centroid, then each subsequent dot nearest to already-picked nodes). Only one node per pitch class highlighted.
+* **Dot-only chords** (dim, aug, m7b5, dim7): highlighted as node circle strokes + connecting edge strokes using the **greedy chain** nearest-node algorithm (nearest to shape centroid, then each subsequent dot nearest to already-picked nodes). Only one node per pitch class highlighted. Algorithm implemented in `INTEGRATION/src/grid-highlighter.ts`; anchor point is the shape's centroid (see POL-D13 for dot-only centroid rule, HC-D9 revised per POL-D15).
+* **Centroid / path marker:** For all chord types, centroid_uv is the **root vertex position** (the lattice node whose pitch class matches the chord root). Progression path traces root motion. See HC-D9 (revised) in ARCH_HARMONY_CORE.md.
 * **Dot-only color rule:** dim/m7b5 (minor 3rd) → blue (minor palette); aug (major 3rd) → red (major palette)
 * Node labels → dark grey (`#555`); enharmonic nodes show sharp name on top, flat name on bottom (e.g., D# / Eb)
 
@@ -237,9 +238,9 @@ UX introduces the following interface expectations:
 | Triangle/edge hit classification | `HitResult` (discriminated union: HitTriangle \| HitEdge \| HitNone) | ✅ Implemented |
 | UI state machine | `createUIStateController()` | ✅ Implemented |
 | Clear button integration | `UIStateController.clearProgression()` + `ControlPanel` | ✅ Implemented |
-| Layout zones | `createLayoutManager(options)` | ✅ Implemented |
-| Control panel | `createControlPanel(options)` | ✅ Implemented |
-| Toolbar | `createToolbar(options)` | ✅ Implemented |
+| Layout zones | `createLayoutManager(options)` | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
+| Control panel | `createControlPanel(options)` | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
+| Toolbar | `createToolbar(options)` | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
 
 ### Audio Engine
 

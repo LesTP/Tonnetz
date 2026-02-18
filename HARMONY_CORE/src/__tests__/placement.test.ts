@@ -129,16 +129,17 @@ describe("decomposeChordToShape — triangulated", () => {
     expect(pc(rootVert.u, rootVert.v)).toBe(0); // C = 0
   });
 
-  it("centroid_uv for single triangle = mean of 3 vertices", () => {
+  it("centroid_uv for single triangle = root vertex position", () => {
     const chord = parseChordSymbol("C");
     const mainTri = placeMainTriad(chord, focus, idx)!;
     const shape = decomposeChordToShape(chord, mainTri, focus, idx);
-    const expected = triCentroid(mainTri);
-    expect(shape.centroid_uv.u).toBeCloseTo(expected.u);
-    expect(shape.centroid_uv.v).toBeCloseTo(expected.v);
+    // Root of C major (U triangle at 0,0) is vertex 0 = (0,0)
+    const rootVert = triVertices(mainTri)[shape.root_vertex_index!];
+    expect(shape.centroid_uv.u).toBe(rootVert.u);
+    expect(shape.centroid_uv.v).toBe(rootVert.v);
   });
 
-  it("centroid_uv for tri + ext = mean of unique vertices", () => {
+  it("centroid_uv for tri + ext = root vertex (not cluster center)", () => {
     const chord = parseChordSymbol("Cmaj7");
     const mainTri = placeMainTriad(chord, focus, idx)!;
     const shape = decomposeChordToShape(chord, mainTri, focus, idx);

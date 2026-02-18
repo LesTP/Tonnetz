@@ -65,6 +65,7 @@ export function createSvgScaffold(container: Element): SvgScaffold {
   const svg = svgEl("svg", {
     width: "100%",
     height: "100%",
+    style: "user-select: none; -webkit-user-select: none; touch-action: none;",
   }) as SVGSVGElement;
 
   const layers = {} as Record<LayerId, SVGGElement>;
@@ -207,6 +208,7 @@ export function renderGrid(
         "font-family": "sans-serif",
         "font-weight": "600",
         fill: LABEL_COLOR,
+        "pointer-events": "none",
         "data-id": `label-${nid as string}`,
       });
       topLabel.textContent = PC_NAMES[pitchClass];
@@ -221,6 +223,7 @@ export function renderGrid(
         "font-family": "sans-serif",
         "font-weight": "600",
         fill: LABEL_COLOR,
+        "pointer-events": "none",
         "data-id": `label-alt-${nid as string}`,
       });
       bottomLabel.textContent = enharmonic;
@@ -236,6 +239,7 @@ export function renderGrid(
         "font-family": "sans-serif",
         "font-weight": "600",
         fill: LABEL_COLOR,
+        "pointer-events": "none",
         "data-id": `label-${nid as string}`,
       });
       label.textContent = PC_NAMES[pitchClass];

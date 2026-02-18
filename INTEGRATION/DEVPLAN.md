@@ -505,23 +505,13 @@ Revisit if: Chord grammar expands to include symbols that contain spaces.
 ```
 INT-D8: Tempo control UI element
 Date: 2026-02-15
-Status: Open
+Status: Closed (resolved in MVP_POLISH/DEVPLAN.md Phase 1c)
 Priority: Normal
-Decision: (deferred to UI testing phase)
-Context:
-SPEC §Cross-Module Wiring Points lists "ControlPanel tempo input →
-AudioTransport.setTempo(bpm)". But ControlPanel (RU source) has no tempo
-input element — only textarea, Load, Play, Stop, Clear buttons.
-Options:
-A) Add tempo <input type="number"> to ControlPanel — requires RU module change.
-B) Add a standalone tempo input in main.ts outside ControlPanel — no RU change.
-C) Defer tempo UI to post-MVP. Use PD's stored tempo_bpm (from shared URL
-   or saved progression) and default 120 BPM otherwise. No runtime tempo change.
-Trade-offs:
-A: cleanest UX, but modifies a completed module.
-B: quick, but tempo input lives outside the panel — inconsistent layout.
-C: simplest, no UI work. Tempo is still set from PD records and URL payloads.
-Note: Decision deferred — will be resolved during UI testing when element
-positioning and layout can be evaluated visually. Not blocking implementation;
-tempo is set from PD data in the interim.
+Decision: Tempo slider (range input, 40–240 BPM) built into the sidebar's Play
+tab, wired to AudioTransport.setTempo(bpm) and persistence saveSettings().
+Resolution:
+The sidebar redesign (POL-D1) replaced ControlPanel entirely, making Options A–C
+moot. The tempo slider lives in the Play tab below transport buttons — natural
+placement, no standalone element, no RU module change required.
+See MVP_POLISH/DEVPLAN.md §Phase 1c for implementation details.
 ```

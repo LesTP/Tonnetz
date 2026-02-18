@@ -161,13 +161,14 @@ Status: Closed
 Supported types (MVP):
 
 * triads: maj, min, dim, aug
-* extensions: 6, add9, 6/9, maj7, 7, m7
+* extensions: 6, add9, 6/9, maj7, 7, m7, dim7, m7b5
 
 Excluded from MVP:
 
 * extended chords built on augmented triads (e.g., aug7, augMaj7)
+* extended tensions (9, 11, 13) and compound extensions (maj9, 7#9, etc.)
 
-Augmented extended chords are deferred to a future grammar expansion (see Section 12).
+Augmented extended chords are deferred to a future grammar expansion (see Section 12). `dim7` and `m7b5` were added per POL-D7.
 
 Chord structure:
 
@@ -263,15 +264,27 @@ Shape:
 
 ### HC-D9: Centroid computation
 
-Status: Closed
+Status: Closed (revised 2026-02-18 per POL-D15)
 
-Centroid is computed as the arithmetic mean of all unique vertex coordinates in the shape's triangle cluster:
+Centroid is always set to the **root vertex position** — the lattice node whose pitch class matches the chord's root.
 
+**Triangulated shapes (maj, min):**
 ```
-centroid_uv = mean of all unique (u,v) among main_tri and ext_tris vertices
+centroid_uv = mainVerts[root_vertex_index]   (integer lattice coordinate)
 ```
+Fallback: if root vertex cannot be identified (should not occur for valid chords), falls back to the arithmetic mean of all unique vertices across the triangle cluster.
 
-For dot-only shapes (no triangles), centroid defaults to the focus coordinate used during placement.
+**Dot-only shapes (dim, aug):**
+```
+centroid_uv = nearest lattice node matching root pitch class, relative to focus
+```
+This places the centroid on the root note (musically intuitive) and aligns with the grid-highlighter's greedy chain anchor. See POL-D13.
+
+**Consequences:**
+- All chord types consistently use root-note position as centroid
+- Progression path traces root motion (orange dots sit on root vertices)
+- Chain focus (HC-D11) propagates root-to-root, producing tighter placements
+- Centroids are integer lattice coordinates (not fractional cluster centers)
 
 ---
 
@@ -387,7 +400,7 @@ Notes:
 * HC-D6: nearest-placement strategy
 * HC-D7: greedy adjacent-triangle decomposition
 * HC-D8: simplification deferred
-* HC-D9: centroid as mean of unique vertex coordinates
+* HC-D9: centroid as root vertex position (revised per POL-D15)
 * HC-D10: edge union chord computation
 * HC-D11: chain focus policy for progressions
 

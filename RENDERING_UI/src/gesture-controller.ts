@@ -73,6 +73,7 @@ export function createGestureController(
   function onPointerDown(e: PointerEvent): void {
     if (e.button !== 0) return; // primary button only
     if (isDown) return; // ignore if already tracking a pointer
+    e.preventDefault();
 
     isDown = true;
     isDragging = false;
@@ -91,6 +92,7 @@ export function createGestureController(
 
   function onPointerMove(e: PointerEvent): void {
     if (!isDown || e.pointerId !== pointerId) return;
+    e.preventDefault();
 
     const dx = e.clientX - startScreenX;
     const dy = e.clientY - startScreenY;

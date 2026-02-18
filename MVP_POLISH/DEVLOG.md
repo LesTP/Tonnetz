@@ -5,6 +5,62 @@ Started: 2026-02-16
 
 ---
 
+## Entry 9 — Post-Phase 1: Centroid = Root Vertex + Drag Bug Fix
+
+**Date:** 2026-02-18
+
+### 9a: Centroid = Root Vertex (POL-D15)
+
+Changed `decomposeChordToShape()` in `HARMONY_CORE/src/placement.ts` so that triangulated shapes use the root vertex position as `centroid_uv` instead of `clusterCentroid()` (mean of all unique cluster vertices). Falls back to cluster centroid only if root vertex cannot be found (shouldn't happen for valid chords).
+
+**Result:**
+- All chord types (triangulated + dot-only) now consistently use the root note position as centroid
+- Progression path traces root motion — orange dots sit on root vertices
+- Chain focus (HC-D11) propagates root-to-root — produces tighter, more musically coherent placements
+- Centroids are now integer lattice coordinates (not fractional cluster centers)
+
+**Tests updated (3):**
+- `placement.test.ts`: "centroid = mean of 3 vertices" → "centroid = root vertex position"
+- `progression.test.ts`: "centroids are fractional" → "centroids are integer lattice nodes"
+- `progression.test.ts`: I-IV-V-I distance threshold relaxed (4 → 5) since root positions differ slightly from cluster centers
+
+**Decision:** POL-D15 (Closed) — extends POL-D13 (dot-only root node) to triangulated shapes.
+
+### 9b: Drag Bug Fix — Browser Text Selection + Gesture Interference
+
+**Symptom:** Dragging caused the surface to jitter and half the grid appeared selected (blue OS text selection overlay on SVG `<text>` elements). The browser's native text selection was fighting the SVG pan gesture.
+
+**Root cause:** SVG `<text>` labels were capturing pointer events and the browser was interpreting drags as text selection attempts. Additionally, browser default touch/scroll gestures were interfering with pointer event handling.
+
+**Fixes in `RENDERING_UI/src/renderer.ts`:**
+1. `user-select: none; -webkit-user-select: none` on SVG element — prevents browser text selection during drag
+2. `pointer-events: none` on all `<text>` label elements — prevents labels from capturing pointer events and interfering with hit detection on triangles
+3. `touch-action: none` on SVG element — prevents browser from interpreting pointer events as scroll/pan gestures
+
+**Fixes in `RENDERING_UI/src/gesture-controller.ts`:**
+4. `e.preventDefault()` on `pointerdown` — prevents browser from initiating its own drag behavior
+5. `e.preventDefault()` on `pointermove` — prevents browser from processing move events during our pan
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `HARMONY_CORE/src/placement.ts` | Triangulated centroid: `clusterCentroid(cluster)` → `mainVerts[rootIdx]` with fallback |
+| `HARMONY_CORE/src/__tests__/placement.test.ts` | Updated centroid test expectations (root vertex, not cluster mean) |
+| `HARMONY_CORE/src/__tests__/progression.test.ts` | Updated: integer centroids, relaxed I-IV-V-I threshold |
+| `RENDERING_UI/src/renderer.ts` | Added `user-select: none`, `touch-action: none` on SVG; `pointer-events: none` on all `<text>` |
+| `RENDERING_UI/src/gesture-controller.ts` | Added `e.preventDefault()` on `pointerdown` and `pointermove` |
+
+### Docs Updated
+
+| File | Changes |
+|------|---------|
+| `HARMONY_CORE/ARCH_HARMONY_CORE.md` | HC-D9 revised: centroid = root vertex for all shapes; decision summary updated |
+| `UX_SPEC.md` | §3: added centroid/path marker rule referencing HC-D9 revised |
+| `MVP_POLISH/DEVPLAN.md` | Current status updated; POL-D15 decision added |
+
+---
+
 ## Entry 8 — Phase 1f: Info Overlay Modals + Phase 1g: Button Visual Redesign
 
 **Date:** 2026-02-17

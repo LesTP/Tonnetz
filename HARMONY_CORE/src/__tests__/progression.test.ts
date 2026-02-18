@@ -114,19 +114,19 @@ describe("mapProgressionToShapes", () => {
     const du = last.u - first.u;
     const dv = last.v - first.v;
     const dist = Math.sqrt(du * du + dv * dv);
-    expect(dist).toBeLessThan(4);
+    expect(dist).toBeLessThan(5);
   });
 
-  it("centroids are fractional (not rounded to integers)", () => {
+  it("centroids are on integer lattice nodes (root vertex positions)", () => {
     const shapes = mapProgressionToShapes(
       [parseChordSymbol("C"), parseChordSymbol("Am")],
       origin,
       indices,
     );
-    // Centroid of a single triangle is mean of 3 vertices → has /3 fractions
+    // Root vertices are integer lattice coordinates
     const c = shapes[0].centroid_uv;
-    const isFractional = !Number.isInteger(c.u) || !Number.isInteger(c.v);
-    expect(isFractional).toBe(true);
+    expect(Number.isInteger(c.u)).toBe(true);
+    expect(Number.isInteger(c.v)).toBe(true);
   });
 
   it("long progression (8+ chords): no NaN/Infinity", () => {
