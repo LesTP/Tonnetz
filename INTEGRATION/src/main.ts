@@ -482,6 +482,14 @@ const interactionCallbacks = {
     interactiveGridHandle = null;
     baseInteractionCallbacks.onPointerUp?.();
   },
+  onDragStart: () => {
+    // Stop audio and clear highlight when drag begins (UX-D4)
+    deactivateGridHighlight(interactiveGridHandle);
+    interactiveGridHandle = null;
+    if (audioState.immediatePlayback) {
+      stopAll(audioState.immediatePlayback);
+    }
+  },
 };
 
 // ── Step 12: Interaction Controller ─────────────────────────────────

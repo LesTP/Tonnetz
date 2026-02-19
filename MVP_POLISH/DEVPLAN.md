@@ -31,7 +31,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 ## Current Status
 
 **Phase:** 0–2 complete. Next: header redesign (POL-D18), auto-center (POL-D20), audio quality (Phase 3).
-**Blocked/Broken:** Drag jitter on pan (previously attempted, unresolved). Audio crackling at chord transitions.
+**Blocked/Broken:** Audio crackling at chord transitions.
 **Open decisions:** POL-D3, D4 (audio — superseded by D19), D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
 
 ---
@@ -131,8 +131,14 @@ After loading a progression (manual or library), auto-fit camera to show the ent
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| Drag jitter on pan | Unresolved | Previously attempted. Needs investigation. |
 | Audio crackling at chord transitions | Open | Fixed by D19 envelope cleanup + sustained repeats |
+
+## Resolved Issues
+
+| Issue | Resolution |
+|-------|-----------|
+| Drag jitter on pan | Fixed: switched from world-space differencing to screen-space deltas (Entry 13) |
+| Chord continues during drag | Fixed: `onDragStart` callback stops audio when drag threshold exceeded (UX-D4, Entry 13) |
 
 ---
 

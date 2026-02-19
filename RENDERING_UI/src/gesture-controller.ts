@@ -13,8 +13,8 @@ export interface GestureCallbacks {
   onTap?: (world: WorldPoint) => void;
   /** Fires when drag threshold is first exceeded. */
   onDragStart?: (world: WorldPoint) => void;
-  /** Fires on each subsequent pointer move during an active drag. */
-  onDragMove?: (world: WorldPoint) => void;
+  /** Fires on each subsequent pointer move during an active drag. Passes screen-pixel deltas since last move for stable panning. */
+  onDragMove?: (world: WorldPoint, screenDx: number, screenDy: number) => void;
   /** Fires on pointer-up after a drag. */
   onDragEnd?: (world: WorldPoint) => void;
 }
@@ -61,6 +61,8 @@ export function createGestureController(
   let pointerId: number | null = null;
   let startScreenX = 0;
   let startScreenY = 0;
+  let lastScreenX = 0;
+  let lastScreenY = 0;
 
   function toWorld(e: PointerEvent): WorldPoint {
     const rect = svg.getBoundingClientRect();
@@ -80,6 +82,8 @@ export function createGestureController(
     pointerId = e.pointerId;
     startScreenX = e.clientX;
     startScreenY = e.clientY;
+    lastScreenX = e.clientX;
+    lastScreenY = e.clientY;
 
     try {
       svg.setPointerCapture(e.pointerId);
@@ -107,8 +111,12 @@ export function createGestureController(
       return;
     }
 
-    // Already dragging — fire move
-    callbacks.onDragMove?.(toWorld(e));
+    // Already dragging — fire move with screen deltas
+    const screenDx = e.clientX - lastScreenX;
+    const screenDy = e.clientY - lastScreenY;
+    lastScreenX = e.clientX;
+    lastScreenY = e.clientY;
+    callbacks.onDragMove?.(toWorld(e), screenDx, screenDy);
   }
 
   function onPointerUp(e: PointerEvent): void {

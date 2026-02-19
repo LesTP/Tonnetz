@@ -5,6 +5,40 @@ Started: 2026-02-16
 
 ---
 
+## Entry 13 — Fix drag jitter + chord-stops-on-drag (UX-D4)
+
+**Date:** 2026-02-19
+
+### Summary
+
+Fixed two long-standing interaction bugs: drag jitter (visual oscillation during pan) and chord audio continuing to play during drag instead of stopping at drag threshold.
+
+### Drag Jitter Fix
+
+**Root cause:** `onDragMove` in `interaction-controller.ts` computed two world-coordinate positions from a shifting viewBox and differenced them. Each `panMove()` call changed the viewBox, so the next `onDragMove` converted the same screen position to a different world position — a feedback loop causing oscillation.
+
+**Fix:** Gesture controller now passes **screen-pixel deltas** (`screenDx`, `screenDy`) alongside world coordinates. Interaction controller converts screen deltas to world deltas using viewBox scale ratio (`screenDx * vb.width / rect.width`), which is stable regardless of viewBox position.
+
+### Chord Stops on Drag (UX-D4)
+
+**Root cause:** `InteractionCallbacks` had no `onDragStart` callback. Audio was only stopped in `onPointerUp`, so a hold-then-drag kept the chord sounding for the entire drag duration.
+
+**Fix:** Added `onDragStart` to `InteractionCallbacks`. Interaction controller fires it when drag threshold is exceeded. Integration `main.ts` wires it to `stopAll()` + deactivate grid highlight.
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `RU/src/gesture-controller.ts` | Track `lastScreenX/Y`, pass `screenDx/screenDy` in `onDragMove` callback |
+| `RU/src/interaction-controller.ts` | `onDragStart` fires `callbacks.onDragStart?.()`, `onDragMove` uses screen-to-world delta conversion, removed `lastDragWorld` state |
+| `INT/src/main.ts` | Wire `onDragStart` → `stopAll()` + `deactivateGridHighlight()` |
+
+### Test Results
+
+RU 367, INT 241 — all passing, 0 type errors.
+
+---
+
 ## Entry 12 — Active chord label on path marker
 
 **Date:** 2026-02-19

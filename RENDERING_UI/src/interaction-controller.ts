@@ -17,6 +17,8 @@ export interface InteractionCallbacks {
   onPointerDown?: (world: WorldPoint) => void;
   /** Pointer-up — release (audio stop per UX-D4). */
   onPointerUp?: () => void;
+  /** Drag started — drag threshold exceeded (audio stop per UX-D4). */
+  onDragStart?: () => void;
 }
 
 export interface InteractionControllerOptions {
@@ -62,7 +64,6 @@ export function createInteractionController(
 
   // --- Drag state ---
   let isPanning = false;
-  let lastDragWorld: WorldPoint | null = null;
 
   // --- Gesture callbacks ---
 
@@ -92,20 +93,22 @@ export function createInteractionController(
     }
   }
 
-  function onDragStart(world: WorldPoint): void {
+  function onDragStart(_world: WorldPoint): void {
     isPanning = true;
-    lastDragWorld = world;
     cameraController.panStart();
+    callbacks.onDragStart?.();
   }
 
-  function onDragMove(world: WorldPoint): void {
+  function onDragMove(_world: WorldPoint, screenDx: number, screenDy: number): void {
     if (!isPanning) return;
-    if (lastDragWorld) {
-      const dx = world.x - lastDragWorld.x;
-      const dy = world.y - lastDragWorld.y;
-      cameraController.panMove(-dx, -dy);
-    }
-    lastDragWorld = world;
+    // Convert screen-pixel delta to world-unit delta using viewBox scale.
+    // This avoids the feedback loop of computing world positions from a
+    // shifting viewBox, which causes jitter.
+    const vb = cameraController.getViewBox();
+    const rect = svg.getBoundingClientRect();
+    const worldDx = screenDx * (vb.width / rect.width);
+    const worldDy = screenDy * (vb.height / rect.height);
+    cameraController.panMove(-worldDx, -worldDy);
   }
 
   function onDragEnd(_world: WorldPoint): void {
@@ -113,7 +116,6 @@ export function createInteractionController(
       cameraController.panEnd();
     }
     isPanning = false;
-    lastDragWorld = null;
   }
 
   // --- Create gesture controller ---
@@ -136,7 +138,6 @@ export function createInteractionController(
     destroy(): void {
       gestureCtrl.destroy();
       isPanning = false;
-      lastDragWorld = null;
     },
   };
 }
