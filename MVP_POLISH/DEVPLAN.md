@@ -32,55 +32,114 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. The te
 
 ## Current Status
 
-**Phase:** 1 complete. Ready for Phase 2 (Library) or further testing.
-**Focus:** All Phase 1 sub-phases (1a–1g) complete: sidebar layout, tempo/loop, chord display, info overlays, button redesign. Post-Phase 1 improvements: centroid = root vertex (POL-D15), drag bug fix, tonal centroid toggle (POL-D16), duration simplification + Load→Play merge + rootPc unification (POL-D17).
-**Blocked/Broken:** Nothing
-**Known visual TODO:** Header triangle buttons extend slightly past the separator line — needs CSS investigation (triangle SVGs are wider than the border-bottom boundary). Low priority.
-**Open design TODO:** Library → textarea chord display format (see below).
-**Decisions closed:** POL-D2, D9, D10, D11, D12, D13. POL-D14 open (m7b5 triangle placement — deferred).
+**Phase:** 2 complete (Library). Ready for header/button redesign, then Phase 3 (Audio Quality) and Phase 4 (Mobile UAT).
+**Focus:** Chord labels on path markers (Entry 12). Next: header redesign (POL-D18), then audio crackling fix (Phase 3), drag jitter investigation, mobile UAT (Phase 4).
+**Blocked/Broken:** Drag jitter on pan (previously attempted, unresolved). Audio crackling at chord transitions during scheduled playback.
+**Decisions closed:** POL-D2, D9, D10, D11, D12, D13, D15, D16, D17, D18. POL-D14 open (m7b5 triangle placement — deferred). POL-D3, D4, D5 open (audio quality + mobile radius — deferred to Phases 3/4).
 
-### Open TODO: Library Textarea Display Format
+### Resolved: Library Textarea Display Format
 
-**Problem:** Chord durations are encoded by repetition (PD-D2). A chord lasting 4 beats at `grid="1/4"` appears 4 times: `["Cm7", "Cm7", "Cm7", "Cm7"]`. The pipeline's `collapseRepeatedChords()` groups these into `{ symbol: "Cm7", count: 4 }` → 4 beats.
-
-When loading from the library, the textarea needs to display the chords. Two options:
-
-**Option A (current implementation): Show full repetitions grouped by bar.**
-```
-Cm7 Cm7 Cm7 Cm7 | F7 F7 F7 F7 | Bbmaj7 Bbmaj7 Bbmaj7 Bbmaj7 | ...
-```
-- ✅ Round-trip safe: user can click Load on the textarea and get identical durations
-- ✅ Accurate: shows exactly what the pipeline receives
-- ❌ Verbose and noisy — looks like data, not music
-- ❌ Fills the textarea with repetitive content
-
-**Option B: Show unique symbols only (collapsed).**
-```
-Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm
-```
-- ✅ Clean and readable — looks like a chord chart
-- ❌ Not round-trip safe: re-loading gives 1 beat per chord (4× too fast)
-- Could be made round-trip safe if the pipeline assumed "1 symbol = 1 bar" when no repetitions are present, but this changes the input semantics
-
-**Option C: Show unique symbols, but store the library entry ID so re-load uses original data.**
-- ✅ Clean display + correct re-load
-- ❌ More complex: requires tracking "this textarea content came from library entry X"
-- ❌ Breaks if user edits the textarea (hybrid state: library entry + manual edits)
-
-**Option D: Show unique symbols with explicit duration notation.**
-```
-Cm7 x4 | F7 x4 | Bbmaj7 x4 | Ebmaj7 x4 | Am7b5 x4 | D7 x4 | Gm x8
-```
-- ✅ Compact and informative
-- ❌ Requires parser changes to understand `x4` notation
-- Could be a nice future enhancement
-
-**Current state:** Option A is implemented. Decision deferred — user to review and choose.
+**Resolved by POL-D17** (duration simplification). The repetition-based encoding (`Cm7 Cm7 Cm7 Cm7`) is eliminated. Each chord token = 1 bar (4 beats). Library entries store one symbol per bar. Textarea shows clean `Cm7 | F7 | Bbmaj7` — no repetitions, round-trip safe. Options A–D from the original TODO are all moot.
 
 ---
 
 ## Test Baseline
 
+```
+
+```
+POL-D19: Two playback modes — Piano (discrete) vs Pad (continuous)
+Date: 2026-02-19
+Status: Closed
+Priority: Important
+Decision:
+  Baseline behavior (both modes): consecutive identical chords sustain as one
+  continuous sound for the combined duration. Re-attacking the same chord is
+  never correct — detect identical pitch classes at chord boundary, skip voice
+  stop/restart. This is implemented in the scheduler, not mode-dependent.
+
+  Two playback modes exposed as a toggle in the Play tab sidebar:
+
+  🎹 Piano (discrete):
+  - Different chords = full stop + fresh attack (rhythmic comping feel)
+  - Short attack, clean release with brief fade-out (fixes current crackling)
+  - Identical consecutive chords sustain (baseline behavior above)
+
+  ♫ Pad (continuous):
+  - Per-voice continuation: common tones sustain, only changing voices crossfade
+  - Voice-diff at chord boundary — compare current MIDI notes with voice-led
+    incoming notes. Three buckets: keep (same MIDI), release (removed), attack (new).
+    Uses existing voiceLead() for assignments.
+  - Longer attack/release envelopes for smooth transitions
+  - Identical consecutive chords sustain (baseline behavior above)
+  - Current dual-oscillator pad timbre is ideal
+
+  Both modes share transport, scheduling, onChordChange visual callbacks.
+  Difference is purely in voice transition handling at chord boundaries.
+
+  Icons: simple geometric monochromatic — piano key outline, sine wave or ♫.
+Rationale:
+  Reframes POL-D3 (envelope) and POL-D4 (synthesis model) from one-time
+  design decisions into a user preference. Piano mode gives rhythmic clarity
+  for studying chord changes. Pad mode gives harmonic continuity for hearing
+  voice-leading and sustained harmony. Both are musically valid and serve
+  different exploration goals. Repeated chord sustain is baseline correctness —
+  re-attacking the same sound serves no musical purpose in either mode.
+Revisit if: A third mode is needed (e.g., arpeggiated) or if the pad voice-diff
+  logic proves too complex for MVP (fall back to detect-identical-only for pad).
+```
+
+```
+POL-D20: Auto-center viewport on progression load
+Date: 2026-02-19
+Status: Closed
+Priority: Normal
+Decision:
+  After loading a progression (manual input → Play, or library load), auto-fit
+  the camera to show the entire progression path.
+
+  Implementation:
+  1. Compute bounding box of all shape centroids in world coordinates
+  2. Add fitToBounds(bbox) to CameraController — center + zoom from bbox vs viewport
+  3. Call after renderProgressionPath() in loadProgressionFromChords()
+  4. Start with instant snap; smooth animation (lerp ~300ms) as future refinement
+
+  Chain focus placement happens BEFORE the camera move: path geometry is
+  determined by the current viewport center, then camera frames the result.
+Rationale:
+  Users entering manual progressions often find the path drifts off-screen,
+  requiring manual pan/zoom to see the full path. Auto-framing eliminates
+  this friction. Library loads also benefit since the user hasn't positioned
+  the viewport for an unknown progression.
+Revisit if: Users want the camera to stay where it is (e.g., focused on a
+  specific region). Could add a "don't auto-center" preference.
+```
+
+```
+POL-D18: Header redesign — info buttons, title, library tab icon
+Date: 2026-02-19
+Status: Closed
+Priority: Normal
+Decision:
+  1. Info buttons (? and ⓘ) move from sidebar header to upper-right corner of
+     the canvas as small overlay icons (semi-transparent at rest, opaque on hover).
+     They are reference/help actions, not sidebar content — canvas corner is a
+     well-understood pattern for infrequent utility actions.
+  2. Sidebar header becomes title-only: "Tone Nets" rendered larger with subtitle,
+     no interactive elements competing for space.
+  3. Reset View stays in sidebar (bottom of Play tab). It's a session action that
+     groups with Stop/Clear. Rendered in darker grey font for better visibility.
+  4. Library tab icon: replace 📚 emoji with ♫ (monochromatic musical symbol) to
+     match the geometric style of ▶ on the Play tab.
+Rationale:
+  The previous triangle-button design (POL-D8) was clever but not effective —
+  buttons weren't obviously clickable and crowded the title. Separating branding
+  (non-interactive header) from utility (canvas overlay) resolves both the
+  affordance problem and the CSS overflow issue (header triangle buttons extending
+  past the separator line). Musical icon for Library maintains stylistic
+  consistency with the Play tab's geometric icon.
+Revisit if: Canvas overlay icons conflict with future overlays (e.g., zoom
+  controls, minimap) or mobile touch targets need adjustment.
 ```
 HC:  178 passed  (was 168 — +10 dim7/m7b5 tests)
 RU:  341 passed

@@ -112,8 +112,8 @@ The interface is organized into two primary zones with responsive behavior:
 
 | Zone           | Function                                    |
 | -------------- | ------------------------------------------- |
-| Sidebar        | Title/branding, progression input, library browser, playback controls + tempo, info/about button |
-| Central Canvas | Tonnetz lattice, interaction surface        |
+| Sidebar        | Title/branding, progression input, library browser, playback controls + tempo, reset view |
+| Central Canvas | Tonnetz lattice, interaction surface, info overlay icons (upper-right corner) |
 
 ### Responsive Behavior
 
@@ -130,16 +130,15 @@ The interface is organized into two primary zones with responsive behavior:
 ### Sidebar Content Order (top to bottom)
 
 1. **Header (persistent across tabs)**
-   - **Title / branding** — "Tone Nets" with subtitle "an interactive Tonnetz explorer" (POL-D2)
-   - **Info buttons** — `?` (How to Use) and `ⓘ` (What This Is), right-aligned next to title → open full-viewport overlay modals (POL-D8)
-   - **Tab bar** — two tabs: `▶ Play` (default) | `📚 Library`
+   - **Title / branding** — "Tone Nets" with subtitle "an interactive Tonnetz explorer", rendered larger with no competing interactive elements (POL-D18)
+   - **Tab bar** — two tabs: `▶ Play` (default) | `♫ Library` (POL-D18: monochromatic musical icon)
 
 2. **Tab: Play** (doing — active controls)
-   - **Active chord display** — compact single-line showing current chord name (POL-D10)
-   - **Progression input** — textarea for paste/type, Load button
+   - **Progression input** — textarea for paste/type
    - **Playback controls** — standard transport icons (POL-D11):
      - ▶ Play (auto-loads from textarea if needed), ■ Stop, 🔁 Loop (toggle), ✕ Clear
    - **Tempo controller** — slider (20–960 BPM) + BPM display (POL-D17: no Italian markings)
+   - **Reset View** — darker grey font for visibility (POL-D18)
 
 3. **Tab: Library** (choosing — browse and select)
    - **Filter tabs** — All | By Genre | By Harmonic Feature
@@ -148,9 +147,10 @@ The interface is organized into two primary zones with responsive behavior:
      - Detail (expanded): comment, roman numerals, tempo, full chords, Load button
    - Selecting "Load" from a card → loads progression + auto-switches to Play tab
 
-4. **Info overlay modals** (full-viewport, not sidebar content; POL-D8)
+4. **Canvas overlay icons** (upper-right corner of canvas area; POL-D18)
    - `?` → "How to Use": interaction guide, keyboard shortcuts, supported chord symbols, input tips, library usage
    - `ⓘ` → "What This Is": Tonnetz history & theory, harmonic geometry, credits/author
+   - Semi-transparent at rest, opaque on hover; open full-viewport overlay modals
 
 ### 4b. Progression Library
 
