@@ -5,6 +5,65 @@ Started: 2026-02-16
 
 ---
 
+## Entry 14 — POL-D20: Auto-Center Viewport on Progression Load
+
+**Date:** 2026-02-19
+
+### Summary
+
+After loading a progression (manual paste, library, or URL hash), the camera now auto-fits to frame the entire path. Added `pointsWorldExtent()` utility, `computeBaseExtent()` helper (DRYs the aspect-fit logic shared with `computeViewBox`), and `fitToBounds()` on `CameraController`.
+
+### New APIs
+
+**`pointsWorldExtent(points): WorldExtent | null`** (`camera.ts`)
+Computes world-space bounding box from an array of `{x, y}` points. Peer to `windowWorldExtent` — same return type, arbitrary point input. Returns `null` for empty input.
+
+**`computeBaseExtent(gridExtent, containerWidth, containerHeight): { baseW, baseH }`** (`camera.ts`)
+Extracted aspect-fit base dimension logic previously duplicated in `computeViewBox` and `fitToBounds`. Single source of truth for the zoom-to-viewBox-size relationship.
+
+**`CameraController.fitToBounds(extent, padding?): void`** (`camera-controller.ts`)
+Centers camera on the extent midpoint and computes zoom to frame the padded extent. Features:
+- Hybrid padding: `margin = max(rawExtent * padding, 1.5)` — fractional 20% for large progressions, absolute floor (1.5 world units) for short ones where 20% is smaller than one triangle
+- Degenerate bbox (single chord) falls back to `DEFAULT_ZOOM`
+- Zoom clamped to `[MIN_ZOOM, MAX_ZOOM]`
+
+### Wiring
+
+In `loadProgressionFromChords()` (`main.ts`), after `renderProgressionPath()`:
+1. Map shape centroids to world coordinates via `latticeToWorld()`
+2. Compute extent via `pointsWorldExtent()`
+3. Bias extent rightward by 1.0 world unit (chord shapes extend right of root centroids)
+4. Call `camera.fitToBounds(biasedExtent)`
+
+### Padding Refinement
+
+Initial 20% fractional padding clipped short progressions (2–4 chords) because 20% of a small bbox is less than one triangle edge. Added absolute floor of 1.5 world units per side (triangle edge + active marker radius 0.32). The floor dominates for progressions narrower than ~7.5 world units; fractional padding dominates for longer ones.
+
+Rightward bias (1.0 world unit added to `maxX`) compensates for chord shapes extending right of their root centroids in the equilateral layout.
+
+### Zoom Constants
+
+Exported `MIN_ZOOM`, `MAX_ZOOM`, `DEFAULT_ZOOM` from `camera.ts` (were module-private). Needed by `fitToBounds` in `camera-controller.ts` for clamping and fallback.
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `RU/src/camera.ts` | Added `pointsWorldExtent()`, `computeBaseExtent()`; exported zoom constants; refactored `computeViewBox` to use `computeBaseExtent` |
+| `RU/src/camera-controller.ts` | Added `fitToBounds()` to interface + implementation; uses `computeBaseExtent` |
+| `RU/src/index.ts` | Added exports: `pointsWorldExtent`, `computeBaseExtent`, `MIN_ZOOM`, `MAX_ZOOM`, `DEFAULT_ZOOM` |
+| `INT/src/main.ts` | Added `latticeToWorld`, `pointsWorldExtent` imports; fitToBounds wiring after `renderProgressionPath()` with rightward bias |
+
+### Decisions
+
+- **POL-D20** (Closed): Auto-center viewport on progression load via `fitToBounds(bbox)`. Snap (no animation). Smooth animation deferred as future refinement.
+
+### Test Results
+
+RU 367, INT 241 — all passing, 0 type errors.
+
+---
+
 ## Entry 13 — Fix drag jitter + chord-stops-on-drag (UX-D4)
 
 **Date:** 2026-02-19
@@ -689,7 +748,7 @@ Both use `quality = "dim"` (diminished triad [0,3,6]) as the base. The distincti
 **HARMONY_CORE:**
 - `src/types.ts` — Added `"dim7"` and `"m7b5"` to `Extension` union type
 - `src/chords.ts` — Restructured `CHORD_RE` regex (5 capture groups), added compound token parsing path, added `dim7`/`m7b5` to `EXTENSION_INTERVALS`
-- `src/__tests__/chords.test.ts` — +10 tests (5 parse tests + 5 pitch-class correctness tests + 1 symmetry test... wait, 10 total)
+- `src/__tests__/chords.test.ts` — +10 tests (parse, pitch-class correctness, symmetry)
 
 ### Test Results
 

@@ -3,9 +3,13 @@ import type { CameraState, ViewBox, WorldExtent } from "./camera.js";
 import {
   computeInitialCamera,
   computeViewBox,
+  computeBaseExtent,
   applyPanWithExtent,
   applyZoom,
   windowWorldExtent,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  DEFAULT_ZOOM,
 } from "./camera.js";
 import { screenToWorld } from "./coords.js";
 import { setAttrs } from "./svg-helpers.js";
@@ -60,6 +64,18 @@ export interface CameraController {
   ): void;
   /** Reset camera to initial fit-to-viewport state. */
   reset(): void;
+  /**
+   * Fit the camera to frame the given world-space extent with padding.
+   *
+   * Centers on the extent and computes the zoom level that makes the
+   * viewBox just contain the padded extent. Zoom is clamped to
+   * [MIN_ZOOM, MAX_ZOOM]. For degenerate extents (point or near-zero
+   * area), falls back to DEFAULT_ZOOM.
+   *
+   * @param extent — world-space bounding box to frame
+   * @param padding — fractional padding around the extent (default 0.2 = 20%)
+   */
+  fitToBounds(extent: WorldExtent, padding?: number): void;
   /** Remove all event listeners. */
   destroy(): void;
 }
@@ -156,6 +172,40 @@ export function createCameraController(
     reset(): void {
       cachedExtent = windowWorldExtent(cBounds);
       camera = computeInitialCamera(cWidth, cHeight, cBounds);
+      syncViewBox();
+    },
+    fitToBounds(extent: WorldExtent, padding: number = 0.2): void {
+      const cx = (extent.minX + extent.maxX) / 2;
+      const cy = (extent.minY + extent.maxY) / 2;
+
+      const rawW = extent.maxX - extent.minX;
+      const rawH = extent.maxY - extent.minY;
+
+      // Hybrid padding: fractional padding with an absolute floor.
+      // For large progressions, 20% is generous. For short ones (2–4 chords),
+      // the bbox is small so 20% of it is less than one triangle — shapes at
+      // the edges get clipped. The floor (1.5 world units ≈ triangle edge +
+      // active marker radius) guarantees enough room around each centroid.
+      const MIN_MARGIN = 1.5;
+      const marginW = Math.max(rawW * padding, MIN_MARGIN);
+      const marginH = Math.max(rawH * padding, MIN_MARGIN);
+      const progW = rawW + marginW * 2;
+      const progH = rawH + marginH * 2;
+
+      // Degenerate bbox (single point or near-zero area) — use default zoom
+      if (rawW < 1e-6 && rawH < 1e-6) {
+        camera = { centerX: cx, centerY: cy, zoom: DEFAULT_ZOOM };
+        syncViewBox();
+        return;
+      }
+
+      const { baseW, baseH } = computeBaseExtent(cachedExtent, cWidth, cHeight);
+
+      // zoom = min(baseW / progW, baseH / progH), clamped
+      const fitZoom = Math.min(baseW / progW, baseH / progH);
+      const clampedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, fitZoom));
+
+      camera = { centerX: cx, centerY: cy, zoom: clampedZoom };
       syncViewBox();
     },
     destroy(): void {

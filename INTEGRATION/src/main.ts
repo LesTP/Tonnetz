@@ -28,6 +28,8 @@ import {
   createProximityCursor,
   computeProximityRadius,
   hitTest,
+  latticeToWorld,
+  pointsWorldExtent,
 } from "rendering-ui";
 import type {
   PathHandle,
@@ -186,6 +188,19 @@ function loadProgressionFromChords(chords: string[]): boolean {
     shapesForPath,
     { chordLabels: result.cleanedSymbols, showCentroidLabels: pathMode !== "tonal" },
   );
+
+  // Auto-center viewport to frame the progression path (POL-D20)
+  const worldCentroids = shapesForPath.map(
+    (s) => latticeToWorld(s.centroid_uv.u, s.centroid_uv.v),
+  );
+  const progExtent = pointsWorldExtent(worldCentroids);
+  if (progExtent && camera) {
+    // Chord shapes (triangles + active marker) extend ~1 world unit
+    // to the right of root centroids — bias the extent so fitToBounds
+    // leaves more room on that side.
+    const biased = { ...progExtent, maxX: progExtent.maxX + 1.0 };
+    camera.fitToBounds(biased);
+  }
 
   // Update UI state (synchronous — immediate visual feedback)
   uiState.loadProgression(result.shapes);

@@ -359,15 +359,15 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 | Startup → Settings | PD → AE + RU | `loadSettings()` → `setTempo(bpm)`, apply view prefs | Restore user preferences on page load |
 | URL → Progression | PD → HC → RU + AE | `decodeShareUrl(hash)` → `parseChordSymbol()` each → `mapProgressionToShapes()` → `UIState.loadProgression()` | Auto-load shared progression from URL fragment |
 | Load → Progression | PD → HC → RU + AE | `loadProgression(id)` → same parse pipeline | Load saved progression from local storage |
-| Save ← UI | RU → PD | Sidebar save action → `saveProgression({ title, tempo_bpm, grid, chords })` | Persist current progression locally |
+| Save ← UI | RU → PD | Sidebar save action → `saveProgression({ title, tempo_bpm, chords })` | Persist current progression locally |
 | Share ← UI | RU → PD | Sidebar share action → `encodeShareUrl(prog)` → clipboard / URL bar | Generate shareable URL |
 | Settings ← UI | RU → PD | Tempo change, view prefs → `saveSettings(partial)` | Persist user preferences |
-| Grid → Beats | PD → AE (bridged) | Integration converts PD grid notation (e.g., `"1/4"`) + `tempo_bpm` → AE `beatsPerChord` for `shapesToChordEvents()` | Bridge PD's time model to AE's beat model |
+| Duration → Beats | Integration | Each chord token = 4 beats (one bar). `shapesToChordEvents(shapes)` produces `ChordEvent[]` directly — no grid conversion needed (POL-D17). |
 
 ### Data Flow: Progression Load Pipeline
 
 ```
-PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120, grid: "1/4" }
+PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120 }
   │
   ├─→ HC: parseChordSymbol() each → Chord[]
   ├─→ HC: mapProgressionToShapes(chords, focus, indices) → Shape[]
@@ -376,7 +376,7 @@ PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120, grid: "1/4" }
   ├─→ RU: renderProgressionPath(shapes)
   │
   ├─→ AE: setTempo(120)
-  └─→ AE: shapesToChordEvents(shapes, beatsPerChord) → scheduleProgression(events)
+  └─→ AE: shapesToChordEvents(shapes) → scheduleProgression(events)
 ```
 
 ## Dependency Direction
@@ -416,15 +416,11 @@ Audio Engine is stateless with respect to UI state (see ARCH_AUDIO_ENGINE.md §4
 * **Playback Running:** interactive playback suppressed (UX-D6); only `AudioTransport` controls active
 * **Progression Loaded:** ready for scheduled playback; interactive playback suppressed (INT-D6) — user clears progression first to return to exploration
 
-## Grid-to-Beat Bridging
+## Duration Model
 
-Persistence/Data stores durations as grid notation (e.g., `"1/4"` = quarter-note grid, repeated chord symbols for longer durations). Audio Engine schedules in beats. The integration module bridges these:
+Each chord token represents 4 beats (one bar) at the current tempo. There is no grid notation, no duration-by-repetition, and no chord collapsing (POL-D17). `Dm7 Dm7` produces two shapes totaling 8 beats. For more than one chord per bar, repeat chords and increase tempo.
 
-* Parse grid string to fractional beat value: `"1/4"` → 1 beat, `"1/8"` → 0.5 beats, `"1/3"` → triplet
-* Count consecutive identical chord symbols to compute per-chord duration in grid units
-* Pass `beatsPerChord` to `shapesToChordEvents(shapes, beatsPerChord)`
-
-This conversion logic lives in the integration module, not in PD or AE, keeping both subsystems grid-agnostic and beat-agnostic respectively.
+`shapesToChordEvents(shapes)` converts `Shape[]` → `ChordEvent[]` with 4 beats per chord. The integration module passes the result directly to `scheduleProgression(events)`.
 
 ## Integration Readiness Checklist
 
@@ -482,7 +478,7 @@ All items must be verified before starting integration module development.
 - [x] AE `AudioTransport` interface satisfies RU event subscription needs (onChordChange, onStateChange, getTime)
 - [x] AE `ChordEvent.shape` references HC `Shape` — same object identity preserved through pipeline
 - [x] PD `chords: string[]` → HC `parseChordSymbol()` each → valid `Chord[]` (integration pipeline)
-- [x] PD `grid` string + `tempo_bpm` → integration bridge → AE `beatsPerChord` (grid-to-beat conversion)
+- [x] Each chord = 4 beats (POL-D17) → `shapesToChordEvents(shapes)` → AE `scheduleProgression(events)`
 
 ---
 

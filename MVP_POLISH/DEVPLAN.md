@@ -30,9 +30,9 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** 0–2 complete. Next: header redesign (POL-D18), auto-center (POL-D20), audio quality (Phase 3).
+**Phase:** 0–2 complete, D20 (auto-center) shipped. Next: header redesign (POL-D18), audio quality (Phase 3).
 **Blocked/Broken:** Audio crackling at chord transitions.
-**Open decisions:** POL-D3, D4 (audio — superseded by D19), D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
+**Open decisions:** POL-D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
 
 ---
 
@@ -85,14 +85,6 @@ Post-Phase 1 improvements:
 - Library tab icon: `📚` → `♫` (monochromatic, matches `▶`)
 - Reset View: stays in sidebar, darker grey font
 
-### Auto-Center Viewport (POL-D20)
-
-After loading a progression (manual or library), auto-fit camera to show the entire path.
-1. Compute bounding box of all shape centroids in world coordinates
-2. `fitToBounds(bbox)` on CameraController — center + zoom from bbox vs viewport
-3. Call after `renderProgressionPath()` in `loadProgressionFromChords()`
-4. Snap initially; smooth animation as future refinement
-
 ### Phase 3: Audio Quality
 
 **Baseline fix (both modes):** Consecutive identical chords sustain as one continuous sound — detect identical pitch classes at chord boundary, skip voice stop/restart. This is default behavior, not mode-dependent (POL-D19).
@@ -103,9 +95,9 @@ After loading a progression (manual or library), auto-fit camera to show the ent
 
 ♫ **Pad (continuous):** Per-voice continuation — common tones sustain, only changing voices crossfade. Voice-diff at chord boundary using existing `voiceLead()`. Longer envelopes. Identical chords sustain.
 
-**3a: Synthesis exploration** — Waveform combinations, reverb, filter tuning, envelope tweaks. Iterative listening. (POL-D3 superseded by D19 toggle approach.)
+**3a: Synthesis exploration** — Waveform combinations, reverb, filter tuning, envelope tweaks. Iterative listening.
 
-**3b: Voicing comparison** — Current greedy minimal-motion vs root-bottom voicing. A/B listening test. (POL-D4 superseded by D19.)
+**3b: Voicing comparison** — Current greedy minimal-motion vs root-bottom voicing. A/B listening test.
 
 **3c: Register & blend** — Default register tuning, voice-count normalization, release overlap.
 
@@ -165,13 +157,13 @@ Decisions are listed once. See DEVLOG entries for implementation details.
 | D17 | 02-18 | 4 beats/chord, no collapsing, Load merged into Play, 20–960 BPM, rootPc unification |
 | D18 | 02-19 | Header redesign: info icons → canvas overlay, larger title, ♫ Library icon, darker Reset View |
 | D19 | 02-19 | Piano/Pad toggle + sustained repeated chords as baseline for both modes |
-| D20 | 02-19 | Auto-center viewport on progression load via fitToBounds(bbox) |
+| D20 | 02-19 | Auto-center viewport on progression load via fitToBounds(bbox) — Entry 14 |
+| D3 | 02-16 | Synthesis model — closed, subsumed by D19 (Phase 3a) |
+| D4 | 02-16 | Voicing strategy — closed, subsumed by D19 (Phase 3b) |
 
 ### Open
 
 | # | Date | Decision | Status |
 |---|------|----------|--------|
-| D3 | 02-16 | Synthesis model | Superseded by D19 toggle; retained as sub-task of Phase 3a |
-| D4 | 02-16 | Voicing strategy (root position) | Superseded by D19; retained as sub-task of Phase 3b |
 | D5 | 02-16 | Mobile proximity radius | Deferred to Phase 4a |
 | D14 | 02-17 | m7b5 non-root triangle placement | Deferred post-MVP |

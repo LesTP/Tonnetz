@@ -16,9 +16,9 @@ export interface ViewBox {
   readonly height: number;
 }
 
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 12;
-const DEFAULT_ZOOM = 6;
+export const MIN_ZOOM = 0.25;
+export const MAX_ZOOM = 12;
+export const DEFAULT_ZOOM = 6;
 
 /**
  * Compute responsive window bounds based on container size and minimum
@@ -131,6 +131,31 @@ export function windowWorldExtent(bounds: WindowBounds): WorldExtent {
 }
 
 /**
+ * Compute the world-space bounding box of an array of world points.
+ * Peer to `windowWorldExtent` — same return type, arbitrary point input.
+ *
+ * Returns `null` if the array is empty.
+ */
+export function pointsWorldExtent(
+  points: ReadonlyArray<{ readonly x: number; readonly y: number }>,
+): WorldExtent | null {
+  if (points.length === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+
+  return { minX, minY, maxX, maxY };
+}
+
+/**
  * Compute the initial camera that centers the window in the viewport (RU-D11).
  */
 export function computeInitialCamera(
@@ -147,6 +172,31 @@ export function computeInitialCamera(
 }
 
 /**
+ * Compute the aspect-fitted base dimensions for a given grid extent and
+ * container size. At zoom=1 the viewBox shows baseW × baseH world units.
+ *
+ * Shared by `computeViewBox` and `CameraController.fitToBounds` —
+ * extracted to prevent drift between the two zoom calculations.
+ */
+export function computeBaseExtent(
+  gridExtent: WorldExtent,
+  containerWidth: number,
+  containerHeight: number,
+): { baseW: number; baseH: number } {
+  const gridW = gridExtent.maxX - gridExtent.minX;
+  const gridH = gridExtent.maxY - gridExtent.minY;
+  const containerAspect = containerWidth / containerHeight;
+  const worldAspect = gridW / gridH;
+
+  if (containerAspect > worldAspect) {
+    const baseH = gridH;
+    return { baseW: baseH * containerAspect, baseH };
+  }
+  const baseW = gridW;
+  return { baseW, baseH: baseW / containerAspect };
+}
+
+/**
  * Compute the SVG viewBox from camera state and container dimensions.
  *
  * At zoom=1, the viewBox shows the full window extent.
@@ -159,21 +209,7 @@ export function computeViewBox(
   bounds: WindowBounds,
 ): ViewBox {
   const ext = windowWorldExtent(bounds);
-  const worldWidth = ext.maxX - ext.minX;
-  const worldHeight = ext.maxY - ext.minY;
-
-  const containerAspect = containerWidth / containerHeight;
-  const worldAspect = worldWidth / worldHeight;
-
-  let baseW: number;
-  let baseH: number;
-  if (containerAspect > worldAspect) {
-    baseH = worldHeight;
-    baseW = baseH * containerAspect;
-  } else {
-    baseW = worldWidth;
-    baseH = baseW / containerAspect;
-  }
+  const { baseW, baseH } = computeBaseExtent(ext, containerWidth, containerHeight);
 
   const w = baseW / camera.zoom;
   const h = baseH / camera.zoom;

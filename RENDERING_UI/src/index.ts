@@ -13,6 +13,11 @@ export {
   applyPanWithExtent,
   applyZoom,
   windowWorldExtent,
+  pointsWorldExtent,
+  computeBaseExtent,
+  MIN_ZOOM,
+  MAX_ZOOM,
+  DEFAULT_ZOOM,
 } from "./camera.js";
 export type { CameraState, ViewBox, WorldExtent } from "./camera.js";
 
