@@ -116,14 +116,6 @@ describe("createSidebar", () => {
       expect(libraryTab!.textContent).toBe("📚 Library");
     });
 
-    it("creates chord display with placeholder", () => {
-      sidebar = createSidebar(opts);
-      const display = q(root, "chord-display");
-      expect(display).not.toBeNull();
-      expect(display!.textContent).toBe("Tap a triangle to play");
-      expect(display!.classList.contains("tonnetz-sidebar-chord-display--placeholder")).toBe(true);
-    });
-
     it("creates progression input textarea", () => {
       sidebar = createSidebar(opts);
       const textarea = q(root, "progression-input") as HTMLTextAreaElement;
@@ -476,29 +468,6 @@ describe("createSidebar", () => {
       slider.value = "400";
       slider.dispatchEvent(new Event("input", { bubbles: true }));
       expect(label.textContent).toBe("400 BPM");
-    });
-  });
-
-  // ── Chord Display ──────────────────────────────────────────────────
-
-  describe("chord display", () => {
-    it("setActiveChord() shows chord name", () => {
-      sidebar = createSidebar(opts);
-      sidebar.setActiveChord("Am7");
-
-      const display = q(root, "chord-display")!;
-      expect(display.textContent).toBe("Am7");
-      expect(display.classList.contains("tonnetz-sidebar-chord-display--placeholder")).toBe(false);
-    });
-
-    it("setActiveChord(null) restores placeholder", () => {
-      sidebar = createSidebar(opts);
-      sidebar.setActiveChord("Dm");
-      sidebar.setActiveChord(null);
-
-      const display = q(root, "chord-display")!;
-      expect(display.textContent).toBe("Tap a triangle to play");
-      expect(display.classList.contains("tonnetz-sidebar-chord-display--placeholder")).toBe(true);
     });
   });
 

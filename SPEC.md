@@ -1,7 +1,7 @@
 # SPEC.md — Tonnetz Interactive Harmonic Explorer
 
-Version: Draft 0.4
-Date: 2026-02-13
+Version: Draft 0.5
+Date: 2026-02-18
 
 ---
 
@@ -228,9 +228,9 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | Function | Description |
 |----------|-------------|
 | `createUIStateController()` | UI state machine (idle, chord-selected, progression-loaded, playback-running) |
-| `createLayoutManager(options)` | Three-zone layout (toolbar, canvas, control panel) |
-| `createControlPanel(options)` | HTML control panel (progression input, playback buttons) |
-| `createToolbar(options)` | HTML toolbar (Reset View button) |
+| ~~`createLayoutManager(options)`~~ | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
+| ~~`createControlPanel(options)`~~ | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
+| ~~`createToolbar(options)`~~ | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
 
 ## Key Types
 
@@ -246,9 +246,9 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | `HighlightHandle` | Handle for clearing highlights |
 | `UIState` | State union: `"idle" \| "chord-selected" \| "progression-loaded" \| "playback-running"` |
 | `UIStateController` | Controller interface with state transitions and event subscription |
-| `LayoutManager` | Layout interface (container getters, toggleControlPanel) |
-| `ControlPanel` | Control panel interface (show/hide, state setters) |
-| `Toolbar` | Toolbar interface (show/hide/destroy) |
+| ~~`LayoutManager`~~ | Superseded — see `createSidebar()` in Integration (POL-D1) |
+| ~~`ControlPanel`~~ | Superseded — see `createSidebar()` in Integration (POL-D1) |
+| ~~`Toolbar`~~ | Superseded — see `createSidebar()` in Integration (POL-D1) |
 
 See ARCH_RENDERING_UI.md Section 11 for full type definitions and function signatures.
 
@@ -444,12 +444,12 @@ All items must be verified before starting integration module development.
 
 - [x] SVG scaffold, grid rendering, camera controller operational
 - [x] `hitTest()` returns discriminated `HitResult` (HitTriangle | HitEdge | HitNone)
-- [x] `createInteractionController()` emits `onTriangleSelect`, `onEdgeSelect`, `onDragScrub`, `onPointerUp` with pitch classes
+- [x] `createInteractionController()` emits `onTriangleSelect`, `onEdgeSelect`, `onPointerUp` with pitch classes
 - [x] `renderShape()` / `renderProgressionPath()` render HC Shape objects
 - [x] `PathHandle.setActiveChord(index)` ready for transport subscription
 - [x] `createUIStateController()` implements all state transitions (idle → chord-selected → progression-loaded → playback-running)
-- [x] `createControlPanel()` exposes play/stop/clear callbacks
-- [x] `createLayoutManager()` provides three-zone layout
+- [x] `createControlPanel()` exposes play/stop/clear callbacks (superseded by sidebar; legacy API still exported)
+- [x] `createLayoutManager()` provides three-zone layout (superseded by sidebar; legacy API still exported)
 - [x] All tests passing (344 tests including 20 AE contract tests)
 - [x] No runtime dependencies on audio or storage
 
@@ -613,8 +613,8 @@ Deliver playable harmonic instrument with progression visualization.
 
 ## Phase 2: Progression Tools
 
-* save/load library UI
-* loop playback controls
+* ~~save/load library UI~~ (shipped in MVP Polish Phase 2)
+* ~~loop playback controls~~ (shipped in MVP Polish Phase 1)
 * transposition via Tonnetz motion
 * improved voice-leading engine
 

@@ -5,6 +5,7 @@ import type { Shape, Chord, TriRef } from "harmony-core";
 import {
   renderProgressionPath,
   clearProgression,
+  formatShortChordLabel,
 } from "../path-renderer.js";
 import type { PathHandle } from "../path-renderer.js";
 
@@ -55,6 +56,11 @@ function makeProgression(): Shape[] {
     makeShape(1.5, 1, 0), // C at (1.5, 1)
     makeShape(2, 0.5, 5), // F at (2, 0.5)
   ];
+}
+
+/** Query the active marker group element. */
+function getActiveMarker(layer: SVGGElement): SVGGElement | null {
+  return layer.querySelector("g[data-path-element='active-marker']") as SVGGElement | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,13 +116,22 @@ describe("renderProgressionPath — basic rendering", () => {
     expect(markers[3].getAttribute("data-chord-index")).toBe("3");
   });
 
-  it("creates hidden active marker", () => {
+  it("creates hidden active marker group", () => {
     const shapes = makeProgression();
     handle = renderProgressionPath(layerPath, shapes);
 
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+    const activeMarker = getActiveMarker(layerPath);
     expect(activeMarker).not.toBeNull();
     expect(activeMarker?.getAttribute("visibility")).toBe("hidden");
+  });
+
+  it("active marker group contains a circle and a text element", () => {
+    const shapes = makeProgression();
+    handle = renderProgressionPath(layerPath, shapes);
+
+    const activeMarker = getActiveMarker(layerPath);
+    expect(activeMarker?.querySelector("circle")).not.toBeNull();
+    expect(activeMarker?.querySelector("text")).not.toBeNull();
   });
 
   it("getChordCount returns correct count", () => {
@@ -208,21 +223,20 @@ describe("renderProgressionPath — setActiveChord", () => {
 
     handle.setActiveChord(0);
 
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+    const activeMarker = getActiveMarker(layerPath);
     expect(activeMarker?.getAttribute("visibility")).toBe("visible");
   });
 
-  it("moves active marker to correct position", () => {
+  it("moves active marker group to correct position via transform", () => {
     const shapes = makeProgression();
     handle = renderProgressionPath(layerPath, shapes);
 
     // Set to first chord (centroid at 0, 0 → world 0, 0)
     handle.setActiveChord(0);
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+    const activeMarker = getActiveMarker(layerPath);
 
-    // World coords for centroid (0, 0): x = 0 + 0*0.5 = 0, y = 0 * √3/2 = 0
-    expect(activeMarker?.getAttribute("cx")).toBe("0");
-    expect(activeMarker?.getAttribute("cy")).toBe("0");
+    // Group uses translate(x,y) — world coords for centroid (0,0): x=0, y=0
+    expect(activeMarker?.getAttribute("transform")).toBe("translate(0,0)");
   });
 
   it("hides active marker when index is -1", () => {
@@ -232,7 +246,7 @@ describe("renderProgressionPath — setActiveChord", () => {
     handle.setActiveChord(0); // Show first
     handle.setActiveChord(-1); // Hide
 
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+    const activeMarker = getActiveMarker(layerPath);
     expect(activeMarker?.getAttribute("visibility")).toBe("hidden");
   });
 
@@ -243,7 +257,7 @@ describe("renderProgressionPath — setActiveChord", () => {
     handle.setActiveChord(0); // Show first
     handle.setActiveChord(100); // Out of bounds
 
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+    const activeMarker = getActiveMarker(layerPath);
     expect(activeMarker?.getAttribute("visibility")).toBe("hidden");
   });
 
@@ -253,7 +267,7 @@ describe("renderProgressionPath — setActiveChord", () => {
 
     for (let i = 0; i < shapes.length; i++) {
       handle.setActiveChord(i);
-      const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+      const activeMarker = getActiveMarker(layerPath);
       expect(activeMarker?.getAttribute("visibility")).toBe("visible");
     }
   });
@@ -352,8 +366,9 @@ describe("renderProgressionPath — options", () => {
       activeFill: "#0000ff",
     });
 
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
-    expect(activeMarker?.getAttribute("fill")).toBe("#0000ff");
+    const activeGroup = getActiveMarker(layerPath);
+    const circle = activeGroup?.querySelector("circle");
+    expect(circle?.getAttribute("fill")).toBe("#0000ff");
   });
 
   it("respects showCentroidMarkers=false option", () => {
@@ -365,8 +380,8 @@ describe("renderProgressionPath — options", () => {
     const markers = layerPath.querySelectorAll("circle[data-path-element='centroid-marker']");
     expect(markers).toHaveLength(0);
 
-    // Active marker should still exist
-    const activeMarker = layerPath.querySelector("circle[data-path-element='active-marker']");
+    // Active marker group should still exist
+    const activeMarker = getActiveMarker(layerPath);
     expect(activeMarker).not.toBeNull();
   });
 });
@@ -415,5 +430,163 @@ describe("renderProgressionPath — world coordinate conversion", () => {
       expect(px).toBeCloseTo(mx, 5);
       expect(py).toBeCloseTo(my, 5);
     }
+  });
+});
+
+describe("renderProgressionPath — chord labels", () => {
+  let layerPath: SVGGElement;
+  let handle: PathHandle;
+
+  beforeEach(() => {
+    layerPath = makeLayerGroup();
+  });
+
+  afterEach(() => {
+    handle?.clear();
+    layerPath.parentElement?.remove();
+  });
+
+  it("renders white note-name labels on each centroid marker", () => {
+    const shapes = makeProgression();
+    handle = renderProgressionPath(layerPath, shapes);
+
+    const labels = layerPath.querySelectorAll("text[data-path-element='centroid-label']");
+    expect(labels).toHaveLength(shapes.length);
+  });
+
+  it("showCentroidLabels=false suppresses note-name labels", () => {
+    const shapes = makeProgression();
+    handle = renderProgressionPath(layerPath, shapes, {
+      showCentroidLabels: false,
+    });
+
+    const labels = layerPath.querySelectorAll("text[data-path-element='centroid-label']");
+    expect(labels).toHaveLength(0);
+
+    // Centroid marker circles should still render
+    const markers = layerPath.querySelectorAll("circle[data-path-element='centroid-marker']");
+    expect(markers).toHaveLength(shapes.length);
+  });
+
+  it("centroid labels show preferred enharmonic root note names", () => {
+    // makeProgression: rootPc 2=D, 7=G, 0=C, 5=F
+    const shapes = makeProgression();
+    handle = renderProgressionPath(layerPath, shapes);
+
+    const labels = layerPath.querySelectorAll("text[data-path-element='centroid-label']");
+    expect(labels[0].textContent).toBe("D");
+    expect(labels[1].textContent).toBe("G");
+    expect(labels[2].textContent).toBe("C");
+    expect(labels[3].textContent).toBe("F");
+  });
+
+  it("centroid labels use white fill", () => {
+    const shapes = [makeShape(0, 0, 0)];
+    handle = renderProgressionPath(layerPath, shapes);
+
+    const label = layerPath.querySelector("text[data-path-element='centroid-label']");
+    expect(label?.getAttribute("fill")).toBe("#fff");
+  });
+
+  it("active marker shows chord label when chordLabels provided", () => {
+    const shapes = makeProgression();
+    handle = renderProgressionPath(layerPath, shapes, {
+      chordLabels: ["Dm", "G", "C", "F"],
+    });
+
+    handle.setActiveChord(2);
+
+    const activeGroup = getActiveMarker(layerPath);
+    const textEl = activeGroup?.querySelector("text");
+    expect(textEl?.textContent).toBe("C");
+  });
+
+  it("active marker text is empty when no chordLabels", () => {
+    const shapes = makeProgression();
+    handle = renderProgressionPath(layerPath, shapes);
+
+    handle.setActiveChord(0);
+
+    const activeGroup = getActiveMarker(layerPath);
+    const textEl = activeGroup?.querySelector("text");
+    expect(textEl?.textContent).toBe("");
+  });
+});
+
+describe("formatShortChordLabel", () => {
+  it("returns empty string for empty input", () => {
+    expect(formatShortChordLabel("")).toBe("");
+  });
+
+  it("passes through simple major chord", () => {
+    expect(formatShortChordLabel("C")).toBe("C");
+  });
+
+  it("passes through simple minor chord", () => {
+    expect(formatShortChordLabel("Am")).toBe("Am");
+  });
+
+  it("shortens m7b5 to ø7 (half-diminished)", () => {
+    expect(formatShortChordLabel("Cm7b5")).toBe("Cø7");
+  });
+
+  it("shortens dim7 to o7", () => {
+    expect(formatShortChordLabel("Cdim7")).toBe("Co7");
+  });
+
+  it("shortens dim to o", () => {
+    expect(formatShortChordLabel("Cdim")).toBe("Co");
+  });
+
+  it("shortens maj7 to △7", () => {
+    expect(formatShortChordLabel("Cmaj7")).toBe("C△7");
+  });
+
+  it("shortens add9 to +9", () => {
+    expect(formatShortChordLabel("Cadd9")).toBe("C+9");
+  });
+
+  it("shortens aug to +", () => {
+    expect(formatShortChordLabel("Caug")).toBe("C+");
+  });
+
+  it("picks preferred enharmonic: Bb over A#", () => {
+    expect(formatShortChordLabel("A#m")).toBe("Bbm");
+  });
+
+  it("picks preferred enharmonic: Db over C#", () => {
+    expect(formatShortChordLabel("C#")).toBe("Db");
+  });
+
+  it("picks preferred enharmonic: Eb over D#", () => {
+    expect(formatShortChordLabel("D#m7")).toBe("Ebm7");
+  });
+
+  it("picks preferred enharmonic: Ab over G#", () => {
+    expect(formatShortChordLabel("G#m")).toBe("Abm");
+  });
+
+  it("keeps F# (preferred over Gb)", () => {
+    expect(formatShortChordLabel("F#m")).toBe("F#m");
+  });
+
+  it("converts Gb to F#", () => {
+    expect(formatShortChordLabel("Gb")).toBe("F#");
+  });
+
+  it("handles dom7 chord (plain 7)", () => {
+    expect(formatShortChordLabel("G7")).toBe("G7");
+  });
+
+  it("handles minor 7", () => {
+    expect(formatShortChordLabel("Dm7")).toBe("Dm7");
+  });
+
+  it("handles combined: A#dim7 → Bbo7", () => {
+    expect(formatShortChordLabel("A#dim7")).toBe("Bbo7");
+  });
+
+  it("handles 6/9 extension", () => {
+    expect(formatShortChordLabel("C6/9")).toBe("C6/9");
   });
 });

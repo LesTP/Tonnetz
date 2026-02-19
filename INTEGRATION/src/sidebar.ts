@@ -48,8 +48,6 @@ export interface Sidebar {
   setPlaybackRunning(running: boolean): void;
   /** Set the progression input textarea text. */
   setInputText(text: string): void;
-  /** Set the active chord display text (null clears to placeholder). */
-  setActiveChord(symbol: string | null): void;
   /** Set the tempo slider and label to a specific BPM. */
   setTempo(bpm: number): void;
   /** Set the loop toggle state. */
@@ -90,8 +88,6 @@ const C = {
   tabBtn: "tonnetz-sidebar-tab-btn",
   tabBtnActive: "tonnetz-sidebar-tab-btn--active",
   tabPanel: "tonnetz-sidebar-tab-panel",
-  chordDisplay: "tonnetz-sidebar-chord-display",
-  chordDisplayPlaceholder: "tonnetz-sidebar-chord-display--placeholder",
   inputGroup: "tonnetz-sidebar-input-group",
   textarea: "tonnetz-sidebar-textarea",
   transport: "tonnetz-sidebar-transport",
@@ -265,26 +261,6 @@ const STYLES = `
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-/* Chord display */
-.${C.chordDisplay} {
-  font-size: 20px;
-  font-weight: 600;
-  text-align: center;
-  padding: 8px 4px;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  background: #f0f0f0;
-  color: #222;
-}
-.${C.chordDisplayPlaceholder} {
-  font-size: 12px;
-  font-weight: 400;
-  color: #aaa;
 }
 
 /* Input group */
@@ -683,8 +659,6 @@ function clampTempo(bpm: number): number {
 
 // ── Factory ──────────────────────────────────────────────────────────
 
-const CHORD_PLACEHOLDER = "Tap a triangle to play";
-
 export function createSidebar(options: SidebarOptions): Sidebar {
   injectCSS(STYLE_ID, STYLES);
 
@@ -758,10 +732,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   const playPanel = el("section", C.tabPanel, { "data-tab": "play", "data-testid": "panel-play" });
 
-  // Chord display
-  const chordDisplay = el("div", `${C.chordDisplay} ${C.chordDisplayPlaceholder}`, { "data-testid": "chord-display" });
-  chordDisplay.textContent = CHORD_PLACEHOLDER;
-
   // Progression input
   const inputGroup = el("div", C.inputGroup);
   const inputLabel = el("label");
@@ -827,7 +797,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   pathToggle.appendChild(tonalBtn);
 
   // Assemble play panel
-  playPanel.appendChild(chordDisplay);
   playPanel.appendChild(inputGroup);
   playPanel.appendChild(transportRow);
   playPanel.appendChild(tempoSection);
@@ -1150,15 +1119,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       textarea.value = text;
     },
 
-    setActiveChord(symbol: string | null): void {
-      if (symbol) {
-        chordDisplay.textContent = symbol;
-        chordDisplay.classList.remove(C.chordDisplayPlaceholder);
-      } else {
-        chordDisplay.textContent = CHORD_PLACEHOLDER;
-        chordDisplay.classList.add(C.chordDisplayPlaceholder);
-      }
-    },
 
     setTempo(bpm: number): void {
       const clamped = clampTempo(bpm);

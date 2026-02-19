@@ -5,6 +5,65 @@ Started: 2026-02-16
 
 ---
 
+## Entry 12 — Active chord label on path marker
+
+**Date:** 2026-02-19
+
+### Summary
+
+Moved chord symbol display from the sidebar onto the active-chord path marker (orange circle) during progression playback. The user now tracks one place on screen instead of two. Added white note-name labels on centroid markers (root motion mode) so grid labels remain readable under opaque dots.
+
+### Changes
+
+**Path renderer** (`RU/src/path-renderer.ts`):
+- Active marker changed from `<circle>` to `<g>` group containing circle + `<text>` label
+- Active marker radius enlarged from 0.18 → 0.32 world units to fit text
+- `setActiveChord()` positions via `transform="translate(x,y)"` and updates label text
+- New `PathRenderOptions.chordLabels?: string[]` — passes chord symbols into renderer
+- New `PathRenderOptions.showCentroidLabels?: boolean` — controls note-name labels on centroid dots (default: true)
+- New exported `formatShortChordLabel()` — compact chord notation for tight SVG space
+- White note-name labels rendered on top of opaque centroid markers using `PREFERRED_ROOT[root_pc]`
+- Two-character names (Eb, Bb, F#, Ab, Db) use smaller font (0.14) vs single-character (0.18)
+
+**Compact chord notation** (`formatShortChordLabel`):
+| Input | Output | Rationale |
+|-------|--------|-----------|
+| `dim` | `o` | Visual consistency with `ø` |
+| `dim7` | `o7` | Visual consistency with `ø7` |
+| `m7b5` | `ø7` | Standard half-diminished |
+| `maj7` | `△7` | Standard triangle symbol |
+| `add9` | `+9` | Shorter, avoids 6-char labels |
+| `aug` | `+` | Standard augmented |
+| `A#` | `Bb` | Preferred enharmonic (Bb, Eb, Ab, Db; keep F#) |
+
+**Sidebar cleanup** (`INT/src/sidebar.ts`, `INT/src/main.ts`):
+- Removed chord display section from sidebar (DOM, CSS, `setActiveChord` method, `CHORD_PLACEHOLDER`)
+- Removed ~90 lines of dead chord-label helpers from main.ts (`triLabel`, `edgeLabel`, `chordName`, etc.)
+- Trimmed unused imports (`EdgeId`, `getTrianglePcs`, `getEdgeUnionPcs`)
+
+**Integration wiring** (`INT/src/main.ts`):
+- Both `renderProgressionPath()` call sites pass `{ chordLabels, showCentroidLabels }`
+- Root motion mode: `showCentroidLabels: true` (white note names on dots)
+- Tonal centroid mode: `showCentroidLabels: false` (plain dots — centroid floats between nodes)
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `RU/src/path-renderer.ts` | Active marker group, `formatShortChordLabel()`, centroid note labels, `showCentroidLabels` option, two-char font sizing |
+| `RU/src/index.ts` | Added `formatShortChordLabel` to public exports |
+| `INT/src/main.ts` | Pass `chordLabels` + `showCentroidLabels` to path renderer, remove sidebar chord display calls + dead helpers |
+| `INT/src/sidebar.ts` | Remove chord display DOM/CSS/method/constant |
+| `INT/src/__tests__/sidebar.test.ts` | Remove chord display tests (3 tests removed) |
+| `RU/src/__tests__/path-renderer.test.ts` | Updated active marker queries, added tests for labels, shortening, centroid labels, showCentroidLabels |
+| `UX_SPEC.md` | Added active chord path label + centroid note label encoding rules to §3 |
+
+### Test Results
+
+RU 363, INT 244 — all passing, 0 type errors.
+
+---
+
 ## Entry 11 — POL-D17: Simplify Duration Model + Load→Play Merge
 
 **Date:** 2026-02-18

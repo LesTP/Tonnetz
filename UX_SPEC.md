@@ -1,7 +1,7 @@
 # UX_SPEC.md
 
-Version: Draft 0.5
-Date: 2026-02-13
+Version: Draft 0.6
+Date: 2026-02-18
 
 ---
 
@@ -54,6 +54,8 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 * Step forward/back through chords
 * Clear button → dismiss progression and return to Idle Exploration (UX-D5)
 
+> **Note:** POL-D* decisions referenced throughout this document originate from the MVP Polish module (see `MVP_POLISH/DEVLOG.md`). They are cited here when they modify UX contracts.
+
 ---
 
 ## 3. Visual Encoding Rules
@@ -68,6 +70,8 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 * Union chord (edge selection) → both adjacent triangles highlighted
 * **Dot-only chords** (dim, aug, m7b5, dim7): highlighted as node circle strokes + connecting edge strokes using the **greedy chain** nearest-node algorithm (nearest to shape centroid, then each subsequent dot nearest to already-picked nodes). Only one node per pitch class highlighted. Algorithm implemented in `INTEGRATION/src/grid-highlighter.ts`; anchor point is the shape's centroid (see POL-D13 for dot-only centroid rule, HC-D9 revised per POL-D15).
 * **Centroid / path marker:** For all chord types, centroid_uv is the **root vertex position** (the lattice node whose pitch class matches the chord root). Progression path traces root motion. See HC-D9 (revised) in ARCH_HARMONY_CORE.md.
+* **Active chord path label:** During progression playback, the active chord marker (orange circle) displays a compact chord symbol. Labels are shortened for space: `dim` → `o`, `m7b5` → `ø7`, `dim7` → `o7`, `maj7` → `△7`, `aug` → `+`, `add9` → `+9`. Enharmonic roots use the more common spelling: Bb over A#, Eb over D#, Ab over G#, Db over C#, F# over Gb. See `formatShortChordLabel()` in `RENDERING_UI/src/path-renderer.ts`.
+* **Centroid marker note labels:** In root motion mode, each centroid dot displays a white note-name label (matching grid label font, white fill) so the grid label underneath remains readable despite the opaque marker. Two-character names (Eb, Bb, F#, Ab, Db) use a slightly smaller font than single-character names. In tonal centroid mode, labels are suppressed (centroid floats between nodes, no correct note name to show). Controlled by `PathRenderOptions.showCentroidLabels`.
 * **Dot-only color rule:** dim/m7b5 (minor 3rd) → blue (minor palette); aug (major 3rd) → red (major palette)
 * Node labels → dark grey (`#555`); enharmonic nodes show sharp name on top, flat name on bottom (e.g., D# / Eb)
 
@@ -163,9 +167,7 @@ Bundled library of ~25 curated progressions. Static data (not user-generated; us
 
 ---
 
-### Legacy Layout (superseded)
-
-The previous three-zone layout (Toolbar, Canvas, Control Panel) implemented via `createLayoutManager()` and `createControlPanel()` in RU is superseded by the sidebar design. See POL-D1 for implementation approach.
+> **Legacy note:** The previous three-zone layout (`createLayoutManager()`, `createControlPanel()`, `createToolbar()`) is superseded by the sidebar design (POL-D1). Legacy APIs remain exported for test compatibility.
 
 ---
 
@@ -188,10 +190,28 @@ State transitions:
 * Progression Loaded → Playback Running (play)
 * Playback Running → Progression Loaded (stop)
 * Playback Running → Playback Running (tap/click is ignored during active playback; user must stop first) (UX-D6)
+* Progression Loaded → Progression Loaded (tap/click is ignored while a progression is loaded; user clears progression first to return to exploration) (INT-D6)
 * Progression Loaded → Idle Exploration (clear button) (UX-D5)
 * Chord Selected → Idle Exploration (tap empty space or timeout)
 
 Audio and renderer must react deterministically to these states.
+
+### Gesture Sub-States
+
+The macro states above do not model transient gesture mechanics. During **Chord Selected**, the following sub-sequence is handled entirely by the gesture controller and does not produce named state transitions:
+
+1. **Pointer-down** on a triangle → chord begins sounding (enters Chord Selected)
+2. **Hold** → chord continues sounding (still Chord Selected)
+3. **Drag threshold exceeded** → chord stops, camera pan begins (still Chord Selected visually, but audio silenced and pan active)
+4. **Pointer-up** → pan ends; state remains Chord Selected until timeout or next tap
+
+This means Chord Selected can produce audio → silence → pan → silence within a single pointer lifecycle without transitioning to a different macro state. The gesture controller owns this lifecycle; the UI state machine only observes the net result (a Chord Selected state entered on pointer-down, potentially cleared on timeout). See UX-D4 for the design rationale.
+
+**Implication for audio:** The Audio Engine receives `playPitchClasses()` on pointer-down and `stopAll()` when the drag threshold is crossed. There is no "pause" — it is a hard stop followed by pan. If the user releases without dragging, `stopAll()` fires on pointer-up instead. The gesture controller must guarantee exactly one `stopAll()` call per pointer lifecycle regardless of path taken (hold-only vs hold-then-drag).
+
+**Implication for rendering:** The highlight applied on pointer-down should be cleared when drag begins (the user's intent has shifted from "play this chord" to "move the viewport"). This prevents stale highlights persisting during pan.
+
+**Implication for state machine:** No changes needed. The macro state machine correctly ignores gesture internals. The gesture controller is the sole owner of the pointer-down → pointer-up lifecycle and makes its own stop/clear decisions without consulting UIStateController.
 
 ---
 
@@ -287,9 +307,9 @@ Date: 2026-02-13
 Status: Closed
 Priority: Critical
 Decision:
-Hit-testing uses a proximity circle (~half triangle edge length) centered on the pointer.
-Circle enclosed by one triangle → triad. Circle crosses shared edge → union chord.
-Boundary edges excluded. Node overlap (3+ triangles) undefined for MVP.
+Hit-testing uses a proximity circle (0.12 world units, ~12% of triangle edge length) centered
+on the pointer. Circle enclosed by one triangle → triad. Circle crosses shared edge → union
+chord. Boundary edges excluded. Node overlap (3+ triangles) undefined for MVP.
 Rationale:
 Provides generous touch targets. Unifies triangle and edge selection into a single
 spatial model. Avoids separate edge hit targets with small tap areas.

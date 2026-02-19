@@ -12,8 +12,8 @@
  * See DEVPLAN §Phase 6.
  */
 
-import type { CentroidCoord, Shape, TriRef, TriId, EdgeId, WindowIndices } from "harmony-core";
-import { triId, triVertices, getTrianglePcs, getEdgeUnionPcs, pc } from "harmony-core";
+import type { CentroidCoord, Shape, TriRef, TriId, WindowIndices } from "harmony-core";
+import { triId, triVertices, pc } from "harmony-core";
 
 import {
   createSvgScaffold,
@@ -91,96 +91,6 @@ let scheduledEventsCache: readonly ChordEvent[] = [];
 /** Cached chord symbol strings for the current progression (for chord display). */
 let currentChordSymbols: string[] = [];
 
-// ── Chord Label Helpers ─────────────────────────────────────────────
-
-const PC_NAMES: readonly string[] = [
-  "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
-
-const PC_NAMES_FLAT: readonly string[] = [
-  "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B",
-];
-
-/** Format a chord symbol with enharmonic root (e.g., "A#m / Bbm"). */
-function chordName(rootPc: number, suffix: string): string {
-  const sharp = PC_NAMES[rootPc];
-  const flat = PC_NAMES_FLAT[rootPc];
-  if (sharp !== flat) {
-    return `${sharp}${suffix} / ${flat}${suffix}`;
-  }
-  return sharp + suffix;
-}
-
-/** Derive a display label from a triangle hit (e.g., "C" or "A#m / Bbm"). */
-function triLabel(triRef: TriRef): string {
-  const { u, v } = triRef.anchor;
-  const rootPc = triRef.orientation === "U"
-    ? pc(u, v)
-    : pc(u, v + 1);
-  const quality = triRef.orientation === "U" ? "" : "m";
-  return chordName(rootPc, quality);
-}
-
-/** Known 4-note chord interval patterns (root-relative, sorted ascending). */
-const FOUR_NOTE_PATTERNS: readonly [readonly number[], string][] = [
-  [[0, 4, 7, 11], "maj7"],
-  [[0, 4, 7, 10], "7"],
-  [[0, 3, 7, 10], "m7"],
-  [[0, 3, 7, 11], "m(maj7)"],
-  [[0, 3, 6, 10], "m7b5"],
-  [[0, 3, 6, 9],  "dim7"],
-];
-
-/**
- * Identify a 4-note chord from its pitch classes.
- * Tries each PC as a potential root and matches against known interval patterns.
- * Returns a chord symbol (e.g., "C#m7") or a fallback PC list (e.g., "C-E-G#-B").
- */
-function identifyFourNoteChord(pcs: readonly number[]): string {
-  const sorted = [...new Set(pcs)].sort((a, b) => a - b);
-  if (sorted.length !== 4) {
-    return sorted.map((p) => PC_NAMES[p]).join("-");
-  }
-  for (const root of sorted) {
-    const intervals = sorted
-      .map((p) => ((p - root) + 12) % 12)
-      .sort((a, b) => a - b);
-    for (const [pattern, suffix] of FOUR_NOTE_PATTERNS) {
-      if (intervals.every((v, i) => v === pattern[i])) {
-        return chordName(root, suffix);
-      }
-    }
-  }
-  return sorted.map((p) => PC_NAMES[p]).join("-");
-}
-
-/** Derive a display label from an edge hit (e.g., "C#m7", "Cmaj7"). */
-function edgeLabel(
-  edgeId: EdgeId,
-  indices: WindowIndices,
-): string {
-  const pcs = getEdgeUnionPcs(edgeId, indices);
-  if (!pcs || pcs.length === 0) return "";
-  return identifyFourNoteChord(pcs);
-}
-
-/** Format chords array into grouped display: "Cm7 Cm7 Cm7 Cm7 | F7 F7 F7 F7" */
-function formatChordsGrouped(chords: readonly string[]): string {
-  const groups: string[][] = [];
-  let current: string[] = [];
-  let prev = "";
-  for (const c of chords) {
-    if (c !== prev && current.length > 0) {
-      groups.push(current);
-      current = [];
-    }
-    current.push(c);
-    prev = c;
-  }
-  if (current.length > 0) groups.push(current);
-  return groups.map((g) => g.join(" ")).join(" | ");
-}
-
 // ── Step 1: Persistence ─────────────────────────────────────────────
 
 const persistence = initPersistence();
@@ -197,13 +107,6 @@ const persistence = initPersistence();
 const pathHandleProxy: PathHandle = {
   setActiveChord: (index: number) => {
     currentPathHandle?.setActiveChord(index);
-
-    // Update chord display during playback
-    if (index >= 0 && index < currentChordSymbols.length) {
-      sidebar.setActiveChord(currentChordSymbols[index]);
-    } else {
-      sidebar.setActiveChord(null);
-    }
 
     // Deactivate previous grid highlight
     deactivateGridHighlight(activeGridHandle);
@@ -281,6 +184,7 @@ function loadProgressionFromChords(chords: string[]): boolean {
   currentPathHandle = renderProgressionPath(
     scaffold.layers["layer-path"],
     shapesForPath,
+    { chordLabels: result.cleanedSymbols, showCentroidLabels: pathMode !== "tonal" },
   );
 
   // Update UI state (synchronous — immediate visual feedback)
@@ -362,7 +266,6 @@ function handleClear(): void {
   scheduledEventsCache = [];
   currentChordSymbols = [];
   sidebar.setProgressionLoaded(false);
-  sidebar.setActiveChord(null);
   sidebar.setPlaybackRunning(false);
 }
 
@@ -386,7 +289,6 @@ function handleStop(): void {
   // Clear playback grid highlight (last chord's visual state)
   deactivateGridHighlight(activeGridHandle);
   activeGridHandle = null;
-  sidebar.setActiveChord(null);
   if (currentPathHandle) {
     currentPathHandle.setActiveChord(-1);
   }
@@ -419,6 +321,7 @@ function handlePathModeChange(mode: "root" | "tonal"): void {
   currentPathHandle = renderProgressionPath(
     scaffold.layers["layer-path"],
     shapesForPath,
+    { chordLabels: currentChordSymbols, showCentroidLabels: mode !== "tonal" },
   );
 }
 
@@ -555,8 +458,6 @@ const interactionCallbacks = {
           rootPc: triRef ? pc(triVertices(triRef)[triRef.orientation === "U" ? 0 : 2].u, triVertices(triRef)[triRef.orientation === "U" ? 0 : 2].v) : null,
         },
       );
-      // Show chord name during interactive exploration
-      if (triRef) sidebar.setActiveChord(triLabel(triRef));
     } else if (hit.type === "edge") {
       // For edge hits, highlight both triangles as a combined shape
       const mainRef = indices.triIdToRef.get(hit.triIds[0]);
@@ -570,8 +471,6 @@ const interactionCallbacks = {
           rootPc: mainRef ? pc(triVertices(mainRef)[mainRef.orientation === "U" ? 0 : 2].u, triVertices(mainRef)[mainRef.orientation === "U" ? 0 : 2].v) : null,
         },
       );
-      // Show union chord name
-      sidebar.setActiveChord(edgeLabel(hit.edgeId, indices));
     }
 
     // Delegate to base (audio + state gating)
@@ -581,11 +480,6 @@ const interactionCallbacks = {
     // Restore grid on release
     deactivateGridHighlight(interactiveGridHandle);
     interactiveGridHandle = null;
-    // Clear chord display on release (back to placeholder)
-    const state = uiState.getState();
-    if (state !== "playback-running") {
-      sidebar.setActiveChord(null);
-    }
     baseInteractionCallbacks.onPointerUp?.();
   },
 };

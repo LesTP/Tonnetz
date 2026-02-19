@@ -90,6 +90,7 @@ export type {
 export {
   renderProgressionPath,
   clearProgression,
+  formatShortChordLabel,
 } from "./path-renderer.js";
 export type {
   PathHandle,
