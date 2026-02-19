@@ -5,6 +5,65 @@ Started: 2026-02-16
 
 ---
 
+## Entry 16 — Placement Heuristics + Library Finalization
+
+**Date:** 2026-02-19
+
+### Summary
+
+Improved progression path placement with two changes: world-coordinate distance metric in `placeMainTriad` (fixes visual distortion from lattice-coordinate math) and distance-gated root reuse in `mapProgressionToShapes` (repeated chords snap to their prior position when nearby). Finalized library at 26 entries. Explored and rejected compactness-anchor approach for Giant Steps.
+
+### World-Coordinate Distance (placement.ts)
+
+**Problem:** `dist2()` computed squared distance in lattice coordinates (`du² + dv²`), but the Tonnetz uses an equilateral layout where world coordinates are `x = u + v*0.5`, `y = v * √3/2`. Two candidates equidistant on screen had different lattice distances, causing visually confusing placements.
+
+**Fix:** Changed `dist2()` to world-coordinate distance:
+```ts
+const dx = (a.u - b.u) + (a.v - b.v) * 0.5;
+const dy = (a.v - b.v) * SQRT3_2;
+return dx * dx + dy * dy;
+```
+
+This is a one-line conceptual fix that makes all placement decisions match visual perception.
+
+### Distance-Gated Root Reuse (progression.ts)
+
+**Problem:** Whole-step motion (e.g., G → A in Canon in D) placed the second chord at a different octave of the same root, creating a visually confusing leap when a nearer instance of that chord existed from earlier in the progression.
+
+**Fix:** `mapProgressionToShapes` maintains a `placedRoots: Map<number, NodeCoord>` remembering the first placement of each root PC. When the same root recurs, both candidates are scored:
+- `proximityTri` — nearest to chain focus (old behavior)
+- `reuseTri` — nearest to prior placement
+
+Reuse wins if `reuseDist <= proxDist * 1.5` (within 50% of the proximity distance). Otherwise proximity wins, preventing long visual leaps (Rhythm Changes' Bb).
+
+### Explored and Rejected: Compactness Anchor
+
+Attempted to add a cluster-center compactness pull to `placeMainTriad` to resolve Giant Steps' symmetric tritone jumps consistently. Tried: strict tie-break, near-equality threshold (1%), blended scoring (10%, 25%), running centroid, unique-root centroid. None solved Giant Steps — the algorithm is fundamentally local (places one chord at a time) while the problem is global (symmetric pattern requires knowledge of the full layout). Stripped all compactness code to avoid complexity for no payoff. Giant Steps tagged as known limitation requiring future two-pass optimizer.
+
+### Library Finalization
+
+Added 26 entries from LIBRARY_CONTENT.md (3 existed previously). Final count: 26 entries across 7 genres.
+
+- De-duplicated all 4× repetitions per POL-D17 (one token per bar)
+- Entries with 2 chords/bar use doubled tempo: Rhythm Changes (336), Giant Steps (572), Blue Bossa (288), Misty (144), Greensleeves (192)
+- Replaced Don't Stop Believin' with Let It Be
+- Removed Sweet Home Alabama, Wonderwall, Take Five (Cb chord fails HC parser)
+- Updated Все идет по плану: Cyrillic-only title/composer, Pop/Rock genre, corrected chords (Am F C E)
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `HC/src/placement.ts` | `dist2()` → world-coordinate distance; `placeMainTriad` cleaned (no compactnessAnchor) |
+| `HC/src/progression.ts` | Distance-gated root reuse (`placedRoots` + `REUSE_THRESHOLD`); compactness anchor stripped |
+| `INT/src/library/library-data.ts` | 26 library entries (final content) |
+
+### Test Results
+
+HC 178, INT 241 — all passing, 0 type errors.
+
+---
+
 ## Entry 15 — Phase 3a: Envelope Cleanup + Synth Tuning
 
 **Date:** 2026-02-19

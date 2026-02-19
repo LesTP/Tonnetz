@@ -30,9 +30,10 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** 0–2 complete, D20 shipped. Next: header redesign (POL-D18), then Phase 3a (envelope cleanup).
-**Blocked/Broken:** Audio crackling at chord transitions (addressed by Phase 3a).
+**Phase:** Phase 3a shipped. Library complete (26 entries). Placement heuristics refined. Next: header redesign (POL-D18), then Phase 3b (sustained repeats).
+**Blocked/Broken:** None.
 **Open decisions:** POL-D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
+**Known limitations:** Giant Steps' symmetric tritone jumps resolve inconsistently — requires two-pass global optimizer (future).
 
 ---
 
@@ -207,12 +208,13 @@ Waveform combinations, reverb, filter tuning, envelope tweaks, voicing compariso
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| Audio crackling at chord transitions | Open | Addressed by Phase 3a (envelope cleanup — hard-stop previous voices before new attack) |
+| Giant Steps symmetric jumps | Known limitation | Requires two-pass global optimizer (future) |
 
 ## Resolved Issues
 
 | Issue | Resolution |
 |-------|-----------|
+| Audio crackling at chord transitions | Fixed: hard-stop previous voices before new attack + 10ms fade-out (Entry 15) |
 | Drag jitter on pan | Fixed: switched from world-space differencing to screen-space deltas (Entry 13) |
 | Chord continues during drag | Fixed: `onDragStart` callback stops audio when drag threshold exceeded (UX-D4, Entry 13) |
 

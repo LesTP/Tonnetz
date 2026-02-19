@@ -17,13 +17,18 @@ export function triCentroid(tri: TriRef): NodeCoord {
   };
 }
 
+const SQRT3_2 = Math.sqrt(3) / 2;
+
 /**
- * Squared Euclidean distance between two points.
+ * Squared Euclidean distance in world coordinates (equilateral layout).
+ * Uses world transform (x = u + v*0.5, y = v * √3/2) so distance
+ * matches the visual on screen. Lattice dist2 was subtly wrong —
+ * it distorted diagonal distances relative to horizontal ones.
  */
 function dist2(a: NodeCoord, b: NodeCoord): number {
-  const du = a.u - b.u;
-  const dv = a.v - b.v;
-  return du * du + dv * dv;
+  const dx = (a.u - b.u) + (a.v - b.v) * 0.5;
+  const dy = (a.v - b.v) * SQRT3_2;
+  return dx * dx + dy * dy;
 }
 
 /**
@@ -53,10 +58,7 @@ function clusterCentroid(tris: TriRef[]): NodeCoord {
  *
  * - Diminished and augmented triads → null (dot-only path, HC-D5)
  * - Finds candidate triangles via sigToTris
- * - Selects nearest to focus; tie-break: lexicographic TriId
- *
- * Note: main_triad_pcs is in interval order [root, 3rd, 5th], not sorted by pc value.
- * The sort here is required because sigToTris keys are built from getTrianglePcs which sorts.
+ * - Selects nearest to focus (world-coordinate distance); tie-break: lexicographic TriId
  */
 export function placeMainTriad(
   chord: Chord,

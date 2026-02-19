@@ -14,8 +14,8 @@ export interface LibraryEntry {
   readonly composer?: string;
   /** Genre tag for filtering. */
   readonly genre: string;
-  /** Harmonic feature tag for filtering. */
-  readonly harmonicFeature: string;
+  /** Harmonic feature tags for filtering (supports multiple tags per entry). */
+  readonly harmonicFeature: readonly string[];
   /** Explanatory comment about the harmonic content. */
   readonly comment: string;
   /** Tempo in BPM. */

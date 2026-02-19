@@ -312,7 +312,7 @@ export function createLibraryUI(options: LibraryUIOptions): LibraryUI {
     chordsEl.textContent = chordPreview(entry.chords, 999);
 
     const tempoInfo = el("div", L.meta);
-    tempoInfo.textContent = `${entry.tempo} BPM · ${entry.harmonicFeature}`;
+    tempoInfo.textContent = `${entry.tempo} BPM · ${entry.harmonicFeature.join(", ")}`;
 
     const loadBtn = el("button", L.loadBtn, { "data-testid": `lib-load-${entry.id}` });
     loadBtn.textContent = "Load Progression";
@@ -356,7 +356,7 @@ export function createLibraryUI(options: LibraryUIOptions): LibraryUI {
       return entries.filter((e) => e.genre === selectedGenre);
     }
     if (filterMode === "feature" && selectedFeature) {
-      return entries.filter((e) => e.harmonicFeature === selectedFeature);
+      return entries.filter((e) => e.harmonicFeature.includes(selectedFeature));
     }
     return entries;
   }

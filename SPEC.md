@@ -696,7 +696,7 @@ Deliver playable harmonic instrument with progression visualization.
 
 * **Source control:** This project uses **Git**, not Sapling. Use `git` commands (`git status`, `git add`, `git commit`, etc.), not `sl`.
 * **Shell environment:** Windows PowerShell (`pwsh`). No `tail`, `grep`, `head`, `cat` — use PowerShell equivalents (`Select-Object -Last`, `Select-String`, `Get-Content`). Pipe filtering: `| Select-Object -Last 5` instead of `| tail -5`.
-* **Commit cadence:** One commit per phase. Commit early in the phase, then `git commit --amend` as work progresses. Do not create multiple commits within a single phase.
+* **Commit cadence:** One commit per phase. Commit early in the phase, then `git commit --amend` as work progresses. Do not create multiple commits within a single phase. **Do not commit until the human confirms the changes are working** — run the app and wait for explicit approval before staging and committing.
 * **TypeScript:** TypeScript is installed **per-module** as a devDependency, not globally. To type-check, `cd` into the module directory first:
   ```bash
   cd HARMONY_CORE && npx tsc --noEmit
