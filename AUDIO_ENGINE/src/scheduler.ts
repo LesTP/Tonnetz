@@ -180,7 +180,17 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
 
   state.prevVoicing = midiNotes;
 
-  // Create voices scheduled at the chord start time
+  // Hard-stop previous chord's voices at the boundary to prevent
+  // release-tail overlap that causes crackling. The 10ms fade-out in
+  // stop() prevents DC clicks. (Phase 3a envelope cleanup)
+  if (idx > 0) {
+    const prevSlot = state.chords[idx - 1];
+    for (const voice of prevSlot.voices) {
+      voice.stop();
+    }
+    prevSlot.voices = [];
+  }
+
   for (const midi of midiNotes) {
     const voice = createVoice(
       state.ctx,

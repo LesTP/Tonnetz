@@ -5,6 +5,61 @@ Started: 2026-02-16
 
 ---
 
+## Entry 15 — Phase 3a: Envelope Cleanup + Synth Tuning
+
+**Date:** 2026-02-19
+
+### Summary
+
+Fixed audio crackling at chord transitions and tuned the synthesis parameters for a warmer, less abrupt sound. Three files in Audio Engine changed; no new APIs, no architecture changes.
+
+### Root Cause (Crackling)
+
+`scheduleChordVoices()` in `scheduler.ts` created new voices at `slot.startTime` while the previous chord's voices were still in their 0.5s release tail (`SYNTH_DEFAULTS.releaseTime`). Two sets of oscillators overlapped — the decaying release envelope and the rising attack envelope summed to >1.0, causing clipping. Same pattern in `playPitchClasses()` in `immediate-playback.ts`.
+
+### Fix: Hard-Stop at Chord Boundary
+
+**`scheduler.ts`:** Before creating new voices in `scheduleChordVoices(state, idx)`, hard-stop all previous chord's voices:
+```ts
+if (idx > 0) {
+  for (const voice of prevSlot.voices) { voice.stop(); }
+  prevSlot.voices = [];
+}
+```
+
+**`immediate-playback.ts`:** Changed `voice.release()` to `voice.stop()` in `playPitchClasses()`. Previous voices now cut cleanly instead of leaving a 500ms release tail.
+
+**`synth.ts` — `stop()` method redesigned:** Replaced instant disconnect with a 10ms envelope fade-out (`linearRampToValueAtTime(0, t + 0.01)`) before stopping oscillators. Nodes disconnect via `setTimeout` after the fade completes. This prevents the DC click that a raw instant-disconnect would cause, while being 50× shorter than the release tail that caused crackling.
+
+### Synth Tuning (Options B + D)
+
+| Parameter | Before | After | Rationale |
+|-----------|--------|-------|-----------|
+| `attackTime` | 0.05 (50ms) | **0.12 (120ms)** | Softer fade-in; chord transitions feel less percussive |
+| `filterCutoff` | 2000 Hz | **1500 Hz** | Warmer tone; removes upper harmonics that made the sound edgy |
+
+### Attempted and Reverted: Overlap Window (Option A)
+
+Tried a 30ms overlap where previous voices faded out while new voices faded in (`setTimeout(() => voice.stop(), 30)`). This reintroduced crackling — two sets of voices at combined >1.0 amplitude, same fundamental problem as the original release-tail overlap. `setTimeout` is also unreliable for audio timing. Reverted to clean hard-stop at boundary. The improved 120ms attack time makes the clean cut far less noticeable than it was at 50ms.
+
+### Further Sound Quality
+
+Deferred to Phase 3d (Synthesis & Voicing Exploration) as a Refine pass — goals and constraints defined, values emerge from iterative listening. Current sound is functional but not final.
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `AE/src/synth.ts` | `stop()` redesigned: 10ms fade-out + deferred disconnect. `attackTime` 0.05→0.12, `filterCutoff` 2000→1500 |
+| `AE/src/scheduler.ts` | `scheduleChordVoices()`: hard-stop previous chord's voices before creating new ones |
+| `AE/src/immediate-playback.ts` | `playPitchClasses()`: `voice.release()` → `voice.stop()` |
+
+### Test Results
+
+AE 172, RU 367 (incl. 19 AE contract), HC 178, INT 241 — all passing, 0 type errors.
+
+---
+
 ## Entry 14 — POL-D20: Auto-Center Viewport on Progression Load
 
 **Date:** 2026-02-19

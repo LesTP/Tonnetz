@@ -30,8 +30,8 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** 0–2 complete, D20 (auto-center) shipped. Next: header redesign (POL-D18), audio quality (Phase 3).
-**Blocked/Broken:** Audio crackling at chord transitions.
+**Phase:** 0–2 complete, D20 shipped. Next: header redesign (POL-D18), then Phase 3a (envelope cleanup).
+**Blocked/Broken:** Audio crackling at chord transitions (addressed by Phase 3a).
 **Open decisions:** POL-D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
 
 ---
@@ -87,19 +87,103 @@ Post-Phase 1 improvements:
 
 ### Phase 3: Audio Quality
 
-**Baseline fix (both modes):** Consecutive identical chords sustain as one continuous sound — detect identical pitch classes at chord boundary, skip voice stop/restart. This is default behavior, not mode-dependent (POL-D19).
+Ordered by dependency: envelope cleanup first (fixes crackling independently), then sustained repeats (simple gate), then per-voice continuation (full voice-diff). Each step is independently shippable.
 
-**Piano/Pad toggle (POL-D19):** Two playback modes as sidebar toggle:
+#### 3a: Envelope Cleanup — Fix Crackling at Chord Transitions (Build)
 
-🎹 **Piano (discrete):** Different chords = full stop + fresh attack. Short attack, clean release (fixes crackling). Identical chords sustain.
+**Root cause:** `scheduleChordVoices()` in `scheduler.ts` creates new voices at `slot.startTime` while the previous chord's voices are still in their 0.5s release tail (`SYNTH_DEFAULTS.releaseTime`). Two sets of oscillators overlap — the decaying release envelope and the rising attack envelope sum to >1.0, causing clipping.
 
-♫ **Pad (continuous):** Per-voice continuation — common tones sustain, only changing voices crossfade. Voice-diff at chord boundary using existing `voiceLead()`. Longer envelopes. Identical chords sustain.
+The same pattern exists in `playPitchClasses()` in `immediate-playback.ts`: `voice.release()` starts a 0.5s tail, then new voices attack immediately on top.
 
-**3a: Synthesis exploration** — Waveform combinations, reverb, filter tuning, envelope tweaks. Iterative listening.
+**Fix (scheduled playback — `scheduler.ts`):**
 
-**3b: Voicing comparison** — Current greedy minimal-motion vs root-bottom voicing. A/B listening test.
+In `scheduleChordVoices(state, idx)`, before creating new voices:
+1. If `idx > 0`, get the previous slot `state.chords[idx - 1]`
+2. Hard-stop (`voice.stop()`) all previous slot's voices at the new slot's `startTime`
+   - Cannot use `release()` here — the release tail is what causes the overlap
+   - `stop()` disconnects immediately, no tail
+3. This means each chord gets exclusive use of the audio output — clean cut
 
-**3c: Register & blend** — Default register tuning, voice-count normalization, release overlap.
+**Concretely, insert before line 184 (`// Create voices scheduled at the chord start time`):**
+```ts
+// Hard-stop previous chord's voices at this chord's start time
+// to prevent release-tail overlap (crackling fix)
+if (idx > 0) {
+  const prevSlot = state.chords[idx - 1];
+  for (const voice of prevSlot.voices) {
+    voice.stop();
+  }
+  prevSlot.voices = [];
+}
+```
+
+**Fix (immediate playback — `immediate-playback.ts`):**
+
+In `playPitchClasses()`, change `voice.release()` to `voice.stop()`:
+```ts
+// Before (crackling — 0.5s release tail overlaps new attack):
+for (const voice of state.voices) {
+  voice.release();
+}
+
+// After (clean cut — no overlap):
+for (const voice of state.voices) {
+  voice.stop();
+}
+```
+
+**Tradeoff:** Hard stop produces a click at the boundary (instantaneous amplitude discontinuity). Mitigate with a very short fade-out (5–10ms ramp to zero before disconnect) in `VoiceHandle.stop()`. This is shorter than `releaseTime` (500ms) but long enough to avoid a DC click:
+```ts
+// In synth.ts, stop() method:
+const fadeOut = 0.01; // 10ms
+envGain.gain.cancelScheduledValues(ctx.currentTime);
+envGain.gain.setValueAtTime(envGain.gain.value, ctx.currentTime);
+envGain.gain.linearRampToValueAtTime(0, ctx.currentTime + fadeOut);
+osc1.stop(ctx.currentTime + fadeOut + 0.01);
+osc2.stop(ctx.currentTime + fadeOut + 0.01);
+```
+
+**Test spec:**
+
+| Test | Assertion |
+|------|-----------|
+| Previous chord voices stopped at boundary | After scheduling chord 1, `prevSlot.voices` is empty |
+| No voice overlap in 2-chord progression | At any point, only one chord's voices are active |
+| Hard stop uses short fade | `envGain.gain.linearRampToValueAtTime` called with ~10ms window |
+| Immediate playback uses stop not release | `voice.stop()` called, not `voice.release()` |
+| Existing release behavior preserved for pointer-up | Interactive `stopAll()` still calls `stop()` (no change) |
+| Backward compat: single-chord progression | No previous slot → no stop call, voices play normally |
+
+**Files:** `AE/src/scheduler.ts`, `AE/src/synth.ts`, `AE/src/immediate-playback.ts`, tests in `AE/src/__tests__/`
+
+**Acceptance:** Play a 4-chord progression (e.g., Dm7 → G7 → Cmaj7 → Am7) — no crackling, clicks, or audible artifacts at transitions.
+
+#### 3b: Sustained Repeated Chords (Build)
+
+**Baseline for both modes (POL-D19).** At chord boundary, compare new chord's pitch classes to current chord's pitch classes. If identical → skip voice stop/restart entirely, let existing voices keep sounding.
+
+**Where:** Gate at the top of `scheduleChordVoices()` and `playPitchClasses()`. Compare as sorted pitch-class arrays (order-independent).
+
+**Depends on:** 3a (clean boundary behavior must be established first).
+
+**Test spec:** `Dm7 Dm7 Dm7 G7` — first three chords produce one continuous sound, transition to G7 is a clean cut.
+
+#### 3c: Per-Voice Continuation — Pad Mode (Build + Refine)
+
+**POL-D19 toggle.** At chord boundary, diff old MIDI notes vs new MIDI notes:
+- Common tones → sustain (no stop, no re-attack)
+- Departing tones → release (with envelope tail)
+- Arriving tones → attack (new voice)
+
+Uses existing `voiceLead()` to produce the MIDI mapping; the diff falls out from comparing `prevVoicing` to `newVoicing`.
+
+**Depends on:** 3a (clean boundary) + 3b (sustained repeats as special case of zero-diff).
+
+**Sidebar toggle:** Piano 🎹 / Pad ♫ control. Piano = 3a behavior (hard stop + fresh attack). Pad = voice-diff continuation.
+
+#### 3d: Synthesis & Voicing Exploration (Refine)
+
+Waveform combinations, reverb, filter tuning, envelope tweaks, voicing comparison (greedy minimal-motion vs root-bottom), register & blend. Iterative listening sessions — goals and constraints only, values emerge from feedback.
 
 ### Phase 4: Mobile UAT
 
@@ -123,7 +207,7 @@ Post-Phase 1 improvements:
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| Audio crackling at chord transitions | Open | Fixed by D19 envelope cleanup + sustained repeats |
+| Audio crackling at chord transitions | Open | Addressed by Phase 3a (envelope cleanup — hard-stop previous voices before new attack) |
 
 ## Resolved Issues
 

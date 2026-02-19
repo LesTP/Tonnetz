@@ -16,9 +16,9 @@ export const SYNTH_DEFAULTS = {
   osc1Type: "triangle" as OscillatorType,
   osc2Type: "sine" as OscillatorType,
   detuneCents: 3,
-  filterCutoff: 2000,
+  filterCutoff: 1500,
   filterQ: 1.0,
-  attackTime: 0.05,
+  attackTime: 0.12,
   decayTime: 0.2,
   sustainLevel: 0.7,
   releaseTime: 0.5,
@@ -145,17 +145,30 @@ export function createVoice(
       if (stopped) return;
       stopped = true;
       released = true;
+      // Short fade-out (10ms) to avoid DC click from instant disconnect,
+      // but far shorter than releaseTime (500ms) so no audible overlap
+      // with the next chord's attack. (Phase 3a envelope cleanup)
+      const fadeOut = 0.01;
+      const t = ctx.currentTime;
       try {
-        osc1.stop();
-        osc2.stop();
+        envGain.gain.cancelScheduledValues(t);
+        envGain.gain.setValueAtTime(envGain.gain.value, t);
+        envGain.gain.linearRampToValueAtTime(0, t + fadeOut);
+        osc1.stop(t + fadeOut + 0.01);
+        osc2.stop(t + fadeOut + 0.01);
       } catch {
-        // Already stopped — ignore
+        // Already stopped — force disconnect
+        try { osc1.stop(); } catch { /* noop */ }
+        try { osc2.stop(); } catch { /* noop */ }
       }
-      osc1.disconnect();
-      osc2.disconnect();
-      mixGain.disconnect();
-      filter.disconnect();
-      envGain.disconnect();
+      // Schedule disconnect after fade completes
+      setTimeout(() => {
+        osc1.disconnect();
+        osc2.disconnect();
+        mixGain.disconnect();
+        filter.disconnect();
+        envGain.disconnect();
+      }, (fadeOut + 0.02) * 1000);
     },
   };
 

@@ -74,9 +74,12 @@ export function playPitchClasses(
   const register = options?.register ?? DEFAULT_REGISTER;
   const velocity = options?.velocity ?? DEFAULT_VELOCITY;
 
-  // Release previous voices (with ADSR release tail for blending)
+  // Hard-stop previous voices (clean cut, no release-tail overlap).
+  // The 10ms fade-out in stop() prevents DC clicks while being far
+  // shorter than the 500ms release tail that caused crackling.
+  // (Phase 3a envelope cleanup)
   for (const voice of state.voices) {
-    voice.release();
+    voice.stop();
   }
   state.voices.clear();
 
