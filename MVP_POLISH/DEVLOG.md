@@ -5,6 +5,67 @@ Started: 2026-02-16
 
 ---
 
+## Entry 18 — Placement Heuristics: Centroid Focus + Cluster Gravity
+
+**Date:** 2026-02-20
+
+### Summary
+
+Fixed systematic chain-focus drift that caused progression paths to spread across the lattice instead of staying compact. Two root causes identified and fixed: (1) chain focus used root vertex (a triangle corner) instead of triangle centroid (geometric center), causing ~50% overshoot per step; (2) pure chain focus had no memory of where the cluster lives, picking directionally wrong candidates when equidistant options existed. Also fixed `dist2()` in `progression.ts` to use world coordinates (was using lattice coordinates, inconsistent with `placement.ts`).
+
+### Root Cause 1: Root-Vertex Chain Focus Drift
+
+`mapProgressionToShapes` set `focus = shape.centroid_uv` after each chord. Per POL-D15, `centroid_uv` is the **root vertex** (a corner of the triangle), not the geometric center. This systematically overshoots:
+
+| Step | focus → tri centroid | focus → root vertex | Overshoot |
+|------|---------------------|--------------------|-----------|
+| Dm→C | 1.15 | 1.73 | +50% |
+| C→D7 | 1.53 | 2.00 | +31% |
+
+Each chord placement starts from the far corner of the previous triangle, biasing the next pick away from the cluster. Visible in: `Dm C Dm` (second Dm at different position), `Am F C E` (E jumps far), `Adagio` (D7 jumps 2.6 units down).
+
+**Fix:** Chain focus now uses `triCentroid(mainTri)` (geometric center of triangle), not `shape.centroid_uv` (root vertex corner). Root vertex remains as `centroid_uv` for path rendering — display is unchanged.
+
+### Root Cause 2: No Cluster Memory
+
+Even with centroid focus, the algorithm only knew about the **previous** chord's position. For Adagio's `Gm Cm → D7`, the nearest D major triangle from Cm's centroid was up-left (`U:(-2,1)`, dist 1.85) while the visually correct one to the right of G (`U:(2,0)`, dist 2.40) lost. The cluster center was to the right, but the focus couldn't see it.
+
+**Fix:** Blended chain focus = 50% previous triangle centroid + 50% running cluster center (mean of all placed centroids). The running center acts as a gravity well that keeps placements near the cluster without lagging too badly on modulating progressions.
+
+```ts
+focus = 0.5 * prevTriCentroid + 0.5 * clusterCenter
+```
+
+First chord uses pure tri centroid (no cluster history yet).
+
+### Root Cause 3: Lattice vs World Distance
+
+`dist2()` in `progression.ts` (used for reuse-threshold comparison) computed squared distance in lattice coordinates (`du² + dv²`), while `placement.ts` used world coordinates. The lattice metric distorts diagonal distances. Fixed to match `placement.ts`: `dx = (a.u-b.u) + (a.v-b.v)*0.5`, `dy = (a.v-b.v)*√3/2`.
+
+### Results
+
+| Progression | Before | After |
+|-------------|--------|-------|
+| Dm C Dm | 3 different positions | Second Dm = first Dm ✅ |
+| G B C Cm (Creep) | B and C far from G | Compact cluster, span 1.7 |
+| Am F C E | E jumped far | All jumps = 1.0 ✅ |
+| Adagio (Gm Cm D7...) | D7 jumped 2.6 down | D7 right of G, span 2.2 ✅ |
+| Canon in D | OK | Compact, span 2.2 |
+| Rhythm Changes | OK | span 3.5 |
+| Autumn Leaves | OK | span 3.1 |
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `HC/src/progression.ts` | Chain focus = blended centroid + cluster center; `dist2()` → world coords; `CHAIN_BLEND = 0.61` |
+
+### Test Results
+
+HC 178 — all passing, 0 type errors.
+
+---
+
 ## Entry 17 — Phase 3b/3c: Sustained Repeats + Piano/Pad Mode
 
 **Date:** 2026-02-20

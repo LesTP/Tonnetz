@@ -30,7 +30,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phases 3a–3c shipped. Sustained repeats, Piano/Pad mode, and multi-voice crackling fix complete. Next: header redesign (POL-D18, pending design decision), then Phase 3d (synthesis exploration), then Phase 4 (mobile UAT).
+**Phase:** Phases 3a–3c shipped. Placement heuristics refined (centroid focus + cluster gravity blend). Next: header redesign (POL-D18, pending design decision), then Phase 3d (synthesis exploration), then Phase 4 (mobile UAT).
 **Blocked/Broken:** None.
 **Open decisions:** POL-D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
 **Known limitations:** Giant Steps' symmetric tritone jumps resolve inconsistently — requires two-pass global optimizer (future).
