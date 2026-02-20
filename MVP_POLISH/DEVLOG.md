@@ -5,6 +5,101 @@ Started: 2026-02-16
 
 ---
 
+## Entry 17 — Phase 3b/3c: Sustained Repeats + Piano/Pad Mode
+
+**Date:** 2026-02-20
+
+### Summary
+
+Implemented shared VoiceHandle infrastructure (`cancelRelease`), sustained repeated chords (3b), and per-voice continuation with Piano/Pad mode toggle (3c). Three-phase build with each step independently shippable. Also consolidated superseded API annotations across SPEC.md and UX_SPEC.md into appendices.
+
+### Shared Infrastructure: VoiceHandle.cancelRelease()
+
+**Problem:** Both 3b and 3c require carrying voices across chord boundaries, but `release()` was one-shot (guarded by `released` flag) and called `osc.stop()` which is irreversible in the Web Audio API.
+
+**Fix (synth.ts):**
+- Removed `osc.stop()` from `release()` — oscillators stay alive; cleanup deferred via `setTimeout → handle.stop()`
+- Added `cancelRelease()` — resets `released` flag, clears pending cleanup timer, cancels envelope ramp, restores sustain level (`peakGain * sustainLevel`)
+- Tracked `releaseCleanupId` so `cancelRelease()` can `clearTimeout()` the pending cleanup (initial version missed this — voices died mid-sustain because the old timer fired)
+
+### Phase 3b: Sustained Repeated Chords
+
+**Approach:** Pitch-class equality gate at the top of both playback paths. If consecutive chords have identical `chord_pcs` sets → carry all voices forward, skip stop/restart. Applies in both Piano and Pad modes.
+
+**Scheduler (`scheduleChordVoices`):** After extracting pcs, if `idx > 0` and `samePitchClasses(prevPcs, pcs)` → per-voice carry loop: `cancelRelease()` → `release(newEndTime)` → move to current slot. Early return.
+
+**Immediate (`playPitchClasses`):** Derive current pcs from `prevVoicing % 12`, compare with incoming sorted pcs. If identical → return early.
+
+**Bug found and fixed:** Initial implementation didn't clear the `setTimeout` from `release()` in `cancelRelease()`. Voices died at the original slot's end time because the cleanup timer fired. Fixed by tracking `releaseCleanupId` and calling `clearTimeout()` in `cancelRelease()`.
+
+### Phase 3c: Per-Voice Continuation (Pad Mode)
+
+**Approach:** When pitch classes differ at a chord boundary and `padMode` is true, diff MIDI note sets instead of hard-stopping everything:
+- Common tones (same MIDI in old and new voicing) → `cancelRelease()` + reschedule `release()`
+- Departing tones (in old, not in new) → `voice.release()` with musical 500ms tail
+- Arriving tones (in new, not in old) → `createVoice()` fresh attack
+
+**Decision tree at each boundary:**
+```
+if samePitchClasses(prev, curr) → carry all (3b, both modes)
+else if padMode → voice-diff (3c, pad only)
+else → hard stop + fresh attack (3a, piano only)
+```
+
+**padMode plumbing:**
+- `SchedulerState.padMode: boolean` (set at creation via `CreateSchedulerOptions`)
+- `ImmediatePlaybackState.padMode: boolean` (mutable, flipped by sidebar toggle)
+- `AudioTransport.setPadMode(enabled)` / `getPadMode()` — stored in transport closure, passed to `createScheduler()`
+- Sidebar: 🎹 Piano / ♫ Pad toggle (reuses path-toggle CSS), wired in `main.ts`
+
+**New types exported:** `PlaybackMode = "piano" | "pad"` from `audio-engine`
+
+### Documentation Cleanup
+
+Consolidated superseded API annotations (`createLayoutManager`, `createControlPanel`, `createToolbar` + associated types) from 10 inline mentions across SPEC.md and UX_SPEC.md into a single **Appendix: Superseded APIs** at the end of each document. Body tables now contain only active APIs.
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `AE/src/synth.ts` | `VoiceHandle.cancelRelease()`, `release()` no longer calls `osc.stop()`, `releaseCleanupId` tracking |
+| `AE/src/scheduler.ts` | `samePitchClasses()`, 3b carry gate, 3c pad voice-diff, `padMode` on state/options |
+| `AE/src/immediate-playback.ts` | `samePitchClasses()`, 3b early-return gate, 3c pad voice-diff, `padMode` on state |
+| `AE/src/types.ts` | `setPadMode`/`getPadMode` on `AudioTransport`, `PlaybackMode` type |
+| `AE/src/audio-context.ts` | `padMode` storage, passed to `createScheduler()`, `setPadMode`/`getPadMode` impl |
+| `AE/src/index.ts` | Export `PlaybackMode` |
+| `INT/src/sidebar.ts` | Piano/Pad toggle DOM + handler + `onPlaybackModeChange` callback |
+| `INT/src/main.ts` | Wire `onPlaybackModeChange` → `transport.setPadMode()` + `immediatePlayback.padMode` |
+| `SPEC.md` | Superseded APIs → appendix |
+| `UX_SPEC.md` | Superseded APIs → appendix |
+| `MVP_POLISH/DEVPLAN.md` | 3b/3c specs finalized, current status updated, open issue added |
+
+### Test Results
+
+AE 202 (was 172), INT 241 — all passing, 0 type errors (AE); 3 pre-existing unrelated errors (INT).
+
+### Open Issues
+
+- ~~Audible crackle at first chord onset~~ — Fixed (see below)
+
+### Crackling Fix: Fixed Per-Voice Gain
+
+**Root cause:** `mixGain.gain.value` was 0.5 per voice, and `masterGain` normalization (`1/√n`) was set *after* voice creation. During the creation loop, voices attacked into an un-normalized master gain (value 1.0), so 3 voices briefly summed to `3 × 0.5 × 0.787 ≈ 1.18` — clipping. Single-voice changes were clean because `0.5 × 0.787 = 0.39`.
+
+**Fix:** Set `mixGain.gain.value = 0.24` per voice (max 4 voices: `4 × 0.24 × 1.0 = 0.96`, always under 1.0). Removed all dynamic `masterGain` normalization (`1/√n` logic, `updateMasterGain()` function, and all call sites). Master gain stays at 1.0 permanently.
+
+### End-of-Progression Crackling Fix
+
+**Root cause (three layers):**
+
+1. **`release()` called at scheduling time with future `when`**: `envGain.gain.value` returns 0 (initial value at scheduling time), not the sustain level the voice will be at when `when` arrives. This scheduled `setValueAtTime(0, endTime)` — an instant snap to zero at chord end, audible as a click. **Fix:** use `peakGain * sustainLevel` (the known sustain value) instead of reading `gain.value`.
+
+2. **`stopScheduler()` hard-stopped voices during release tail**: The completion check fired at `endTime`, calling `stopScheduler()` → `voice.stop()` which cancelled the smooth 500ms release ramp mid-flight. **Fix:** delay completion check by `releaseTime + 0.05s`, and don't call `stopScheduler` on natural end — just clear the timer and fire `onComplete`. Voices self-clean via their release setTimeout.
+
+3. **Release cleanup called `handle.stop()` redundantly**: After the release ramp finished, the cleanup setTimeout called `stop()`, which did `cancelScheduledValues` + `setValueAtTime(gain.value)` + 10ms fade on an already-silent signal — creating a micro-spike. **Fix:** cleanup now silently stops oscillators and disconnects nodes without touching the envelope.
+
+---
+
 ## Entry 16 — Placement Heuristics + Library Finalization
 
 **Date:** 2026-02-19

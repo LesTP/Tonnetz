@@ -585,8 +585,8 @@ describe("natural progression completion", () => {
     transport.play();
     expect(transport.isPlaying()).toBe(true);
 
-    // Advance past the end of the chord (0.5s + margin)
-    mock._currentTime = 0.55;
+    // Advance past the end of the chord (0.5s) plus release tail (~0.55s)
+    mock._currentTime = 1.1;
     vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
 
     expect(transport.isPlaying()).toBe(false);
@@ -606,8 +606,8 @@ describe("natural progression completion", () => {
     transport.play();
     expect(stateChanges).toEqual([true]);
 
-    // Advance past the progression end
-    mock._currentTime = 0.55;
+    // Advance past the progression end + release tail
+    mock._currentTime = 1.1;
     vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
 
     expect(stateChanges).toEqual([true, false]);
@@ -624,7 +624,7 @@ describe("natural progression completion", () => {
     transport.play();
     expect(transport.getCurrentChordIndex()).toBe(0);
 
-    mock._currentTime = 0.55;
+    mock._currentTime = 1.1;
     vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
 
     expect(transport.getCurrentChordIndex()).toBe(-1);
@@ -640,8 +640,8 @@ describe("natural progression completion", () => {
     transport.scheduleProgression([stubChordEvent(0), stubChordEvent(1)]);
     transport.play();
 
-    // Advance past the end of both chords (beat 2 → 1.0s at 120BPM)
-    mock._currentTime = 1.05;
+    // Advance past the end of both chords (beat 2 → 1.0s at 120BPM) + release tail
+    mock._currentTime = 1.6;
     vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
 
     const state = transport.getState();
@@ -660,13 +660,13 @@ describe("natural progression completion", () => {
     transport.scheduleProgression([stubChordEvent(0)]);
     transport.play();
 
-    // Let it finish
-    mock._currentTime = 0.55;
+    // Let it finish (past release tail)
+    mock._currentTime = 1.1;
     vi.advanceTimersByTime(SCHEDULER_INTERVAL_MS);
     expect(transport.isPlaying()).toBe(false);
 
     // Replay
-    mock._currentTime = 1.0;
+    mock._currentTime = 2.0;
     transport.play();
     expect(transport.isPlaying()).toBe(true);
     expect(transport.getCurrentChordIndex()).toBe(0);

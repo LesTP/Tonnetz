@@ -98,6 +98,12 @@ export interface AudioTransport {
   /** Cancels the scheduled progression and stops playback. */
   cancelSchedule(): void;
 
+  /** Sets pad mode for voice continuation at chord boundaries (3c). */
+  setPadMode(enabled: boolean): void;
+
+  /** Returns true if pad mode is active. */
+  getPadMode(): boolean;
+
   // === Event Subscriptions ===
 
   /** Subscribes to playback state changes. Returns unsubscribe function. */
@@ -106,6 +112,9 @@ export interface AudioTransport {
   /** Subscribes to chord change events during playback. Returns unsubscribe function. */
   onChordChange(callback: (event: ChordChangeEvent) => void): () => void;
 }
+
+/** Audio playback mode for chord transitions. */
+export type PlaybackMode = "piano" | "pad";
 
 // ── Immediate Playback Options ───────────────────────────────────────
 

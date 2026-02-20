@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createVoice, midiToFreq, SYNTH_DEFAULTS } from "../synth.js";
 import {
   MockAudioContext,
@@ -237,5 +237,182 @@ describe("createVoice — release and stop", () => {
     const voice = createVoice(c, dest as unknown as AudioNode, 60);
     voice.release();
     expect(() => voice.stop()).not.toThrow();
+  });
+});
+
+// ── createVoice — cancelRelease ──────────────────────────────────────
+
+describe("createVoice — cancelRelease", () => {
+  it("cancelRelease() can be called without error", () => {
+    const c = ctx();
+    const dest = c.createGain();
+    const voice = createVoice(c, dest as unknown as AudioNode, 60);
+    voice.release();
+    expect(() => voice.cancelRelease()).not.toThrow();
+  });
+
+  it("cancelRelease() is no-op if not released", () => {
+    const mock = new MockAudioContext();
+    const gains: MockGainNode[] = [];
+    const origCreate = mock.createGain.bind(mock);
+    mock.createGain = () => {
+      const g = origCreate();
+      gains.push(g);
+      return g;
+    };
+    const dest = mock.createGain();
+    const voice = createVoice(
+      mock as unknown as AudioContext,
+      dest as unknown as AudioNode,
+      60,
+      100,
+    );
+    const envGain = gains[gains.length - 1];
+    const valueBefore = envGain.gain.value;
+    voice.cancelRelease();
+    expect(envGain.gain.value).toBe(valueBefore);
+  });
+
+  it("cancelRelease() is no-op after stop()", () => {
+    const c = ctx();
+    const dest = c.createGain();
+    const voice = createVoice(c, dest as unknown as AudioNode, 60);
+    voice.release();
+    voice.stop();
+    expect(() => voice.cancelRelease()).not.toThrow();
+  });
+
+  it("cancelRelease() restores sustain level after release()", () => {
+    const mock = new MockAudioContext();
+    const gains: MockGainNode[] = [];
+    const origCreate = mock.createGain.bind(mock);
+    mock.createGain = () => {
+      const g = origCreate();
+      gains.push(g);
+      return g;
+    };
+    const dest = mock.createGain();
+    const velocity = 100;
+    const voice = createVoice(
+      mock as unknown as AudioContext,
+      dest as unknown as AudioNode,
+      60,
+      velocity,
+    );
+    voice.release();
+    voice.cancelRelease();
+    const envGain = gains[gains.length - 1];
+    const expectedSustain = (velocity / 127) * SYNTH_DEFAULTS.sustainLevel;
+    expect(envGain.gain.value).toBeCloseTo(expectedSustain, 5);
+  });
+
+  it("release() fires again after cancelRelease()", () => {
+    const mock = new MockAudioContext();
+    const gains: MockGainNode[] = [];
+    const origCreate = mock.createGain.bind(mock);
+    mock.createGain = () => {
+      const g = origCreate();
+      gains.push(g);
+      return g;
+    };
+    const dest = mock.createGain();
+    const voice = createVoice(
+      mock as unknown as AudioContext,
+      dest as unknown as AudioNode,
+      60,
+      100,
+    );
+    voice.release();
+    voice.cancelRelease();
+    // Second release should fire (envelope ramps to 0)
+    voice.release();
+    const envGain = gains[gains.length - 1];
+    expect(envGain.gain.value).toBeCloseTo(0, 5);
+  });
+
+  it("release() does not call osc.stop() synchronously", () => {
+    const mock = new MockAudioContext();
+    const oscs: MockOscillatorNode[] = [];
+    const origCreate = mock.createOscillator.bind(mock);
+    mock.createOscillator = () => {
+      const osc = origCreate();
+      oscs.push(osc);
+      return osc;
+    };
+    const dest = mock.createGain();
+    const stopSpies: ReturnType<typeof vi.fn>[] = [];
+    const voice = createVoice(
+      mock as unknown as AudioContext,
+      dest as unknown as AudioNode,
+      60,
+    );
+    // Attach spies after creation (oscillators already started)
+    for (const osc of oscs) {
+      const spy = vi.fn();
+      osc.stop = spy;
+      stopSpies.push(spy);
+    }
+    voice.release();
+    // osc.stop() should NOT have been called synchronously by release()
+    for (const spy of stopSpies) {
+      expect(spy).not.toHaveBeenCalled();
+    }
+  });
+
+  it("release() cleanup eventually calls stop() via setTimeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const mock = new MockAudioContext();
+      const dest = mock.createGain();
+      const voice = createVoice(
+        mock as unknown as AudioContext,
+        dest as unknown as AudioNode,
+        60,
+      );
+      voice.release();
+      // Fast-forward past release tail + cleanup margin
+      vi.advanceTimersByTime(
+        (SYNTH_DEFAULTS.releaseTime + 0.1) * 1000,
+      );
+      // After cleanup fires, calling stop again should be a no-op (already stopped)
+      expect(() => voice.stop()).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancelRelease() prevents cleanup timeout from killing the voice", () => {
+    vi.useFakeTimers();
+    try {
+      const mock = new MockAudioContext();
+      const gains: MockGainNode[] = [];
+      const origCreate = mock.createGain.bind(mock);
+      mock.createGain = () => {
+        const g = origCreate();
+        gains.push(g);
+        return g;
+      };
+      const dest = mock.createGain();
+      const voice = createVoice(
+        mock as unknown as AudioContext,
+        dest as unknown as AudioNode,
+        60,
+        100,
+      );
+      // Release — schedules cleanup setTimeout
+      voice.release();
+      // Cancel — should clear the pending timeout
+      voice.cancelRelease();
+      const envGain = gains[gains.length - 1];
+      const sustainValue = envGain.gain.value;
+      // Advance past the original cleanup time
+      vi.advanceTimersByTime(
+        (SYNTH_DEFAULTS.releaseTime + 0.2) * 1000,
+      );
+      // Voice should still be at sustain level (not stopped)
+      expect(envGain.gain.value).toBeCloseTo(sustainValue, 5);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

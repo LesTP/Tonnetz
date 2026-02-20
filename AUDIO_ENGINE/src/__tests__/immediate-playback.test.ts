@@ -123,9 +123,9 @@ describe("playPitchClasses", () => {
     expect(state.voices.size).toBe(3);
   });
 
-  it("applies voice-count normalization to master gain", () => {
+  it("master gain stays at 1 (per-voice normalization, no dynamic adjustment)", () => {
     playPitchClasses(state, [0, 4, 7]);
-    expect(state.masterGain.gain.value).toBeCloseTo(1 / Math.sqrt(3), 3);
+    expect(state.masterGain.gain.value).toBe(1);
   });
 
   it("no-ops for empty pitch class array", () => {
@@ -177,7 +177,7 @@ describe("playShape", () => {
     const shape = makeShape([0, 4, 7, 11]);
     playShape(state, shape);
     expect(state.voices.size).toBe(4);
-    expect(state.masterGain.gain.value).toBeCloseTo(0.5, 3);
+    expect(state.masterGain.gain.value).toBe(1);
   });
 
   it("updates prevVoicing for voice-leading continuity", () => {
@@ -213,9 +213,9 @@ describe("stopAll", () => {
     expect(state.prevVoicing).toEqual([]);
   });
 
-  it("resets master gain to 1", () => {
+  it("master gain stays at 1 after stopAll", () => {
     playPitchClasses(state, [0, 4, 7]);
-    expect(state.masterGain.gain.value).not.toBe(1);
+    expect(state.masterGain.gain.value).toBe(1);
     stopAll(state);
     expect(state.masterGain.gain.value).toBe(1);
   });
@@ -297,5 +297,175 @@ describe("velocity option", () => {
       playShape(state, makeShape([0, 4, 7]), { velocity: 64 }),
     ).not.toThrow();
     expect(state.voices.size).toBe(3);
+  });
+});
+
+// ── 3b: Sustained repeated chords (immediate) ───────────────────────
+
+describe("3b — sustained repeated chords (immediate)", () => {
+  it("identical pcs: no stop/restart, voices preserved", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+
+    playPitchClasses(state, [0, 4, 7]);
+    const oscsAfterFirst = oscs.length;
+    const voicesAfterFirst = state.voices.size;
+    expect(voicesAfterFirst).toBe(3);
+
+    // Same pitch classes (different order) — should not create new voices
+    playPitchClasses(state, [7, 0, 4]);
+    expect(oscs.length).toBe(oscsAfterFirst);
+    expect(state.voices.size).toBe(voicesAfterFirst);
+  });
+
+  it("identical pcs: prevVoicing unchanged", async () => {
+    const { transport } = await makeTransport();
+    const state = createImmediatePlayback(transport);
+
+    playPitchClasses(state, [2, 5, 9, 0]); // Dm7
+    const voicingAfterFirst = [...state.prevVoicing];
+
+    playPitchClasses(state, [0, 2, 5, 9]); // same pcs, different order
+    expect(state.prevVoicing).toEqual(voicingAfterFirst);
+  });
+
+  it("different pcs: normal stop + restart", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+
+    playPitchClasses(state, [0, 4, 7]); // C
+    const oscsAfterC = oscs.length;
+
+    playPitchClasses(state, [2, 5, 9]); // Dm
+    expect(oscs.length).toBeGreaterThan(oscsAfterC); // new voices created
+  });
+
+  it("first call with empty prevVoicing: no gate (voices created normally)", async () => {
+    const { transport } = await makeTransport();
+    const state = createImmediatePlayback(transport);
+
+    expect(state.prevVoicing.length).toBe(0);
+    playPitchClasses(state, [0, 4, 7]);
+    expect(state.voices.size).toBe(3);
+  });
+
+  it("gate compares pitch classes, not MIDI notes", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+
+    // Play C major [0, 4, 7]
+    playPitchClasses(state, [0, 4, 7]);
+    const oscsAfterC = oscs.length;
+
+    // Same pitch classes — gate should fire regardless of input order
+    playPitchClasses(state, [4, 7, 0]);
+    expect(oscs.length).toBe(oscsAfterC);
+  });
+
+  it("different length pcs: not sustained", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+
+    playPitchClasses(state, [0, 4, 7]); // C triad (3 pcs)
+    const oscsAfterTriad = oscs.length;
+
+    playPitchClasses(state, [0, 4, 7, 11]); // Cmaj7 (4 pcs — different set)
+    expect(oscs.length).toBeGreaterThan(oscsAfterTriad);
+  });
+});
+
+// ── 3c: Pad mode — per-voice continuation (immediate) ────────────────
+
+describe("3c — pad mode (immediate)", () => {
+  it("pad mode: fewer new voices than full replacement", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+    state.padMode = true;
+
+    playPitchClasses(state, [0, 4, 7]); // C major
+    const oscsAfterC = oscs.length;
+
+    playPitchClasses(state, [9, 0, 4]); // Am (shares C=0, E=4)
+    const newOscsCreated = oscs.length - oscsAfterC;
+    // Only A (arriving) should get new voices, not C and E (common tones)
+    // Full replacement would be 6 new oscillators (3 voices × 2 oscs each)
+    expect(newOscsCreated).toBeGreaterThan(0);
+    expect(newOscsCreated).toBeLessThan(oscsAfterC);
+  });
+
+  it("pad mode: voice count matches new chord size", async () => {
+    const { transport } = await makeTransport();
+    const state = createImmediatePlayback(transport);
+    state.padMode = true;
+
+    playPitchClasses(state, [0, 4, 7]); // C major (3 pcs)
+    expect(state.voices.size).toBe(3);
+
+    playPitchClasses(state, [9, 0, 4]); // Am (3 pcs)
+    expect(state.voices.size).toBe(3);
+  });
+
+  it("pad mode: prevVoicing updated to new chord", async () => {
+    const { transport } = await makeTransport();
+    const state = createImmediatePlayback(transport);
+    state.padMode = true;
+
+    playPitchClasses(state, [0, 4, 7]); // C
+    playPitchClasses(state, [9, 0, 4]); // Am
+    // prevVoicing should have 3 MIDI notes for the Am chord
+    expect(state.prevVoicing.length).toBe(3);
+  });
+
+  it("piano mode (default): full replacement", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+    // padMode defaults to false
+
+    playPitchClasses(state, [0, 4, 7]); // C major
+    const oscsAfterC = oscs.length;
+
+    playPitchClasses(state, [9, 0, 4]); // Am
+    // Full replacement: all 3 voices re-created (6 new oscillators)
+    expect(oscs.length - oscsAfterC).toBe(oscsAfterC);
+  });
+
+  it("3b fast path still fires in pad mode", async () => {
+    const { transport } = await makeTransport();
+    const ctx = transport.getContext() as unknown as MockAudioContext;
+    const oscs = spyOscillators(ctx);
+    const state = createImmediatePlayback(transport);
+    state.padMode = true;
+
+    playPitchClasses(state, [0, 4, 7]); // C
+    const oscsAfterC = oscs.length;
+
+    playPitchClasses(state, [7, 0, 4]); // Same pcs, different order
+    expect(oscs.length).toBe(oscsAfterC); // 3b gate, no new voices
+  });
+
+  it("pad mode: voice count changes correctly on chord change", async () => {
+    const { transport } = await makeTransport();
+    const state = createImmediatePlayback(transport);
+    state.padMode = true;
+
+    playPitchClasses(state, [0, 4, 7]); // 3 voices
+    expect(state.voices.size).toBe(3);
+
+    playPitchClasses(state, [0, 4, 7, 11]); // Cmaj7 — 4 voices
+    expect(state.voices.size).toBe(4);
+    // Master gain stays at 1 (per-voice normalization)
+    expect(state.masterGain.gain.value).toBe(1);
   });
 });

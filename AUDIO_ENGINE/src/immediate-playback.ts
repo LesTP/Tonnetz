@@ -4,8 +4,8 @@
  * Manages a set of active voices and a master gain node.
  * Provides the ARCH §6.2 public API: playShape(), playPitchClasses(), stopAll().
  *
- * Voice-count normalization: master gain = 1 / sqrt(voiceCount)
- * to prevent clipping while maintaining perceived loudness (ARCH §2b).
+ * Per-voice gain is fixed at 0.24 (mix gain in synth.ts) so that up to 4
+ * simultaneous voices never clip. No dynamic normalization needed.
  */
 
 import type { Shape } from "harmony-core";
@@ -16,6 +16,19 @@ import { voiceInRegister, voiceLead } from "./voicing.js";
 const DEFAULT_REGISTER = 60;
 const DEFAULT_VELOCITY = 100;
 
+// ── Pitch-class comparison ───────────────────────────────────────────
+
+/** Order-independent pitch-class set equality. */
+function samePitchClasses(
+  a: readonly number[],
+  b: readonly number[],
+): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((v, i) => v === sb[i]);
+}
+
 // ── Active voice tracking ────────────────────────────────────────────
 
 /** State for the immediate playback system. Created per-transport. */
@@ -24,6 +37,8 @@ export interface ImmediatePlaybackState {
   readonly masterGain: GainNode;
   readonly voices: Set<VoiceHandle>;
   prevVoicing: number[];
+  /** Pad mode: per-voice continuation on chord change (3c). */
+  padMode: boolean;
 }
 
 /**
@@ -43,14 +58,8 @@ export function createImmediatePlayback(
     masterGain,
     voices: new Set(),
     prevVoicing: [],
+    padMode: false,
   };
-}
-
-// ── Voice-count normalization ────────────────────────────────────────
-
-function updateMasterGain(state: ImmediatePlaybackState): void {
-  const count = state.voices.size;
-  state.masterGain.gain.value = count > 0 ? 1 / Math.sqrt(count) : 1;
 }
 
 // ── Public API (ARCH §6.2) ───────────────────────────────────────────
@@ -74,20 +83,64 @@ export function playPitchClasses(
   const register = options?.register ?? DEFAULT_REGISTER;
   const velocity = options?.velocity ?? DEFAULT_VELOCITY;
 
-  // Hard-stop previous voices (clean cut, no release-tail overlap).
-  // The 10ms fade-out in stop() prevents DC clicks while being far
-  // shorter than the 500ms release tail that caused crackling.
-  // (Phase 3a envelope cleanup)
-  for (const voice of state.voices) {
-    voice.stop();
+  // ── 3b gate: sustain identical chords (both modes) ────────────────
+  if (state.prevVoicing.length > 0 && state.voices.size > 0) {
+    const currentPcs = [...new Set(state.prevVoicing.map((m) => m % 12))].sort(
+      (a, b) => a - b,
+    );
+    const incomingPcs = [...new Set(pcs)].sort((a, b) => a - b);
+    if (samePitchClasses(currentPcs, incomingPcs)) {
+      return;
+    }
   }
-  state.voices.clear();
 
-  // Voice the pitch classes
+  // Voice the pitch classes (needed by both pad and piano modes)
   const midiNotes =
     state.prevVoicing.length > 0
       ? voiceLead(state.prevVoicing, [...pcs], register)
       : voiceInRegister([...pcs], register);
+
+  // ── 3c: pad mode — per-voice continuation ────────────────────────
+  if (state.padMode && state.voices.size > 0) {
+    const prevByMidi = new Map<number, VoiceHandle>();
+    for (const voice of state.voices) {
+      if (!prevByMidi.has(voice.midi)) {
+        prevByMidi.set(voice.midi, voice);
+      }
+    }
+
+    const newVoices = new Set<VoiceHandle>();
+    for (const midi of midiNotes) {
+      const existing = prevByMidi.get(midi);
+      if (existing) {
+        // Common tone — keep sounding
+        newVoices.add(existing);
+        prevByMidi.delete(midi);
+      } else {
+        // Arriving tone — fresh attack
+        const voice = createVoice(ctx, state.masterGain, midi, velocity);
+        newVoices.add(voice);
+      }
+    }
+
+    // Departing tones — musical release (500ms tail)
+    for (const voice of prevByMidi.values()) {
+      voice.release();
+    }
+
+    state.voices.clear();
+    for (const v of newVoices) {
+      state.voices.add(v);
+    }
+    state.prevVoicing = midiNotes;
+    return;
+  }
+
+  // ── Piano mode (3a): hard-stop previous, create all new ──────────
+  for (const voice of state.voices) {
+    voice.stop();
+  }
+  state.voices.clear();
 
   // Create new voices
   for (const midi of midiNotes) {
@@ -100,8 +153,7 @@ export function playPitchClasses(
     state.voices.add(voice);
   }
 
-  // Update normalization and save voicing for next voice-leading
-  updateMasterGain(state);
+  // Save voicing for next voice-leading
   state.prevVoicing = midiNotes;
 
   // Auto-release after duration (if specified)
@@ -140,5 +192,4 @@ export function stopAll(state: ImmediatePlaybackState): void {
   }
   state.voices.clear();
   state.prevVoicing = [];
-  updateMasterGain(state);
 }

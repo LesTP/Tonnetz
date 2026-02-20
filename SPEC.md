@@ -228,9 +228,8 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | Function | Description |
 |----------|-------------|
 | `createUIStateController()` | UI state machine (idle, chord-selected, progression-loaded, playback-running) |
-| ~~`createLayoutManager(options)`~~ | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
-| ~~`createControlPanel(options)`~~ | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
-| ~~`createToolbar(options)`~~ | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
+
+> Three legacy UI component APIs (`createLayoutManager`, `createControlPanel`, `createToolbar`) and their associated types have been superseded. See [Appendix: Superseded APIs](#appendix-superseded-apis).
 
 ## Key Types
 
@@ -246,9 +245,6 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | `HighlightHandle` | Handle for clearing highlights |
 | `UIState` | State union: `"idle" \| "chord-selected" \| "progression-loaded" \| "playback-running"` |
 | `UIStateController` | Controller interface with state transitions and event subscription |
-| ~~`LayoutManager`~~ | Superseded — see `createSidebar()` in Integration (POL-D1) |
-| ~~`ControlPanel`~~ | Superseded — see `createSidebar()` in Integration (POL-D1) |
-| ~~`Toolbar`~~ | Superseded — see `createSidebar()` in Integration (POL-D1) |
 
 See ARCH_RENDERING_UI.md Section 11 for full type definitions and function signatures.
 
@@ -444,8 +440,8 @@ All items must be verified before starting integration module development.
 - [x] `renderShape()` / `renderProgressionPath()` render HC Shape objects
 - [x] `PathHandle.setActiveChord(index)` ready for transport subscription
 - [x] `createUIStateController()` implements all state transitions (idle → chord-selected → progression-loaded → playback-running)
-- [x] `createControlPanel()` exposes play/stop/clear callbacks (superseded by sidebar; legacy API still exported)
-- [x] `createLayoutManager()` provides three-zone layout (superseded by sidebar; legacy API still exported)
+- [x] `createControlPanel()` exposes play/stop/clear callbacks (legacy API; see [Superseded APIs appendix](#appendix-superseded-apis))
+- [x] `createLayoutManager()` provides three-zone layout (legacy API; see [Superseded APIs appendix](#appendix-superseded-apis))
 - [x] All tests passing (344 tests including 20 AE contract tests)
 - [x] No runtime dependencies on audio or storage
 
@@ -720,3 +716,20 @@ Deliver playable harmonic instrument with progression visualization.
 * **Edge Union Chord** — 4-note chord formed by the pitch-class union of two adjacent triangles
 * **Chain Focus** — progression placement policy where each chord's focus is the preceding shape's centroid
 * **Progression Path** — ordered sequence of Tonnetz shapes
+
+---
+
+# Appendix: Superseded APIs
+
+The following Rendering/UI APIs were superseded by `createSidebar()` in the Integration module (POL-D1). Legacy exports are retained for test compatibility.
+
+| Original API | Type | Replacement |
+|--------------|------|-------------|
+| `createLayoutManager(options)` | Function | `createSidebar()` |
+| `createControlPanel(options)` | Function | `createSidebar()` |
+| `createToolbar(options)` | Function | `createSidebar()` |
+| `LayoutManager` | Type | Sidebar internal state |
+| `ControlPanel` | Type | Sidebar internal state |
+| `Toolbar` | Type | Sidebar internal state |
+
+**Reason:** The original three-zone layout (toolbar + control panel + canvas) was replaced by a two-zone sidebar design during MVP Polish. The sidebar consolidates all controls into a persistent left panel (desktop) or hamburger overlay (mobile). See POL-D1 in `MVP_POLISH/DEVLOG.md` for the full design rationale.

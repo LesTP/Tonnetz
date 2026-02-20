@@ -30,7 +30,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phase 3a shipped. Library complete (26 entries). Placement heuristics refined. Next: header redesign (POL-D18), then Phase 3b (sustained repeats).
+**Phase:** Phases 3a–3c shipped. Sustained repeats, Piano/Pad mode, and multi-voice crackling fix complete. Next: header redesign (POL-D18, pending design decision), then Phase 3d (synthesis exploration), then Phase 4 (mobile UAT).
 **Blocked/Broken:** None.
 **Open decisions:** POL-D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
 **Known limitations:** Giant Steps' symmetric tritone jumps resolve inconsistently — requires two-pass global optimizer (future).
@@ -88,7 +88,7 @@ Post-Phase 1 improvements:
 
 ### Phase 3: Audio Quality
 
-Ordered by dependency: envelope cleanup first (fixes crackling independently), then sustained repeats (simple gate), then per-voice continuation (full voice-diff). Each step is independently shippable.
+Ordered by dependency: envelope cleanup first (fixes crackling independently), then shared VoiceHandle infrastructure (`cancelRelease`), then sustained repeats (identical-chord gate), then per-voice continuation (full voice-diff with mode toggle). Each step is independently shippable.
 
 #### 3a: Envelope Cleanup — Fix Crackling at Chord Transitions (Build)
 
@@ -159,28 +159,202 @@ osc2.stop(ctx.currentTime + fadeOut + 0.01);
 
 **Acceptance:** Play a 4-chord progression (e.g., Dm7 → G7 → Cmaj7 → Am7) — no crackling, clicks, or audible artifacts at transitions.
 
+#### Shared Infrastructure: VoiceHandle.cancelRelease() (Build)
+
+3b and 3c both require carrying voices across chord boundaries. The current `VoiceHandle` in `synth.ts` prevents this because:
+
+1. **`release()` is one-shot** — the `released` flag prevents a second call, so a voice whose release was scheduled at `slot.endTime` cannot be rescheduled to a later time.
+2. **`release()` calls `osc.stop(t + releaseTime)`** — `OscillatorNode.stop()` is irreversible in the Web Audio API. Once scheduled, the oscillator will stop at that time regardless.
+
+**Fix — two changes to `synth.ts`:**
+
+**A. Remove `osc.stop()` from `release()`**. Instead, schedule a `setTimeout` to disconnect all nodes after the release tail completes (same pattern `stop()` already uses):
+```ts
+release(releaseWhen?: number): void {
+  if (released || stopped) return;
+  released = true;
+  const t = releaseWhen ?? ctx.currentTime;
+  envGain.gain.cancelScheduledValues(t);
+  envGain.gain.setValueAtTime(envGain.gain.value, t);
+  envGain.gain.linearRampToValueAtTime(0, t + releaseTime);
+  // Do NOT call osc.stop() — oscillators must stay alive for cancelRelease().
+  // Schedule cleanup after release tail completes.
+  setTimeout(() => {
+    if (!stopped) handle.stop();
+  }, ((t - ctx.currentTime) + releaseTime + 0.05) * 1000);
+},
+```
+
+**B. Add `cancelRelease()` method**. Resets the `released` flag, cancels the scheduled envelope ramp, and restores the sustain level:
+```ts
+cancelRelease(): void {
+  if (!released || stopped) return;
+  released = false;
+  const t = ctx.currentTime;
+  envGain.gain.cancelScheduledValues(t);
+  envGain.gain.setValueAtTime(peakGain * sustainLevel, t);
+},
+```
+
+**C. Update `VoiceHandle` interface** to expose `cancelRelease():void`.
+
+**Test spec:**
+
+| Test | Assertion |
+|------|-----------|
+| `release()` does not call `osc.stop()` | After `release()`, oscillator `stop` not called synchronously |
+| `cancelRelease()` resets released flag | After `release()` + `cancelRelease()`, a second `release()` fires normally |
+| `cancelRelease()` restores sustain level | `envGain.gain.value` equals `peakGain * sustainLevel` after cancel |
+| `cancelRelease()` no-op if not released | Calling without prior `release()` does nothing |
+| `cancelRelease()` no-op if stopped | Calling after `stop()` does nothing |
+| `release()` cleanup still fires if not cancelled | Voice self-cleans after release tail via setTimeout |
+
+**Files:** `AE/src/synth.ts`, tests in `AE/src/__tests__/synth.test.ts`
+
+---
+
 #### 3b: Sustained Repeated Chords (Build)
 
-**Baseline for both modes (POL-D19).** At chord boundary, compare new chord's pitch classes to current chord's pitch classes. If identical → skip voice stop/restart entirely, let existing voices keep sounding.
+**Baseline for both modes (POL-D19).** At chord boundary, compare new chord's pitch classes to current chord's pitch classes. If identical (strict — same `chord_pcs` set) → carry voices forward, skip stop/restart entirely. Applies in both Piano and Pad modes.
 
-**Where:** Gate at the top of `scheduleChordVoices()` and `playPitchClasses()`. Compare as sorted pitch-class arrays (order-independent).
+**Depends on:** 3a (clean boundary behavior) + shared infrastructure (`cancelRelease`).
 
-**Depends on:** 3a (clean boundary behavior must be established first).
+**Helper — `samePitchClasses()`:**
+```ts
+function samePitchClasses(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((v, i) => v === sb[i]);
+}
+```
+Duplicated in `scheduler.ts` and `immediate-playback.ts` (5 lines each, not worth a shared module).
 
-**Test spec:** `Dm7 Dm7 Dm7 G7` — first three chords produce one continuous sound, transition to G7 is a clean cut.
+**Scheduled playback (`scheduler.ts` → `scheduleChordVoices`):**
+
+After extracting `pcs` for the current slot:
+1. If `idx > 0`, extract previous slot's pcs the same way
+2. If `samePitchClasses(prevPcs, pcs)`:
+   - Per-voice carry: for each voice in `prevSlot.voices`, call `voice.cancelRelease()`, then `voice.release(slot.endTime)`. Move handle to `slot.voices`.
+   - Empty `prevSlot.voices` (prevents double-stop in `stopScheduler`)
+   - Preserve `state.prevVoicing` (unchanged)
+   - Mark `slot.scheduled = true`, return early
+3. If different: proceed with 3a behavior (hard-stop previous, voice-lead, create new)
+
+Per-voice carry loop (not array swap) so 3c extends naturally:
+```ts
+for (const voice of prevSlot.voices) {
+  voice.cancelRelease();
+  voice.release(slot.endTime);
+  slot.voices.push(voice);
+}
+prevSlot.voices = [];
+```
+
+**Immediate playback (`immediate-playback.ts` → `playPitchClasses`):**
+
+Before the hard-stop block:
+1. Derive current pitch classes: `[...new Set(state.prevVoicing.map(m => m % 12))].sort((a,b) => a - b)`
+2. Sort incoming pcs the same way
+3. If `samePitchClasses(currentPcs, sortedIncoming)` → return early (voices keep sounding, no state changes)
+
+**Test spec:**
+
+| Test | Assertion |
+|------|-----------|
+| Identical chords: no new voices created | `Dm7 Dm7 Dm7` — `createVoice` called once (first chord only) |
+| Identical chords: voices carry across slots | After scheduling slot 1, `slot[1].voices.length > 0` and `slot[0].voices.length === 0` |
+| Identical chords: `cancelRelease()` called | Each carried voice has `cancelRelease` invoked |
+| Identical chords: release rescheduled | Each carried voice has `release(newSlot.endTime)` |
+| Different chord after repeats: clean transition | `Dm7 Dm7 G7` — G7 slot hard-stops Dm7 voices, creates new |
+| `prevVoicing` preserved across identical chords | After `Dm7 Dm7`, `state.prevVoicing` unchanged from first Dm7 |
+| Immediate: identical pcs → no stop/restart | `playPitchClasses(state, [2,5,9])` twice → `voice.stop()` not called on second |
+| Immediate: different pcs → normal 3a behavior | `[0,4,7]` then `[2,5,9]` → stop + new voices |
+| `samePitchClasses` order-independent | `[0,4,7]` vs `[7,0,4]` → true |
+| `samePitchClasses` different lengths → false | `[0,4,7]` vs `[0,4,7,11]` → false |
+
+**Files:** `AE/src/scheduler.ts`, `AE/src/immediate-playback.ts`, tests in `AE/src/__tests__/`
+
+**Acceptance:** Play `Dm7 Dm7 Dm7 G7` — first three chords produce one continuous sound, transition to G7 is a clean cut.
+
+---
 
 #### 3c: Per-Voice Continuation — Pad Mode (Build + Refine)
 
-**POL-D19 toggle.** At chord boundary, diff old MIDI notes vs new MIDI notes:
-- Common tones → sustain (no stop, no re-attack)
-- Departing tones → release (with envelope tail)
-- Arriving tones → attack (new voice)
+**POL-D19 toggle.** When pitch classes differ at a chord boundary, diff the MIDI note sets instead of hard-stopping everything:
+- **Common tones** (same MIDI note in old and new voicings) → `cancelRelease()` + reschedule release (sustain through boundary)
+- **Departing tones** (in old, not in new) → `voice.release()` with musical 500ms tail
+- **Arriving tones** (in new, not in old) → `createVoice()` (fresh attack)
 
-Uses existing `voiceLead()` to produce the MIDI mapping; the diff falls out from comparing `prevVoicing` to `newVoicing`.
+Uses existing `voiceLead(prevVoicing, newPcs)` to produce the new MIDI mapping. The diff is: compare `prevVoicing` MIDI notes against `voiceLead` result MIDI notes.
 
-**Depends on:** 3a (clean boundary) + 3b (sustained repeats as special case of zero-diff).
+**Depends on:** 3a (clean boundary) + shared infrastructure (`cancelRelease`) + 3b (identical-chord fast path).
 
-**Sidebar toggle:** Piano 🎹 / Pad ♫ control. Piano = 3a behavior (hard stop + fresh attack). Pad = voice-diff continuation.
+**Decision tree at each chord boundary:**
+```
+if samePitchClasses(prev, curr):
+    carry all voices forward                      // 3b — both modes
+else if padMode:
+    voice-diff: carry common, release departing,
+                attack arriving                   // 3c — pad only
+else:
+    hard stop all + fresh attack                  // 3a — piano only
+```
+
+**Scheduled playback (`scheduler.ts` → `scheduleChordVoices`):**
+
+In the `else` branch (pitch classes differ), if `padMode`:
+1. Compute `midiNotes = voiceLead(state.prevVoicing, pcs)`
+2. Build `Map<number, VoiceHandle>` from `prevSlot.voices` keyed by `voice.midi`
+3. For each MIDI in `midiNotes`:
+   - If map has a voice for that MIDI → `cancelRelease()`, `release(slot.endTime)`, move to `slot.voices`, delete from map
+   - Else → `createVoice(...)`, `release(slot.endTime)`, push to `slot.voices`
+4. Remaining voices in map (departing) → `voice.release(slot.startTime)` (musical tail), remove from `prevSlot.voices`
+5. Empty `prevSlot.voices`
+6. Update `state.prevVoicing = midiNotes`
+7. Recalculate `masterGain` for new voice count
+
+**Immediate playback (`immediate-playback.ts` → `playPitchClasses`):**
+
+Same diff logic, simpler — no pre-scheduled releases to cancel:
+1. Compute `midiNotes = voiceLead(state.prevVoicing, pcs)`
+2. Build `Map<number, VoiceHandle>` from `state.voices` keyed by `voice.midi`
+3. Common tones → keep in set. Departing → `voice.release()` (musical tail), remove from set. Arriving → `createVoice()`, add to set.
+4. Update `state.prevVoicing = midiNotes`, recalculate master gain
+
+**`padMode` flag plumbing:**
+
+- `SchedulerState`: add `readonly padMode: boolean` (set at creation via `CreateSchedulerOptions`)
+- `ImmediatePlaybackState`: add `padMode: boolean` (mutable — integration module flips it via sidebar toggle)
+- Integration module: wire sidebar Piano/Pad toggle to set `padMode` on both states
+
+**Edge cases:**
+
+| Case | Handling |
+|------|----------|
+| MIDI collision (two pitch classes voice-led to same note) | Treat as create-new (Map lookup finds first, second gets fresh voice) |
+| Voice count change (`C → Cmaj7`, 3→4 voices) | Master gain recalculated after diff applied |
+| Empty `prevVoicing` (first chord) | No diff possible — falls through to normal voice creation |
+| `padMode` toggled mid-progression | Takes effect at next chord boundary (no retroactive change) |
+
+**Sidebar toggle:** Piano 🎹 / Pad ♫ control in Play tab. Piano = 3a behavior (hard stop + fresh attack). Pad = voice-diff continuation. Default: Piano (preserves current behavior).
+
+**Test spec:**
+
+| Test | Assertion |
+|------|-----------|
+| Pad mode: common tone sustains | `C → Am` — voice on E4 (MIDI 64) not stopped, `cancelRelease` called |
+| Pad mode: departing tone releases | `C → Am` — voice on G4 `release()` called (not `stop()`) |
+| Pad mode: arriving tone attacks | `C → Am` — new voice created for A |
+| Pad mode: master gain updated | After diff, `masterGain.gain.value` = `1/√(newCount)` |
+| Piano mode: full hard-stop | `C → Am` in piano mode — all C voices stopped, all Am voices fresh |
+| 3b fast path still fires in pad mode | `C → C` in pad mode — all voices carry, no diff needed |
+| MIDI collision | Two pcs map to same MIDI — both get fresh voices, no crash |
+| Toggle mid-progression | Switch piano→pad between chords 2 and 3 — chord 3 uses pad behavior |
+
+**Files:** `AE/src/scheduler.ts`, `AE/src/immediate-playback.ts`, `AE/src/synth.ts` (VoiceHandle interface), `INT/src/sidebar.ts` (toggle), tests in `AE/src/__tests__/`
+
+**Acceptance:** Play `C Am F G` in Pad mode — common tones sustain audibly, departing tones fade out, arriving tones fade in. Toggle to Piano — same progression plays with hard cuts. Toggle back — pad behavior resumes.
 
 #### 3d: Synthesis & Voicing Exploration (Refine)
 
@@ -213,7 +387,9 @@ Waveform combinations, reverb, filter tuning, envelope tweaks, voicing compariso
 ## Resolved Issues
 
 | Issue | Resolution |
-|-------|-----------|
+|-------|------------|
+| End-of-progression crackling | Fixed (3 layers): (1) `release()` used `gain.value` (returns 0 at scheduling time) instead of known sustain level → snap to zero; (2) `stopScheduler` hard-stopped voices mid-release-tail; (3) release cleanup called `stop()` redundantly. See Entry 17. |
+| Multi-voice attack crackling | Fixed: per-voice mix gain lowered from 0.5 to 0.24 so 4 simultaneous voices never exceed 1.0; removed dynamic masterGain normalization that raced with voice creation (Entry 17) |
 | Audio crackling at chord transitions | Fixed: hard-stop previous voices before new attack + 10ms fade-out (Entry 15) |
 | Drag jitter on pan | Fixed: switched from world-space differencing to screen-space deltas (Entry 13) |
 | Chord continues during drag | Fixed: `onDragStart` callback stops audio when drag threshold exceeded (UX-D4, Entry 13) |

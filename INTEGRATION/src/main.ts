@@ -352,6 +352,15 @@ const sidebar: Sidebar = createSidebar({
   onTempoChange: handleTempoChange,
   onLoopToggle: handleLoopToggle,
   onPathModeChange: handlePathModeChange,
+  onPlaybackModeChange: (mode) => {
+    const enabled = mode === "pad";
+    if (audioState.transport) {
+      audioState.transport.setPadMode(enabled);
+    }
+    if (audioState.immediatePlayback) {
+      audioState.immediatePlayback.padMode = enabled;
+    }
+  },
   initialTempo: persistence.settings.tempo_bpm,
 });
 const canvasContainer = sidebar.getCanvasContainer();

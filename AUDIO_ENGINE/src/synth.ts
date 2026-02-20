@@ -39,6 +39,12 @@ export interface VoiceHandle {
   readonly midi: number;
   /** Trigger ADSR release phase. Voice self-cleans after release. */
   release(when?: number): void;
+  /**
+   * Cancel a previously scheduled release, restoring the sustain level.
+   * No-op if the voice was never released or has been hard-stopped.
+   * Allows a subsequent release() call with a new end time.
+   */
+  cancelRelease(): void;
   /** Immediate hard stop (disconnect all nodes). */
   stop(): void;
 }
@@ -90,9 +96,11 @@ export function createVoice(
   osc2.frequency.value = freq;
   osc2.detune.value = -detuneCents;
 
-  // Mix gain (equal blend at 0.5 each)
+  // Mix gain: fixed at 0.24 per voice so that 4 simultaneous voices
+  // never exceed 1.0 (4 × 0.24 × peakGain ≈ 0.76 at velocity 100).
+  // Eliminates the need for dynamic master gain normalization.
   const mixGain = ctx.createGain();
-  mixGain.gain.value = 0.5;
+  mixGain.gain.value = 0.24;
 
   // Low-pass filter
   const filter = ctx.createBiquadFilter();
@@ -124,6 +132,15 @@ export function createVoice(
 
   let released = false;
   let stopped = false;
+  let releaseCleanupId: ReturnType<typeof setTimeout> | null = null;
+
+  function disconnectAll(): void {
+    osc1.disconnect();
+    osc2.disconnect();
+    mixGain.disconnect();
+    filter.disconnect();
+    envGain.disconnect();
+  }
 
   const handle: VoiceHandle = {
     midi,
@@ -132,13 +149,39 @@ export function createVoice(
       if (released || stopped) return;
       released = true;
       const t = releaseWhen ?? ctx.currentTime;
-      // Cancel any scheduled ramps, then ramp to zero
       envGain.gain.cancelScheduledValues(t);
-      envGain.gain.setValueAtTime(envGain.gain.value, t);
+      // Use the known sustain level, not envGain.gain.value — when
+      // release() is called at scheduling time (before the voice plays),
+      // gain.value returns 0 (initial value), not the sustain level the
+      // envelope will be at when t arrives. That would snap to 0 → click.
+      envGain.gain.setValueAtTime(peakGain * sustainLevel, t);
       envGain.gain.linearRampToValueAtTime(0, t + releaseTime);
-      // Stop oscillators after release completes
-      osc1.stop(t + releaseTime + 0.01);
-      osc2.stop(t + releaseTime + 0.01);
+      // Schedule silent cleanup after release tail completes.
+      // Don't call stop() — the envelope is already at zero and
+      // stop()'s setValueAtTime/ramp would create a micro-spike.
+      // Just stop oscillators and disconnect nodes silently.
+      const cleanupDelay = (t - ctx.currentTime) + releaseTime + 0.05;
+      releaseCleanupId = setTimeout(() => {
+        releaseCleanupId = null;
+        if (stopped) return;
+        stopped = true;
+        try { osc1.stop(); } catch { /* already stopped */ }
+        try { osc2.stop(); } catch { /* already stopped */ }
+        disconnectAll();
+      }, cleanupDelay * 1000);
+    },
+
+    cancelRelease(): void {
+      if (!released || stopped) return;
+      released = false;
+      // Cancel the pending cleanup setTimeout from the previous release()
+      if (releaseCleanupId !== null) {
+        clearTimeout(releaseCleanupId);
+        releaseCleanupId = null;
+      }
+      const t = ctx.currentTime;
+      envGain.gain.cancelScheduledValues(t);
+      envGain.gain.setValueAtTime(peakGain * sustainLevel, t);
     },
 
     stop(): void {
@@ -161,14 +204,7 @@ export function createVoice(
         try { osc1.stop(); } catch { /* noop */ }
         try { osc2.stop(); } catch { /* noop */ }
       }
-      // Schedule disconnect after fade completes
-      setTimeout(() => {
-        osc1.disconnect();
-        osc2.disconnect();
-        mixGain.disconnect();
-        filter.disconnect();
-        envGain.disconnect();
-      }, (fadeOut + 0.02) * 1000);
+      setTimeout(() => disconnectAll(), (fadeOut + 0.02) * 1000);
     },
   };
 

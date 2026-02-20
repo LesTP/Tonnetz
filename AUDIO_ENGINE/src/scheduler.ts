@@ -16,7 +16,7 @@
 
 import type { ChordEvent, ChordChangeEvent } from "./types.js";
 import type { VoiceHandle } from "./synth.js";
-import { createVoice } from "./synth.js";
+import { createVoice, SYNTH_DEFAULTS } from "./synth.js";
 import { voiceInRegister, voiceLead } from "./voicing.js";
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -26,6 +26,19 @@ export const SCHEDULE_AHEAD_TIME = 0.1;
 
 /** How often the lookahead timer fires (ms). */
 export const SCHEDULER_INTERVAL_MS = 25;
+
+// ── Pitch-class comparison ───────────────────────────────────────────
+
+/** Order-independent pitch-class set equality. */
+function samePitchClasses(
+  a: readonly number[],
+  b: readonly number[],
+): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((v, i) => v === sb[i]);
+}
 
 // ── Beat ↔ time conversion ──────────────────────────────────────────
 
@@ -88,6 +101,8 @@ export interface SchedulerState {
   readonly onComplete: (() => void) | null;
   /** Whether the scheduler has been stopped. */
   stopped: boolean;
+  /** Pad mode: per-voice continuation at chord boundaries (3c). */
+  readonly padMode: boolean;
 }
 
 // ── Scheduler creation ───────────────────────────────────────────────
@@ -102,6 +117,8 @@ export interface CreateSchedulerOptions {
   onChordChange: (event: ChordChangeEvent) => void;
   /** Called when the progression ends naturally (all chords have played). */
   onComplete?: () => void;
+  /** Pad mode: per-voice continuation at chord boundaries (3c). Default: false (piano mode). */
+  padMode?: boolean;
 }
 
 /**
@@ -155,6 +172,7 @@ export function createScheduler(opts: CreateSchedulerOptions): SchedulerState {
     onChordChange,
     onComplete: opts.onComplete ?? null,
     stopped: false,
+    padMode: opts.padMode ?? false,
   };
 }
 
@@ -172,6 +190,21 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
   const pcs = slot.event.shape.chord?.chord_pcs ?? [...slot.event.shape.covered_pcs];
   if (pcs.length === 0) return;
 
+  // ── 3b gate: sustain identical chords (both modes) ────────────────
+  if (idx > 0) {
+    const prevSlot = state.chords[idx - 1];
+    const prevPcs = prevSlot.event.shape.chord?.chord_pcs ?? [...prevSlot.event.shape.covered_pcs];
+    if (samePitchClasses(prevPcs, pcs)) {
+      for (const voice of prevSlot.voices) {
+        voice.cancelRelease();
+        voice.release(slot.endTime);
+        slot.voices.push(voice);
+      }
+      prevSlot.voices = [];
+      return;
+    }
+  }
+
   // Voice with voice-leading continuity
   const midiNotes =
     state.prevVoicing.length > 0
@@ -180,9 +213,49 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
 
   state.prevVoicing = midiNotes;
 
-  // Hard-stop previous chord's voices at the boundary to prevent
-  // release-tail overlap that causes crackling. The 10ms fade-out in
-  // stop() prevents DC clicks. (Phase 3a envelope cleanup)
+  // ── 3c: pad mode — per-voice continuation at boundary ────────────
+  if (state.padMode && idx > 0) {
+    const prevSlot = state.chords[idx - 1];
+    const prevByMidi = new Map<number, VoiceHandle>();
+    for (const voice of prevSlot.voices) {
+      // On MIDI collision, first voice wins; duplicates get released below
+      if (!prevByMidi.has(voice.midi)) {
+        prevByMidi.set(voice.midi, voice);
+      }
+    }
+
+    for (const midi of midiNotes) {
+      const existing = prevByMidi.get(midi);
+      if (existing) {
+        // Common tone — sustain through boundary
+        existing.cancelRelease();
+        existing.release(slot.endTime);
+        slot.voices.push(existing);
+        prevByMidi.delete(midi);
+      } else {
+        // Arriving tone — fresh attack
+        const voice = createVoice(
+          state.ctx,
+          state.masterGain,
+          midi,
+          100,
+          slot.startTime,
+        );
+        voice.release(slot.endTime);
+        slot.voices.push(voice);
+      }
+    }
+
+    // Departing tones — musical release (500ms tail)
+    for (const voice of prevByMidi.values()) {
+      voice.release(slot.startTime);
+    }
+    prevSlot.voices = [];
+
+    return;
+  }
+
+  // ── Piano mode (3a): hard-stop previous, create all new ──────────
   if (idx > 0) {
     const prevSlot = state.chords[idx - 1];
     for (const voice of prevSlot.voices) {
@@ -199,14 +272,9 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
       100,
       slot.startTime,
     );
-    // Schedule release at chord end time
     voice.release(slot.endTime);
     slot.voices.push(voice);
   }
-
-  // Update voice-count normalization
-  const count = midiNotes.length;
-  state.masterGain.gain.value = count > 0 ? 1 / Math.sqrt(count) : 1;
 }
 
 // ── Lookahead tick ───────────────────────────────────────────────────
@@ -240,11 +308,19 @@ function tick(state: SchedulerState): void {
     }
   }
 
-  // Check if playback is complete (all chords have ended)
+  // Check if playback is complete (all chords have ended).
+  // Delay by releaseTime so the last chord's release tail plays out.
+  // Don't call stopScheduler — voices are already in their release
+  // tails and will self-clean via setTimeout. Hard-stopping would
+  // cancel the smooth ramp and cause a click.
   if (state.chords.length > 0) {
     const lastSlot = state.chords[state.chords.length - 1];
-    if (now >= lastSlot.endTime) {
-      stopScheduler(state);
+    if (now >= lastSlot.endTime + SYNTH_DEFAULTS.releaseTime + 0.05) {
+      state.stopped = true;
+      if (state.timerHandle !== null) {
+        clearInterval(state.timerHandle);
+        state.timerHandle = null;
+      }
       if (state.onComplete) {
         state.onComplete();
       }

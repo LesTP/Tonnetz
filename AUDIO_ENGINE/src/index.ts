@@ -15,6 +15,7 @@ export type {
   AudioTransport,
   PlayOptions,
   InitAudioOptions,
+  PlaybackMode,
 } from "./types.js";
 
 // AudioContext initialization

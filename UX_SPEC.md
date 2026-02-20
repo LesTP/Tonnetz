@@ -167,7 +167,7 @@ Bundled library of ~25 curated progressions. Static data (not user-generated; us
 
 ---
 
-> **Legacy note:** The previous three-zone layout (`createLayoutManager()`, `createControlPanel()`, `createToolbar()`) is superseded by the sidebar design (POL-D1). Legacy APIs remain exported for test compatibility.
+> **Legacy note:** The previous three-zone layout APIs are superseded by the sidebar design (POL-D1). See [Appendix: Superseded APIs](#appendix-superseded-apis).
 
 ---
 
@@ -258,9 +258,8 @@ UX introduces the following interface expectations:
 | Triangle/edge hit classification | `HitResult` (discriminated union: HitTriangle \| HitEdge \| HitNone) | ✅ Implemented |
 | UI state machine | `createUIStateController()` | ✅ Implemented |
 | Clear button integration | `UIStateController.clearProgression()` + `ControlPanel` | ✅ Implemented |
-| Layout zones | `createLayoutManager(options)` | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
-| Control panel | `createControlPanel(options)` | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
-| Toolbar | `createToolbar(options)` | ⚠️ Superseded by `createSidebar()` in Integration (POL-D1) |
+
+> Three legacy Rendering/UI APIs (`createLayoutManager`, `createControlPanel`, `createToolbar`) have been superseded. See [Appendix: Superseded APIs](#appendix-superseded-apis).
 
 ### Audio Engine
 
@@ -397,3 +396,18 @@ playback state machine simple. Pan/zoom is harmless during playback and useful
 for following a long progression path.
 Revisit if: Users request the ability to interrupt playback by tapping a chord.
 ```
+
+---
+
+## Appendix: Superseded APIs
+
+The following Rendering/UI APIs were superseded by `createSidebar()` in the Integration module (POL-D1). Legacy exports are retained for test compatibility.
+
+| Original API | Role | Replacement |
+|--------------|------|-------------|
+| `createLayoutManager(options)` | Three-zone page layout | `createSidebar()` |
+| `createControlPanel(options)` | Playback/transport controls | `createSidebar()` |
+| `createToolbar(options)` | Toolbar strip | `createSidebar()` |
+| `LayoutManager` / `ControlPanel` / `Toolbar` types | Associated interfaces | Sidebar internal state |
+
+**Reason:** The original three-zone layout was replaced by a two-zone sidebar design during MVP Polish. See POL-D1 in `MVP_POLISH/DEVLOG.md` and SPEC.md [Appendix: Superseded APIs] for the canonical reference.

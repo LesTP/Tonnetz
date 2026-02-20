@@ -31,6 +31,8 @@ export interface SidebarOptions {
   onPathModeChange: (mode: "root" | "tonal") => void;
   /** Callback when loop toggle changes. */
   onLoopToggle: (enabled: boolean) => void;
+  /** Callback when playback mode toggle changes (piano = hard cut, pad = voice continuation). */
+  onPlaybackModeChange?: (mode: "piano" | "pad") => void;
   /** Callback when "What This Is" info button is clicked. */
   onAbout?: () => void;
   /** Callback when "How to Use" info button is clicked. */
@@ -56,6 +58,10 @@ export interface Sidebar {
   isLoopEnabled(): boolean;
   /** Get the current path display mode. */
   getPathMode(): "root" | "tonal";
+  /** Set the playback mode (piano/pad). */
+  setPlaybackMode(mode: "piano" | "pad"): void;
+  /** Get the current playback mode. */
+  getPlaybackMode(): "piano" | "pad";
   /** Programmatically switch to a tab. */
   switchToTab(tab: "play" | "library"): void;
   /** Get the library list container (for Phase 2 population). */
@@ -672,6 +678,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onTempoChange,
     onLoopToggle,
     onPathModeChange,
+    onPlaybackModeChange,
     onHowToUse,
     onAbout,
     initialTempo,
@@ -796,11 +803,21 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   pathToggle.appendChild(rootBtn);
   pathToggle.appendChild(tonalBtn);
 
+  // Playback mode toggle (Piano / Pad)
+  const modeToggle = el("div", C.pathToggle, { "data-testid": "mode-toggle" });
+  const pianoBtn = el("button", `${C.pathToggleBtn} ${C.pathToggleBtnActive}`, { "data-testid": "mode-piano" });
+  pianoBtn.textContent = "🎹 Piano";
+  const padBtn = el("button", C.pathToggleBtn, { "data-testid": "mode-pad" });
+  padBtn.textContent = "♫ Pad";
+  modeToggle.appendChild(pianoBtn);
+  modeToggle.appendChild(padBtn);
+
   // Assemble play panel
   playPanel.appendChild(inputGroup);
   playPanel.appendChild(transportRow);
   playPanel.appendChild(tempoSection);
   playPanel.appendChild(pathToggle);
+  playPanel.appendChild(modeToggle);
 
   // ── Library Tab Panel ──────────────────────────────────────────────
 
@@ -1033,6 +1050,15 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onPathModeChange(mode);
   }
 
+  let playbackMode: "piano" | "pad" = "piano";
+  function handleModeToggle(mode: "piano" | "pad"): void {
+    if (mode === playbackMode) return;
+    playbackMode = mode;
+    pianoBtn.className = `${C.pathToggleBtn} ${mode === "piano" ? C.pathToggleBtnActive : ""}`;
+    padBtn.className = `${C.pathToggleBtn} ${mode === "pad" ? C.pathToggleBtnActive : ""}`;
+    if (onPlaybackModeChange) onPlaybackModeChange(mode);
+  }
+
   function handleTempoInput(): void {
     const bpm = clampTempo(Number(tempoSlider.value));
     tempoLabel.textContent = `${bpm} BPM`;
@@ -1086,6 +1112,8 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   loopBtn.addEventListener("click", handleLoopToggle);
   rootBtn.addEventListener("click", () => handlePathToggle("root"));
   tonalBtn.addEventListener("click", () => handlePathToggle("tonal"));
+  pianoBtn.addEventListener("click", () => handleModeToggle("piano"));
+  padBtn.addEventListener("click", () => handleModeToggle("pad"));
   resetBtn.addEventListener("click", handleResetView);
   howBtn.addEventListener("click", handleHowToUse);
   aboutBtn.addEventListener("click", handleAbout);
@@ -1136,6 +1164,14 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     },
     getPathMode(): "root" | "tonal" {
       return pathMode;
+    },
+
+    setPlaybackMode(mode: "piano" | "pad"): void {
+      handleModeToggle(mode);
+    },
+
+    getPlaybackMode(): "piano" | "pad" {
+      return playbackMode;
     },
 
     switchToTab(tab: "play" | "library"): void {

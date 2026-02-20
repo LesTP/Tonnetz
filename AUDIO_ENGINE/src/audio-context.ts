@@ -53,6 +53,7 @@ export async function initAudio(
   let pausedBeatOffset = 0;
   let scheduler: SchedulerState | null = null;
   let prevVoicing: number[] = [];
+  let padMode = false;
 
   const stateListeners = new Set<(e: PlaybackStateChange) => void>();
   const chordListeners = new Set<(e: ChordChangeEvent) => void>();
@@ -144,6 +145,7 @@ export async function initAudio(
         bpm: tempo,
         beatOffset: pausedBeatOffset,
         prevVoicing,
+        padMode,
         onChordChange: emitChordChange,
         onComplete() {
           // Progression ended naturally — transition transport state
@@ -191,6 +193,14 @@ export async function initAudio(
       if (wasPlaying) {
         emitStateChange();
       }
+    },
+
+    setPadMode(enabled: boolean): void {
+      padMode = enabled;
+    },
+
+    getPadMode(): boolean {
+      return padMode;
     },
 
     // === Event Subscriptions ===
