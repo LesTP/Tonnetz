@@ -5,6 +5,64 @@ Started: 2026-02-16
 
 ---
 
+## Entry 20 — Phase 4a: Mobile Touch + Responsive Layout
+
+**Date:** 2026-02-21
+
+### Summary
+
+Mobile UAT Phase 4a: pinch-to-zoom, larger grid for tablets, Android long-press context menu fix, sidebar breakpoint raised to 1024px (always overlay on mobile), floating transport strip, auto-hide sidebar on Play, scrollable sidebar content, default tempo 150 BPM.
+
+### Pinch-to-Zoom
+
+Added two-finger gesture tracking in `gesture-controller.ts`. Tracks active pointers via `Map<number, {x, y}>`. When second pointer arrives, enters pinch mode — cancels any active drag/tap, stops audio (`onPointerUp`). On each move with 2 pointers, computes scale factor from distance change and fires `onPinchZoom(worldCenter, factor)`. Added `zoom(factor, anchorX, anchorY)` to `CameraController` interface. Wired through `interaction-controller.ts`.
+
+### Grid Size
+
+`MIN_TRI_SIZE_PX` lowered from 40 to 25 in `resize-controller.ts`. Roughly doubles the lattice on tablets (~10×8 instead of ~5×5). Zoom via pinch available for fine adjustment.
+
+### Context Menu Prevention
+
+Android tablet long-press opened "Download/Share/Print" dialog instead of sustaining chord. Fixed with `contextmenu` event listener (`preventDefault`) + `-webkit-touch-callout: none` CSS on SVG element.
+
+### Mobile Sidebar Redesign
+
+**Breakpoint 768→1024** (D23): Sidebar is always hamburger-overlay on phones and tablets, both orientations.
+
+**Floating transport strip** (D24): Below hamburger in canvas area. Shows Play/Stop toggle, Loop, Clear when progression loaded + sidebar closed. Hides when sidebar opens. Syncs button states with sidebar (play/stop visibility, loop on/off opacity).
+
+**Auto-hide on Play** (D25): Sidebar closes automatically on mobile when Play tapped (either sidebar or floating). Sidebar open/close is otherwise manual via hamburger only.
+
+**Scrollable sidebar**: Content (title, tabs, panels) wrapped in scroll container. Info footer buttons pinned at bottom.
+
+**Default tempo 150 BPM** (D26): On page load and Clear. Persistence default, AudioTransport default, and Clear handler all updated.
+
+### Bug Fixes During Implementation
+
+- `PipelineError` type still exported from `index.ts` and referenced in `main.ts` after silent-strip refactor — removed
+- Test assertions for default tempo updated from 120 to 150 (only default assertions, not explicit test data)
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `RU/src/gesture-controller.ts` | Two-pointer pinch tracking, `onPinchZoom` callback, touchstart prevention |
+| `RU/src/camera-controller.ts` | `zoom()` method on CameraController interface |
+| `RU/src/interaction-controller.ts` | Wire `onPinchZoom` → `cameraController.zoom()` |
+| `RU/src/resize-controller.ts` | `MIN_TRI_SIZE_PX` 40→25 |
+| `RU/src/renderer.ts` | `-webkit-touch-callout: none` CSS, `contextmenu` event listener |
+| `INT/src/sidebar.ts` | Breakpoint 1024, floating transport DOM+CSS, auto-hide on Play, scrollable wrapper |
+| `INT/src/main.ts` | Clear: +camera.reset +setInputText +setTempo(150), removed PipelineError references |
+| `INT/src/index.ts` | Removed PipelineError export |
+| `AE/src/audio-context.ts` | DEFAULT_TEMPO 120→150 |
+| `PD/src/types.ts` | Default settings tempo_bpm 120→150 |
+
+### Test Results
+
+RU 367, AE 202, INT 239 — all passing, 0 type errors.
+
+---
+
 ## Entry 19 — UI Polish: Header Redesign + Chord Input + Library Updates
 
 **Date:** 2026-02-21

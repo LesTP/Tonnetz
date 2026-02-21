@@ -18,7 +18,6 @@ export {
 } from "./progression-pipeline.js";
 export type {
   PipelineSuccess,
-  PipelineError,
   PipelineResult,
   PipelineArgs,
   CleanResult,

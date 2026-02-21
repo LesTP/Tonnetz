@@ -25,7 +25,7 @@ import {
   type SchedulerState,
 } from "./scheduler.js";
 
-const DEFAULT_TEMPO = 120;
+const DEFAULT_TEMPO = 150;
 
 /**
  * Initialize the audio system. Must be called after a user gesture

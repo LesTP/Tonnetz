@@ -156,11 +156,6 @@ function loadProgressionFromChords(chords: string[]): boolean {
     indices,
   });
 
-  if (!result.ok) {
-    log.warn("pipeline", "Progression load failed", result.error);
-    return false;
-  }
-
   if (result.shapes.length === 0) return false;
 
   // Deactivate any interactive grid highlight when loading a progression
@@ -282,6 +277,10 @@ function handleClear(): void {
   currentChordSymbols = [];
   sidebar.setProgressionLoaded(false);
   sidebar.setInputText("");
+  sidebar.setTempo(150);
+  if (audioState.transport) {
+    audioState.transport.setTempo(150);
+  }
   if (camera) camera.reset();
   sidebar.setPlaybackRunning(false);
 }

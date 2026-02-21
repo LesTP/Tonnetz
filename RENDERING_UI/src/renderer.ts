@@ -65,8 +65,11 @@ export function createSvgScaffold(container: Element): SvgScaffold {
   const svg = svgEl("svg", {
     width: "100%",
     height: "100%",
-    style: "user-select: none; -webkit-user-select: none; touch-action: none;",
+    style: "user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;",
   }) as SVGSVGElement;
+
+  // Prevent native context menu on long-press (iPadOS "Download/Share/Print")
+  svg.addEventListener("contextmenu", (e) => e.preventDefault());
 
   const layers = {} as Record<LayerId, SVGGElement>;
   for (const id of LAYER_IDS) {

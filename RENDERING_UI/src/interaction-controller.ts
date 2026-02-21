@@ -131,6 +131,9 @@ export function createInteractionController(
       onDragStart,
       onDragMove,
       onDragEnd,
+      onPinchZoom(center: WorldPoint, factor: number): void {
+        cameraController.zoom(factor, center.x, center.y);
+      },
     },
   });
 

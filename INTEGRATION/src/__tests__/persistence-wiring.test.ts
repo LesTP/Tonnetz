@@ -43,7 +43,7 @@ describe("initPersistence", () => {
     const state = initPersistence();
     expect(state.backend).toBeDefined();
     expect(state.settings).toEqual(DEFAULT_SETTINGS);
-    expect(state.settings.tempo_bpm).toBe(120);
+    expect(state.settings.tempo_bpm).toBe(150);
   });
 
   it("loads previously saved settings", () => {
@@ -253,7 +253,7 @@ describe("generateShareUrl", () => {
 
 describe("updateSettings", () => {
   it("saves partial settings and updates in-memory state", () => {
-    expect(persistenceState.settings.tempo_bpm).toBe(120);
+    expect(persistenceState.settings.tempo_bpm).toBe(150);
 
     const merged = updateSettings(persistenceState, { tempo_bpm: 140 });
 

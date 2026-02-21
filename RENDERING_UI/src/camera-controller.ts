@@ -64,6 +64,8 @@ export interface CameraController {
   ): void;
   /** Reset camera to initial fit-to-viewport state. */
   reset(): void;
+  /** Apply a zoom factor centered on a world-space anchor point. */
+  zoom(factor: number, anchorX: number, anchorY: number): void;
   /**
    * Fit the camera to frame the given world-space extent with padding.
    *
@@ -172,6 +174,10 @@ export function createCameraController(
     reset(): void {
       cachedExtent = windowWorldExtent(cBounds);
       camera = computeInitialCamera(cWidth, cHeight, cBounds);
+      syncViewBox();
+    },
+    zoom(factor: number, anchorX: number, anchorY: number): void {
+      camera = applyZoom(camera, factor, anchorX, anchorY);
       syncViewBox();
     },
     fitToBounds(extent: WorldExtent, padding: number = 0.2): void {

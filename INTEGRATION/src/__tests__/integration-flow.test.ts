@@ -507,9 +507,9 @@ describe("Full progression lifecycle: load → play → stop → clear", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("Persistence integration", () => {
-  it("initPersistence loads default settings (120 bpm)", () => {
+  it("initPersistence loads default settings (150 bpm)", () => {
     const state = initPersistence();
-    expect(state.settings.tempo_bpm).toBe(120);
+    expect(state.settings.tempo_bpm).toBe(150);
     expect(state.backend).toBeDefined();
   });
 

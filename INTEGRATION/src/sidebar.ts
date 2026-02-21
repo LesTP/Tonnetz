@@ -75,13 +75,14 @@ export interface Sidebar {
 // ── CSS ──────────────────────────────────────────────────────────────
 
 const STYLE_ID = "sidebar";
-const BREAKPOINT = 768;
+const BREAKPOINT = 1024;
 
 const C = {
   app: "tonnetz-app",
   backdrop: "tonnetz-sidebar-backdrop",
   sidebar: "tonnetz-sidebar",
   sidebarOpen: "tonnetz-sidebar--open",
+  sidebarScroll: "tonnetz-sidebar-scroll",
   header: "tonnetz-sidebar-header",
   titleRow: "tonnetz-sidebar-title-row",
   title: "tonnetz-sidebar-title",
@@ -111,6 +112,8 @@ const C = {
   libraryList: "tonnetz-sidebar-library-list",
   canvasArea: "tonnetz-canvas-area",
   hamburger: "tonnetz-hamburger",
+  floatingTransport: "tonnetz-floating-transport",
+  floatingBtn: "tonnetz-floating-btn",
   overlay: "tonnetz-overlay",
   overlayBackdrop: "tonnetz-overlay-backdrop",
   overlayPanel: "tonnetz-overlay-panel",
@@ -176,6 +179,13 @@ const STYLES = `
     transform: translateX(0);
     box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
   }
+}
+
+/* Scrollable content wrapper (everything except info footer) */
+.${C.sidebarScroll} {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* Header */
@@ -522,6 +532,47 @@ const STYLES = `
   }
 }
 
+/* Floating transport (mobile only, visible when progression loaded + sidebar closed) */
+.${C.floatingTransport} {
+  display: none;
+}
+@media (max-width: ${BREAKPOINT - 1}px) {
+  .${C.floatingTransport} {
+    display: none;
+    position: absolute;
+    top: 60px;
+    left: 8px;
+    z-index: 80;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .${C.floatingTransport}.visible {
+    display: flex;
+  }
+  .${C.floatingBtn} {
+    width: 44px;
+    height: 44px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    padding: 0;
+  }
+  .${C.floatingBtn}:hover {
+    background: rgba(255, 255, 255, 0.95);
+  }
+  .${C.floatingBtn}:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
 /* Hidden class */
 .${C.hidden} { display: none !important; }
 
@@ -815,9 +866,12 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   // ── Assemble Sidebar ───────────────────────────────────────────────
 
-  sidebar.appendChild(header);
-  sidebar.appendChild(playPanel);
-  sidebar.appendChild(libraryPanel);
+  // Scrollable wrapper: header + tab panels scroll together; info footer stays fixed at bottom
+  const scrollWrapper = el("div", C.sidebarScroll);
+  scrollWrapper.appendChild(header);
+  scrollWrapper.appendChild(playPanel);
+  scrollWrapper.appendChild(libraryPanel);
+  sidebar.appendChild(scrollWrapper);
   sidebar.appendChild(infoFooter);
 
   // ── Canvas Area ────────────────────────────────────────────────────
@@ -828,6 +882,23 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   hamburgerBtn.textContent = "☰";
 
   canvasArea.appendChild(hamburgerBtn);
+
+  // Floating transport strip (mobile only — visible when progression loaded + sidebar closed)
+  const floatingStrip = el("div", C.floatingTransport, { "data-testid": "floating-transport" });
+  const fPlayBtn = el("button", C.floatingBtn, { "data-testid": "floating-play", "aria-label": "Play" });
+  fPlayBtn.textContent = "▶";
+  const fStopBtn = el("button", C.floatingBtn, { "data-testid": "floating-stop", "aria-label": "Stop" });
+  fStopBtn.textContent = "■";
+  fStopBtn.style.display = "none";
+  const fLoopBtn = el("button", C.floatingBtn, { "data-testid": "floating-loop", "aria-label": "Loop" });
+  fLoopBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.5-4"/><path d="M14 8a6 6 0 0 1-10.5 4"/><polyline points="12,1 13,4 10,4.5"/><polyline points="4,15 3,12 6,11.5"/></svg>`;
+  const fClearBtn = el("button", C.floatingBtn, { "data-testid": "floating-clear", "aria-label": "Clear" });
+  fClearBtn.textContent = "✕";
+  floatingStrip.appendChild(fPlayBtn);
+  floatingStrip.appendChild(fStopBtn);
+  floatingStrip.appendChild(fLoopBtn);
+  floatingStrip.appendChild(fClearBtn);
+  canvasArea.appendChild(floatingStrip);
 
   // ── Info Overlay Modals ────────────────────────────────────────────
 
@@ -878,7 +949,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   const HOW_TO_USE_HTML = `
     <h2>Interacting with the Lattice</h2>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Tap any triangle on the lattice to hear a triad. Tap near a shared edge between two triangles to hear a four-note union chord.</p>
+    <p>Tap any triangle on the lattice to hear a triad. Tap near a shared edge between two triangles to hear a four-note union chord.</p>
     <ul>
       <li><strong>Tap triangle</strong> — play triad (major or minor)</li>
       <li><strong>Tap near edge</strong> — play union chord (4 notes)</li>
@@ -897,7 +968,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     <p><code>Dm7 Dm7 G7 G7 Cmaj7 Cmaj7</code> at 240 BPM sounds the same as <code>Dm7 G7 Cmaj7</code> at 120 BPM — but with two chord changes per bar.</p>
 
     <h2>Supported Chord Types</h2>
-    <p>Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis.</p>
     <ul>
       <li>Triads: <code>C</code>, <code>Cm</code>, <code>Cdim</code>, <code>Caug</code></li>
       <li>7ths: <code>C7</code>, <code>Cmaj7</code>, <code>Cm7</code>, <code>Cdim7</code>, <code>Cm7b5</code></li>
@@ -911,7 +981,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     </ul>
 
     <h2>Playback Controls</h2>
-    <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.</p>
     <ul>
       <li><strong>▶</strong> Play — start progression playback</li>
       <li><strong>■</strong> Stop — stop playback</li>
@@ -922,11 +991,10 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   const ABOUT_HTML = `
     <h2>What is a Tonnetz?</h2>
-    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. The Tonnetz (German: "tone network") is a geometric lattice that maps musical pitch classes into a two-dimensional space where spatial proximity represents harmonic relationships.</p>
-    <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+    <p>The Tonnetz (German: "tone network") is a geometric lattice that maps musical pitch classes into a two-dimensional space where spatial proximity represents harmonic relationships.</p>
 
     <h2>How Harmony Maps to Geometry</h2>
-    <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. On the Tonnetz, each node represents a pitch class (C, C#, D, etc.). Adjacent nodes along each axis are related by specific intervals:</p>
+    <p>On the Tonnetz, each node represents a pitch class (C, C#, D, etc.). Adjacent nodes along each axis are related by specific intervals:</p>
     <ul>
       <li><strong>Horizontal axis</strong> — perfect fifths (7 semitones)</li>
       <li><strong>Diagonal axis (up-right)</strong> — major thirds (4 semitones)</li>
@@ -935,10 +1003,10 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     <p>Major triads form upward-pointing triangles. Minor triads form downward-pointing triangles. Voice-leading between chords corresponds to short geometric distances on the lattice.</p>
 
     <h2>Voice-Leading as Distance</h2>
-    <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Smooth voice-leading between two chords means the notes move by small intervals — which translates to small geometric steps on the Tonnetz.</p>
+    <p>Smooth voice-leading between two chords means the notes move by small intervals — which translates to small geometric steps on the Tonnetz.</p>
 
     <h2>About Tone Nets</h2>
-    <p>Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur. Tone Nets is an interactive harmonic exploration tool built as a web application with zero dependencies.</p>
+    <p>Tone Nets is built by The Moving Finger Studios.</p>
   `;
 
   // ── Mount ──────────────────────────────────────────────────────────
@@ -988,10 +1056,32 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     if (open) {
       sidebar.classList.add(C.sidebarOpen);
       backdrop.classList.add(C.sidebarOpen);
+      floatingStrip.classList.remove("visible");
     } else {
       sidebar.classList.remove(C.sidebarOpen);
       backdrop.classList.remove(C.sidebarOpen);
+      updateFloatingVisibility();
     }
+  }
+
+  function updateFloatingVisibility(): void {
+    // Show floating transport when: progression loaded, sidebar closed, mobile
+    const sidebarOpen = sidebar.classList.contains(C.sidebarOpen);
+    if (progressionLoaded && !sidebarOpen) {
+      floatingStrip.classList.add("visible");
+    } else {
+      floatingStrip.classList.remove("visible");
+    }
+    // Sync play/stop visibility
+    if (playbackRunning) {
+      fPlayBtn.style.display = "none";
+      fStopBtn.style.display = "flex";
+    } else {
+      fPlayBtn.style.display = "flex";
+      fStopBtn.style.display = "none";
+    }
+    // Sync loop visual
+    fLoopBtn.style.opacity = loopEnabled ? "1" : "0.5";
   }
 
   // ── Event handlers ─────────────────────────────────────────────────
@@ -1002,6 +1092,8 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       onLoadProgression(text);
     }
     onPlay();
+    // Auto-hide sidebar on mobile after pressing Play
+    setSidebarOpen(false);
   }
   function handleStop(): void { onStop(); }
   function handleClear(): void { onClear(); }
@@ -1017,6 +1109,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   function handleLoopToggle(): void {
     loopEnabled = !loopEnabled;
     updateLoopVisual();
+    updateFloatingVisibility();
     onLoopToggle(loopEnabled);
   }
 
@@ -1104,6 +1197,12 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   textarea.addEventListener("input", updateButtonStates);
   document.addEventListener("keydown", handleKeydown);
 
+  // Floating transport buttons
+  fPlayBtn.addEventListener("click", handlePlay);
+  fStopBtn.addEventListener("click", handleStop);
+  fLoopBtn.addEventListener("click", handleLoopToggle);
+  fClearBtn.addEventListener("click", handleClear);
+
   // ── Public interface ───────────────────────────────────────────────
 
   return {
@@ -1114,11 +1213,13 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     setProgressionLoaded(loaded: boolean): void {
       progressionLoaded = loaded;
       updateButtonStates();
+      updateFloatingVisibility();
     },
 
     setPlaybackRunning(running: boolean): void {
       playbackRunning = running;
       updateButtonStates();
+      updateFloatingVisibility();
     },
 
     setInputText(text: string): void {

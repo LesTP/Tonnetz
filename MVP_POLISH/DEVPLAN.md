@@ -31,9 +31,9 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phases 0–3 and header redesign complete. Next: Phase 3d (synthesis exploration), then Phase 4 (mobile UAT).
+**Phase:** Phases 0–3, header redesign, and Phase 4a (mobile touch + layout) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4d (remaining mobile UAT), then Phase 5.
 **Blocked/Broken:** None.
-**Open decisions:** POL-D5 (mobile radius), D14 (m7b5 triangles — deferred post-MVP).
+**Open decisions:** POL-D5 (mobile proximity radius — may be adequate as-is), D14 (m7b5 triangles — deferred post-MVP).
 **Known limitations:** Giant Steps symmetric jumps; Tristan chord Am placement (both require global optimizer).
 
 ---
@@ -90,6 +90,20 @@ Key decisions: POL-D1 (sidebar), D9 (two tabs), D11 (transport), D15 (root verte
 
 9th chord aliases (`X9`, `X+9` → `Xadd9`). Unrecognized chord symbols silently stripped (progression plays whatever parsed). Pipeline always returns `ok: true`.
 
+### Phase 4a: Mobile Touch + Responsive Layout ✅
+
+- **Pinch-to-zoom:** Two-finger gesture tracking in gesture-controller.ts; computes scale factor from inter-pointer distance change; wires to `cameraController.zoom()` via new `onPinchZoom` callback. Audio stops on pinch start (same as drag).
+- **Grid size:** `MIN_TRI_SIZE_PX` lowered from 40 to 25 — roughly doubles the lattice on tablets.
+- **Context menu prevention:** `contextmenu` event + `-webkit-touch-callout: none` on SVG — suppresses Android tablet long-press "Download/Share" dialog.
+- **Breakpoint raised:** 768px → 1024px — sidebar is always hamburger-overlay on phones and tablets (both orientations).
+- **Floating transport strip:** Play/Stop, Loop, Clear buttons below hamburger on mobile. Visible when progression loaded + sidebar closed. Auto-syncs with sidebar button states.
+- **Auto-hide on Play:** Sidebar closes automatically on mobile when Play is tapped.
+- **Scrollable sidebar:** Content (title, tabs, panels) scrolls; info footer buttons stay pinned at bottom.
+- **Default tempo:** 150 BPM on page load and Clear (was 120).
+
+**Files:** `RU/src/gesture-controller.ts`, `camera-controller.ts`, `interaction-controller.ts`, `resize-controller.ts`, `renderer.ts`; `INT/src/sidebar.ts`, `main.ts`, `index.ts`, `progression-pipeline.ts`; `AE/src/audio-context.ts`; `PD/src/types.ts`.
+**Tests:** RU 367, INT 239.
+
 ### Supported Chord Reference
 
 **Directly parsed:** maj, min, dim, aug, 7, m7, maj7, 6, add9, 6/9, dim7, m7b5
@@ -119,10 +133,9 @@ Key decisions: POL-D1 (sidebar), D9 (two tabs), D11 (transport), D15 (root verte
 
 Waveform combinations, reverb, filter tuning, envelope tweaks, voicing comparison. Iterative listening sessions — goals and constraints only, values emerge from feedback.
 
-### Phase 4: Mobile UAT
+### Phase 4: Mobile UAT (remaining)
 
-**4a:** Touch interaction — tap, hold, drag, pinch. Proximity radius (POL-D5).
-**4b:** Responsive layout — hamburger, sidebar overlay, mobile keyboard, tap targets ≥44×44px.
+**4b:** Responsive layout — mobile keyboard interaction with textarea, library scrolling, button tap targets ≥44×44px.
 **4c:** Performance — 60fps, <100ms audio latency, SVG element count.
 **4d:** Cross-device — iOS Safari, Android Chrome, URL sharing.
 
@@ -179,6 +192,10 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | D20 | 02-19 | Auto-center viewport on progression load |
 | D21 | 02-21 | Clear absorbs Reset View (camera + textarea + progression) |
 | D22 | 02-21 | 9th chord aliases (X9, X+9 → Xadd9) + silent strip of unrecognized chords |
+| D23 | 02-21 | Mobile breakpoint 1024px — sidebar always hamburger-overlay on phones + tablets |
+| D24 | 02-21 | Floating transport strip on mobile (below hamburger) when progression loaded + sidebar closed |
+| D25 | 02-21 | Auto-hide sidebar on Play (mobile); sidebar open/close manual via hamburger only |
+| D26 | 02-21 | Default tempo 150 BPM (page load + Clear) |
 
 ### Open
 

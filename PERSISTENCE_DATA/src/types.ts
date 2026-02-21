@@ -66,7 +66,7 @@ export interface SettingsRecord {
 
 /** Default settings returned when nothing is stored. */
 export const DEFAULT_SETTINGS: Readonly<SettingsRecord> = {
-  tempo_bpm: 120,
+  tempo_bpm: 150,
 };
 
 // ---------------------------------------------------------------------------
