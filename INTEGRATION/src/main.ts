@@ -281,6 +281,8 @@ function handleClear(): void {
   scheduledEventsCache = [];
   currentChordSymbols = [];
   sidebar.setProgressionLoaded(false);
+  sidebar.setInputText("");
+  if (camera) camera.reset();
   sidebar.setPlaybackRunning(false);
 }
 
@@ -348,7 +350,6 @@ const sidebar: Sidebar = createSidebar({
   onPlay: handlePlay,
   onStop: handleStop,
   onClear: handleClear,
-  onResetView: () => camera!.reset(),
   onTempoChange: handleTempoChange,
   onLoopToggle: handleLoopToggle,
   onPathModeChange: handlePathModeChange,

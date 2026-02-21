@@ -5,6 +5,64 @@ Started: 2026-02-16
 
 ---
 
+## Entry 19 — UI Polish: Header Redesign + Chord Input + Library Updates
+
+**Date:** 2026-02-21
+
+### Summary
+
+Header redesign (POL-D18) completed: enlarged title, info buttons moved to sidebar bottom, Clear absorbs Reset View, geometric loop icon, Staccato/Legato labels, circle Library icon. Added 9th chord input aliases and silent stripping of unrecognized chords. Library corrections.
+
+### Header Redesign (POL-D18)
+
+- Title: 30px, subtitle 17px, centered, full-width
+- Thin grey separator between title and tab bar (`border-top` on tab bar, `margin-top: 14px`)
+- Tab bar bottom border kept, header bottom border removed
+- Info buttons: two rectangular buttons at sidebar bottom — "How / to use" (pink `rgba(230,180,180,0.55)`) + "What / this is" (blue `rgba(170,195,235,0.55)`)
+- Loop button: inline SVG two-arrow cycle icon (replaces ⟳ Unicode)
+- Library tab: `● Library` with 1.5em circle (replaces 📚 emoji)
+- Tab icon spacing: double space between icon and label
+
+### Clear Absorbs Reset View (D21)
+
+Clear button now: stops playback, cancels schedule, clears progression path, clears textarea input, resets camera pan/zoom, returns to Idle state. Reset View button removed from sidebar (DOM, CSS, event listeners, `onResetView` from `SidebarOptions`).
+
+### Staccato / Legato Labels
+
+Playback mode toggle relabeled from "🎹 Piano / ♫ Pad" to "Staccato / Legato" — standard musical terms, no icons.
+
+### Chord Input Improvements (D22)
+
+- 9th chord aliases: `C9` → `Cadd9`, `C+9` → `Cadd9` (via `cleanChordSymbol` steps 6a/6b)
+- Unrecognized chord symbols silently stripped — pipeline always returns `ok: true`, plays whatever parsed
+- Removed `PipelineError` type (pipeline never fails)
+
+### Library Updates
+
+- 12-Bar Blues: retagged Jazz (was Blues — only one entry in that genre)
+- Hallelujah: corrected 31 chords at 300 BPM, retagged "I-IV-V diatonic" (was "Harmonic ambiguity")
+- Girl from Ipanema: corrected 15 chords at 115 BPM, comment updated (F#7 not Gb7)
+- Все идет по плану: comment → "Границы ключ переломлен пополам"
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `INT/src/sidebar.ts` | Header CSS, info footer buttons, loop SVG, ● Library, Staccato/Legato, removed Reset View |
+| `INT/src/main.ts` | Clear handler: +camera.reset() +setInputText(""), removed onResetView |
+| `INT/src/progression-pipeline.ts` | 9th chord cleaning (X9, X+9 → Xadd9), silent strip, removed PipelineError |
+| `INT/src/library/library-data.ts` | 12-Bar Blues, Hallelujah, Girl from Ipanema, Все идет по плану |
+| `INT/src/__tests__/sidebar.test.ts` | Updated for Reset View removal, new info buttons, loop SVG, tab text |
+| `INT/src/__tests__/progression-pipeline.test.ts` | Error cases → silent strip tests |
+| `INT/src/__tests__/integration-flow.test.ts` | Error case → strip test |
+| `MVP_POLISH/DEVPLAN.md` | v0.4: D18 closed, all phases updated, chord reference table |
+
+### Test Results
+
+INT 239 — all passing.
+
+---
+
 ## Entry 18 — Placement Heuristics: Centroid Focus + Cluster Gravity
 
 **Date:** 2026-02-20

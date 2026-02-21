@@ -29,7 +29,6 @@ function defaultOptions(
     onPlay: vi.fn(),
     onStop: vi.fn(),
     onClear: vi.fn(),
-    onResetView: vi.fn(),
     onTempoChange: vi.fn(),
     onLoopToggle: vi.fn(),
     onPathModeChange: vi.fn(),
@@ -94,16 +93,16 @@ describe("createSidebar", () => {
       expect(subtitle!.textContent).toBe("an interactive Tonnetz explorer");
     });
 
-    it("creates info buttons (? and ⓘ) as mini triangles", () => {
+    it("creates info buttons at bottom of sidebar", () => {
       sidebar = createSidebar(opts);
       const howBtn = q(root, "how-btn");
       const aboutBtn = q(root, "about-btn");
       expect(howBtn).not.toBeNull();
-      expect(howBtn!.querySelector("svg")).not.toBeNull();
-      expect(howBtn!.innerHTML).toContain("?");
+      expect(howBtn!.innerHTML).toContain("How");
+      expect(howBtn!.innerHTML).toContain("to use");
       expect(aboutBtn).not.toBeNull();
-      expect(aboutBtn!.querySelector("svg")).not.toBeNull();
-      expect(aboutBtn!.innerHTML).toContain("i");
+      expect(aboutBtn!.innerHTML).toContain("What");
+      expect(aboutBtn!.innerHTML).toContain("this is");
     });
 
     it("creates tab bar with Play and Library tabs", () => {
@@ -111,9 +110,9 @@ describe("createSidebar", () => {
       const playTab = q(root, "tab-play");
       const libraryTab = q(root, "tab-library");
       expect(playTab).not.toBeNull();
-      expect(playTab!.textContent).toBe("▶ Play");
+      expect(playTab!.textContent).toBe("▶  Play");
       expect(libraryTab).not.toBeNull();
-      expect(libraryTab!.textContent).toBe("📚 Library");
+      expect(libraryTab!.textContent).toBe("●  Library");
     });
 
     it("creates progression input textarea", () => {
@@ -132,7 +131,7 @@ describe("createSidebar", () => {
 
       expect(playBtn!.textContent).toBe("▶");
       expect(stopBtn!.textContent).toBe("■");
-      expect(loopBtn!.textContent).toBe("⟳");
+      expect(loopBtn!.querySelector("svg")).not.toBeNull();
       expect(clearBtn!.textContent).toBe("Clear");
     });
 
@@ -153,16 +152,6 @@ describe("createSidebar", () => {
       const hamburger = q(root, "hamburger-btn");
       expect(hamburger).not.toBeNull();
       expect(hamburger!.textContent).toBe("☰");
-    });
-
-    it("creates Reset View button in sidebar (bottom)", () => {
-      sidebar = createSidebar(opts);
-      const resetBtn = q(root, "reset-view-btn");
-      expect(resetBtn).not.toBeNull();
-      expect(resetBtn!.textContent).toBe("Reset View");
-      // Verify it's inside the sidebar, not the canvas area
-      const sidebarEl = root.querySelector(".tonnetz-sidebar")!;
-      expect(sidebarEl.contains(resetBtn!)).toBe(true);
     });
 
     it("creates library panel with placeholder", () => {
@@ -356,12 +345,6 @@ describe("createSidebar", () => {
       sidebar.setProgressionLoaded(true);
       q(root, "clear-btn")!.click();
       expect(opts.onClear).toHaveBeenCalled();
-    });
-
-    it("Reset View button fires onResetView", () => {
-      sidebar = createSidebar(opts);
-      q(root, "reset-view-btn")!.click();
-      expect(opts.onResetView).toHaveBeenCalled();
     });
 
     it("How to Use button fires onHowToUse", () => {

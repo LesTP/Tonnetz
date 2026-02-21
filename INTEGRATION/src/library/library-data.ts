@@ -15,7 +15,7 @@ export const LIBRARY: readonly LibraryEntry[] = [
   {
     id: "12-bar-blues",
     title: "12-Bar Blues",
-    genre: "Blues",
+    genre: "Jazz",
     harmonicFeature: ["I-IV-V diatonic"],
     comment:
       "Foundation of blues, rock, and jazz. All three chords are dominant 7ths — in blues every chord IS the tonic of its moment.",
@@ -170,9 +170,9 @@ export const LIBRARY: readonly LibraryEntry[] = [
     genre: "Jazz",
     harmonicFeature: ["Tritone substitution"],
     comment:
-      "Bossa nova\u2019s signature tune. Gb7 is a tritone substitution for C7 (V), creating a chromatic descending bass line (G-G-Gb-F).",
-    tempo: 138,
-    chords: ["Fmaj7", "G7", "Gm7", "Gb7", "Fmaj7", "G7", "Gm7", "Gb7"],
+      "Bossa nova\u2019s signature tune. F#7 is a tritone substitution for C7 (V), creating a chromatic bass line (G\u2013F#\u2013F).",
+    tempo: 115,
+    chords: ["Fmaj7", "Fmaj7", "G7", "G7", "Gm7", "C7", "Fmaj7", "F#7", "Fmaj7", "Fmaj7", "G7", "G7", "Gm7", "F#7", "Fmaj7"],
   },
   {
     id: "greensleeves",
@@ -192,11 +192,11 @@ export const LIBRARY: readonly LibraryEntry[] = [
     title: "Hallelujah",
     composer: "Leonard Cohen",
     genre: "Pop / Rock",
-    harmonicFeature: ["Harmonic ambiguity"],
+    harmonicFeature: ["I-IV-V diatonic"],
     comment:
       "\"The fourth, the fifth, the minor fall, the major lift\" \u2014 Cohen narrating his own chord progression. The song teaches music theory while performing it.",
-    tempo: 56,
-    chords: ["C", "Am", "C", "Am", "F", "G", "Am", "F", "G", "C"],
+    tempo: 300,
+    chords: ["C", "C", "Am", "Am", "C", "C", "Am", "Am", "F", "F", "G", "G", "C", "C", "G", "G", "C", "C", "F", "G", "Am", "Am", "F", "F", "G", "G", "E", "E", "F", "F", "F"],
   },
   {
     id: "house-of-rising-sun",
@@ -310,7 +310,7 @@ export const LIBRARY: readonly LibraryEntry[] = [
     genre: "Pop / Rock",
     harmonicFeature: ["Minor key i-iv-V"],
     comment:
-      "Am-F-C-E (i-VI-III-V). Stark minor-key cycle with a bVI detour that adds weight before the dominant resolution.",
+      "Границы ключ переломлен пополам",
     tempo: 112,
     chords: ["Am", "F", "C", "E"],
   },

@@ -279,7 +279,7 @@ describe("Full progression lifecycle: load → play → stop → clear", () => {
       }
     });
 
-    it("returns error for invalid chord symbols", () => {
+    it("strips invalid chord symbols and plays valid ones", () => {
       const chords = parseProgressionInput("Dm7 | Xbad | Cmaj7");
       const result = loadProgressionPipeline({
         chords,
@@ -287,10 +287,8 @@ describe("Full progression lifecycle: load → play → stop → clear", () => {
         indices,
       });
 
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.failedSymbols).toContain("Xbad");
-      }
+      expect(result.ok).toBe(true);
+      expect(result.shapes).toHaveLength(2);
     });
   });
 

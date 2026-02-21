@@ -63,7 +63,12 @@ export function cleanChordSymbol(raw: string): CleanResult {
   //    Pattern: after root letter (A-G) and optional accidental (#/b), replace "-" with "m"
   s = s.replace(/^([A-Ga-g][#b]?)-/, "$1m");
 
-  // 6. Strip sus chords: Csus4 → C, Csus2 → C, Dsus → D (with warning)
+  // 6. Convert 9th chord shorthand: C+9 → Cadd9, C9 → Cadd9
+  //    But not 6/9 (already supported) or add9 (already correct)
+  s = s.replace(/\+9$/, "add9");
+  s = s.replace(/(?<!add)(?<!6\/)9$/, "add9");
+
+  // 7. Strip sus chords: Csus4 → C, Csus2 → C, Dsus → D (with warning)
   if (/sus[24]?/.test(s)) {
     warning = `"${raw}" → sus stripped (not supported in MVP), treated as "${s.replace(/sus[24]?/, "")}"`;
     s = s.replace(/sus[24]?/, "");
@@ -98,25 +103,18 @@ export function parseProgressionInput(text: string): string[] {
 
 // ── Phase 2c: Progression Load Pipeline ─────────────────────────────
 
-/** Successful pipeline result. */
+/** Pipeline result — always succeeds (unrecognized chords silently stripped). */
 export interface PipelineSuccess {
   readonly ok: true;
   readonly shapes: Shape[];
   readonly events: ChordEvent[];
-  /** Cleaned chord symbols (after input normalization). One per chord. */
+  /** Cleaned chord symbols that parsed successfully. */
   readonly cleanedSymbols: string[];
   /** Warnings from input cleaning (e.g., sus stripped). Empty if no warnings. */
   readonly warnings: string[];
 }
 
-/** Failed pipeline result (one or more chord symbols failed to parse). */
-export interface PipelineError {
-  readonly ok: false;
-  readonly error: string;
-  readonly failedSymbols: string[];
-}
-
-export type PipelineResult = PipelineSuccess | PipelineError;
+export type PipelineResult = PipelineSuccess;
 
 /** Arguments for the progression load pipeline. */
 export interface PipelineArgs {
@@ -129,16 +127,15 @@ export interface PipelineArgs {
  * Full progression load pipeline: chord strings → Shape[] + ChordEvent[].
  *
  * Duration model (POL-D17): every chord = 4 beats (one bar). No collapsing.
+ * Unrecognized chord symbols are silently stripped.
  *
  * Steps:
- * 1. Clean + parse each symbol via HC parseChordSymbol()
+ * 1. Clean + parse each symbol via HC parseChordSymbol() (skip failures)
  * 2. Map parsed chords to Shapes via HC mapProgressionToShapes()
  * 3. Build ChordEvent[] with uniform 4-beat durations
  *
- * Returns a discriminated union: `{ ok: true, shapes, events }` on success,
- * or `{ ok: false, error, failedSymbols }` if any symbol fails to parse.
- *
- * Empty input produces an empty success result (not an error).
+ * Always returns `ok: true`. Empty input or all-failed input produces
+ * an empty success result.
  */
 export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
   const { chords, focus, indices } = args;
@@ -147,29 +144,24 @@ export function loadProgressionPipeline(args: PipelineArgs): PipelineResult {
     return { ok: true, shapes: [], events: [], cleanedSymbols: [], warnings: [] };
   }
 
-  // Step 1: clean + parse each symbol
+  // Step 1: clean + parse each symbol, silently skip failures
   const parsedChords: Chord[] = [];
-  const failedSymbols: string[] = [];
   const warnings: string[] = [];
   const cleanedSymbols: string[] = [];
 
   for (const raw of chords) {
     const { cleaned, warning } = cleanChordSymbol(raw);
     if (warning) warnings.push(warning);
-    cleanedSymbols.push(cleaned);
     try {
       parsedChords.push(parseChordSymbol(cleaned));
+      cleanedSymbols.push(cleaned);
     } catch {
-      failedSymbols.push(raw);
+      // Unrecognized chord symbol — silently skip
     }
   }
 
-  if (failedSymbols.length > 0) {
-    return {
-      ok: false,
-      error: `Failed to parse chord symbol(s): ${failedSymbols.join(", ")}`,
-      failedSymbols,
-    };
+  if (parsedChords.length === 0) {
+    return { ok: true, shapes: [], events: [], cleanedSymbols: [], warnings: [] };
   }
 
   // Step 2: map to shapes via chain-focus placement (HC-D11)

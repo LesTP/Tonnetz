@@ -10,7 +10,7 @@ import {
   loadProgressionPipeline,
   cleanChordSymbol,
 } from "../progression-pipeline.js";
-import type { PipelineSuccess, PipelineError } from "../progression-pipeline.js";
+import type { PipelineSuccess } from "../progression-pipeline.js";
 import { buildWindowIndices } from "harmony-core";
 import type { CentroidCoord, WindowIndices } from "harmony-core";
 
@@ -248,44 +248,38 @@ describe("loadProgressionPipeline", () => {
     });
   });
 
-  describe("error cases", () => {
-    it("returns error for invalid chord symbol", () => {
+  describe("unrecognized chords (silently stripped)", () => {
+    it("strips invalid chord and plays the rest", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "INVALID", "Cmaj7"],
             focus: defaultFocus,
         indices,
       });
 
-      expect(result.ok).toBe(false);
-      const error = result as PipelineError;
-      expect(error.failedSymbols).toContain("INVALID");
-      expect(error.error).toContain("INVALID");
+      expect(result.ok).toBe(true);
+      expect(result.shapes).toHaveLength(2);
     });
 
-    it("reports all failed symbols (not just first)", () => {
+    it("strips all invalid chords, plays valid ones", () => {
       const result = loadProgressionPipeline({
         chords: ["Dm7", "NOPE", "G7", "ALSO_BAD"],
             focus: defaultFocus,
         indices,
       });
 
-      expect(result.ok).toBe(false);
-      const error = result as PipelineError;
-      expect(error.failedSymbols).toContain("NOPE");
-      expect(error.failedSymbols).toContain("ALSO_BAD");
-      expect(error.failedSymbols).toHaveLength(2);
+      expect(result.ok).toBe(true);
+      expect(result.shapes).toHaveLength(2);
     });
 
-    it("does not include valid symbols in failedSymbols", () => {
+    it("returns empty result if all chords invalid", () => {
       const result = loadProgressionPipeline({
-        chords: ["Dm7", "INVALID"],
+        chords: ["INVALID", "NOPE"],
             focus: defaultFocus,
         indices,
       });
 
-      expect(result.ok).toBe(false);
-      const error = result as PipelineError;
-      expect(error.failedSymbols).not.toContain("Dm7");
+      expect(result.ok).toBe(true);
+      expect(result.shapes).toHaveLength(0);
     });
   });
 });

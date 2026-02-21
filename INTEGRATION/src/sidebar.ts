@@ -21,10 +21,8 @@ export interface SidebarOptions {
   onPlay: () => void;
   /** Callback when user clicks Stop. */
   onStop: () => void;
-  /** Callback when user clicks Clear. */
+  /** Callback when user clicks Clear (dismisses progression + resets viewport). */
   onClear: () => void;
-  /** Callback when user clicks Reset View. */
-  onResetView: () => void;
   /** Callback when tempo slider changes. */
   onTempoChange: (bpm: number) => void;
   /** Callback when path mode toggle changes. */
@@ -88,8 +86,9 @@ const C = {
   titleRow: "tonnetz-sidebar-title-row",
   title: "tonnetz-sidebar-title",
   subtitle: "tonnetz-sidebar-subtitle",
-  infoBtns: "tonnetz-sidebar-info-btns",
-  infoBtn: "tonnetz-sidebar-info-btn",
+  infoFooter: "tonnetz-sidebar-info-footer",
+  infoFooterBtn: "tonnetz-sidebar-info-footer-btn",
+  infoFooterBtnLarge: "tonnetz-sidebar-info-footer-btn-lg",
   tabBar: "tonnetz-sidebar-tabs",
   tabBtn: "tonnetz-sidebar-tab-btn",
   tabBtnActive: "tonnetz-sidebar-tab-btn--active",
@@ -112,7 +111,6 @@ const C = {
   libraryList: "tonnetz-sidebar-library-list",
   canvasArea: "tonnetz-canvas-area",
   hamburger: "tonnetz-hamburger",
-  resetView: "tonnetz-reset-view",
   overlay: "tonnetz-overlay",
   overlayBackdrop: "tonnetz-overlay-backdrop",
   overlayPanel: "tonnetz-overlay-panel",
@@ -183,7 +181,8 @@ const STYLES = `
 /* Header */
 .${C.header} {
   flex-shrink: 0;
-  padding: 12px 14px 0;
+  padding: 24px 14px 16px;
+  text-align: center;
 }
 
 .${C.titleRow} {
@@ -197,7 +196,7 @@ const STYLES = `
 }
 
 .${C.title} {
-  font-size: 22px;
+  font-size: 30px;
   font-weight: 700;
   margin: 0;
   white-space: nowrap;
@@ -207,34 +206,44 @@ const STYLES = `
 
 .${C.subtitle} {
   display: block;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 400;
   color: #777;
 }
 
-.${C.infoBtns} {
+/* Info footer buttons (bottom of sidebar) */
+.${C.infoFooter} {
   flex-shrink: 0;
-}
-
-.${C.infoBtn} {
-  width: 48px;
-  height: 46px;
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px 12px;
+}
+.${C.infoFooterBtn} {
+  flex: 1;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: #555;
+  line-height: 1.25;
+  text-align: center;
   transition: opacity 0.15s;
 }
-.${C.infoBtn}:hover {
-  opacity: 0.7;
+.${C.infoFooterBtn}:hover {
+  opacity: 0.8;
+}
+.${C.infoFooterBtnLarge} {
+  font-size: 16px;
+  font-weight: 700;
+  color: #444;
 }
 
 /* Tab bar */
 .${C.tabBar} {
   display: flex;
+  border-top: 1px solid #e0e0e0;
   border-bottom: 1px solid #d0d0d0;
   margin-top: 14px;
 }
@@ -513,27 +522,6 @@ const STYLES = `
   }
 }
 
-/* Reset View — lightweight text button */
-.${C.resetView} {
-  flex-shrink: 0;
-  margin: 0 14px 12px;
-  min-height: 32px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  color: #999;
-  transition: color 0.15s, background 0.15s;
-  letter-spacing: 0.2px;
-}
-.${C.resetView}:hover {
-  color: #555;
-  background: #f0f0f0;
-}
-
 /* Hidden class */
 .${C.hidden} { display: none !important; }
 
@@ -661,8 +649,6 @@ function clampTempo(bpm: number): number {
   return Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round(bpm)));
 }
 
-// ── Factory
-
 // ── Factory ──────────────────────────────────────────────────────────
 
 export function createSidebar(options: SidebarOptions): Sidebar {
@@ -674,10 +660,9 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onPlay,
     onStop,
     onClear,
-    onResetView,
     onTempoChange,
-    onLoopToggle,
     onPathModeChange,
+    onLoopToggle,
     onPlaybackModeChange,
     onHowToUse,
     onAbout,
@@ -706,33 +691,33 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   const header = el("header", C.header);
 
-  const titleRow = el("div", C.titleRow);
   const titleEl = el("h1", C.title);
   titleEl.textContent = "Tone Nets";
   const subtitleEl = el("small", C.subtitle);
   subtitleEl.textContent = "an interactive Tonnetz explorer";
   titleEl.appendChild(subtitleEl);
 
-  const infoBtns = el("div", C.infoBtns);
-  const howBtn = el("button", C.infoBtn, { "data-testid": "how-btn", "aria-label": "How to Use" });
-  howBtn.innerHTML = `<svg width="44" height="42" viewBox="0 0 24 22"><polygon points="1,1 23,1 12,21" fill="rgba(230,180,180,0.55)" stroke="#bbb" stroke-width="0.8" stroke-linejoin="round"/><text x="12" y="15" text-anchor="middle" font-size="9" font-weight="600" fill="#888" font-family="system-ui,sans-serif">?</text></svg>`;
-  const aboutBtn = el("button", C.infoBtn, { "data-testid": "about-btn", "aria-label": "About" });
-  aboutBtn.innerHTML = `<svg width="44" height="42" viewBox="0 0 24 22"><polygon points="12,1 23,21 1,21" fill="rgba(170,195,235,0.55)" stroke="#bbb" stroke-width="0.8" stroke-linejoin="round"/><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="600" fill="#888" font-family="system-ui,sans-serif">i</text></svg>`;
-
-  titleRow.appendChild(aboutBtn);
-  titleRow.appendChild(titleEl);
-  titleRow.appendChild(howBtn);
+  // Info buttons — bottom of sidebar, styled rectangles with triangle colors
+  const infoFooter = el("div", C.infoFooter);
+  const howBtn = el("button", C.infoFooterBtn, { "data-testid": "how-btn", "aria-label": "How to Use" });
+  howBtn.style.background = "rgba(230,180,180,0.55)";
+  howBtn.innerHTML = `<span class="${C.infoFooterBtnLarge}">How</span><br>to use`;
+  const aboutBtn = el("button", C.infoFooterBtn, { "data-testid": "about-btn", "aria-label": "About" });
+  aboutBtn.style.background = "rgba(170,195,235,0.55)";
+  aboutBtn.innerHTML = `<span class="${C.infoFooterBtnLarge}">What</span><br>this is`;
+  infoFooter.appendChild(howBtn);
+  infoFooter.appendChild(aboutBtn);
 
   // Tab bar
   const tabBar = el("nav", C.tabBar);
   const playTabBtn = el("button", `${C.tabBtn} ${C.tabBtnActive}`, { "data-tab": "play", "data-testid": "tab-play" });
-  playTabBtn.textContent = "▶ Play";
+  playTabBtn.textContent = "▶  Play";
   const libraryTabBtn = el("button", C.tabBtn, { "data-tab": "library", "data-testid": "tab-library" });
-  libraryTabBtn.textContent = "📚 Library";
+  libraryTabBtn.innerHTML = `<span style="font-size:1.5em">●</span>  Library`;
   tabBar.appendChild(playTabBtn);
   tabBar.appendChild(libraryTabBtn);
 
-  header.appendChild(titleRow);
+  header.appendChild(titleEl);
   header.appendChild(tabBar);
 
   // ── Play Tab Panel ─────────────────────────────────────────────────
@@ -763,8 +748,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   stopBtn.disabled = true;
 
   const loopBtn = el("button", C.transportBtn, { "data-testid": "loop-btn", "aria-label": "Loop" });
-  loopBtn.textContent = "⟳";
-  loopBtn.style.fontWeight = "bold";
+  loopBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.5-4"/><path d="M14 8a6 6 0 0 1-10.5 4"/><polyline points="12,1 13,4 10,4.5"/><polyline points="4,15 3,12 6,11.5"/></svg>`;
   loopBtn.disabled = true;
 
   const clearBtn = el("button", C.clearBtn, { "data-testid": "clear-btn" });
@@ -803,12 +787,12 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   pathToggle.appendChild(rootBtn);
   pathToggle.appendChild(tonalBtn);
 
-  // Playback mode toggle (Piano / Pad)
+  // Playback mode toggle (Staccato / Legato)
   const modeToggle = el("div", C.pathToggle, { "data-testid": "mode-toggle" });
   const pianoBtn = el("button", `${C.pathToggleBtn} ${C.pathToggleBtnActive}`, { "data-testid": "mode-piano" });
-  pianoBtn.textContent = "🎹 Piano";
+  pianoBtn.textContent = "Staccato";
   const padBtn = el("button", C.pathToggleBtn, { "data-testid": "mode-pad" });
-  padBtn.textContent = "♫ Pad";
+  padBtn.textContent = "Legato";
   modeToggle.appendChild(pianoBtn);
   modeToggle.appendChild(padBtn);
 
@@ -829,16 +813,12 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   libraryList.appendChild(libraryPlaceholder);
   libraryPanel.appendChild(libraryList);
 
-  // Reset View button (bottom of sidebar)
-  const resetBtn = el("button", C.resetView, { "data-testid": "reset-view-btn" });
-  resetBtn.textContent = "Reset View";
-
   // ── Assemble Sidebar ───────────────────────────────────────────────
 
   sidebar.appendChild(header);
   sidebar.appendChild(playPanel);
   sidebar.appendChild(libraryPanel);
-  sidebar.appendChild(resetBtn);
+  sidebar.appendChild(infoFooter);
 
   // ── Canvas Area ────────────────────────────────────────────────────
 
@@ -1025,7 +1005,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   }
   function handleStop(): void { onStop(); }
   function handleClear(): void { onClear(); }
-  function handleResetView(): void { onResetView(); }
   function handleHowToUse(): void {
     openOverlay("How to Use", HOW_TO_USE_HTML, "overlay-how");
     onHowToUse?.();
@@ -1114,7 +1093,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   tonalBtn.addEventListener("click", () => handlePathToggle("tonal"));
   pianoBtn.addEventListener("click", () => handleModeToggle("piano"));
   padBtn.addEventListener("click", () => handleModeToggle("pad"));
-  resetBtn.addEventListener("click", handleResetView);
   howBtn.addEventListener("click", handleHowToUse);
   aboutBtn.addEventListener("click", handleAbout);
   tempoSlider.addEventListener("input", handleTempoInput);
@@ -1196,7 +1174,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       stopBtn.removeEventListener("click", handleStop);
       clearBtn.removeEventListener("click", handleClear);
       loopBtn.removeEventListener("click", handleLoopToggle);
-      resetBtn.removeEventListener("click", handleResetView);
       howBtn.removeEventListener("click", handleHowToUse);
       aboutBtn.removeEventListener("click", handleAbout);
       tempoSlider.removeEventListener("input", handleTempoInput);
