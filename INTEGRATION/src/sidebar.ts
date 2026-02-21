@@ -31,6 +31,8 @@ export interface SidebarOptions {
   onLoopToggle: (enabled: boolean) => void;
   /** Callback when playback mode toggle changes (piano = hard cut, pad = voice continuation). */
   onPlaybackModeChange?: (mode: "piano" | "pad") => void;
+  /** Callback when user clicks Share. Returns share URL string, or null if nothing to share. */
+  onShare?: () => string | null;
   /** Callback when "What This Is" info button is clicked. */
   onAbout?: () => void;
   /** Callback when "How to Use" info button is clicked. */
@@ -715,6 +717,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onPathModeChange,
     onLoopToggle,
     onPlaybackModeChange,
+    onShare,
     onHowToUse,
     onAbout,
     initialTempo,
@@ -802,6 +805,10 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   loopBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.5-4"/><path d="M14 8a6 6 0 0 1-10.5 4"/><polyline points="12,1 13,4 10,4.5"/><polyline points="4,15 3,12 6,11.5"/></svg>`;
   loopBtn.disabled = true;
 
+  const shareBtn = el("button", C.transportBtn, { "data-testid": "share-btn", "aria-label": "Share" });
+  shareBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8H2V14H14V8H10"/><polyline points="4,5 8,1 12,5"/><line x1="8" y1="1" x2="8" y2="10"/></svg>`;
+  shareBtn.disabled = true;
+
   const clearBtn = el("button", C.clearBtn, { "data-testid": "clear-btn" });
   clearBtn.textContent = "Clear";
   clearBtn.disabled = true;
@@ -809,6 +816,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   transportRow.appendChild(playBtn);
   transportRow.appendChild(stopBtn);
   transportRow.appendChild(loopBtn);
+  transportRow.appendChild(shareBtn);
   transportRow.appendChild(clearBtn);
 
   // Tempo control
@@ -894,9 +902,12 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   fLoopBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.5-4"/><path d="M14 8a6 6 0 0 1-10.5 4"/><polyline points="12,1 13,4 10,4.5"/><polyline points="4,15 3,12 6,11.5"/></svg>`;
   const fClearBtn = el("button", C.floatingBtn, { "data-testid": "floating-clear", "aria-label": "Clear" });
   fClearBtn.textContent = "✕";
+  const fShareBtn = el("button", C.floatingBtn, { "data-testid": "floating-share", "aria-label": "Share" });
+  fShareBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8H2V14H14V8H10"/><polyline points="4,5 8,1 12,5"/><line x1="8" y1="1" x2="8" y2="10"/></svg>`;
   floatingStrip.appendChild(fPlayBtn);
   floatingStrip.appendChild(fStopBtn);
   floatingStrip.appendChild(fLoopBtn);
+  floatingStrip.appendChild(fShareBtn);
   floatingStrip.appendChild(fClearBtn);
   canvasArea.appendChild(floatingStrip);
 
@@ -1022,6 +1033,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     playBtn.disabled = playbackRunning || (!progressionLoaded && !textarea.value.trim());
     stopBtn.disabled = !playbackRunning;
     loopBtn.disabled = !progressionLoaded;
+    shareBtn.disabled = !progressionLoaded;
     clearBtn.disabled = !progressionLoaded;
   }
 
@@ -1097,6 +1109,34 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   }
   function handleStop(): void { onStop(); }
   function handleClear(): void { onClear(); }
+  function handleShare(): void {
+    const url = onShare?.();
+    if (!url) return;
+    // Copy to clipboard with fallback for non-HTTPS contexts
+    function fallbackCopy(text: string): void {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;left:-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    const copyPromise = navigator.clipboard
+      ? navigator.clipboard.writeText(url).catch(() => fallbackCopy(url))
+      : Promise.resolve(fallbackCopy(url));
+    copyPromise.then(() => {
+      // Brief "Copied!" feedback on both sidebar and floating share buttons
+      const origShare = shareBtn.innerHTML;
+      const origFShare = fShareBtn.innerHTML;
+      shareBtn.textContent = "✓";
+      fShareBtn.textContent = "✓";
+      setTimeout(() => {
+        shareBtn.innerHTML = origShare;
+        fShareBtn.innerHTML = origFShare;
+      }, 1500);
+    });
+  }
   function handleHowToUse(): void {
     openOverlay("How to Use", HOW_TO_USE_HTML, "overlay-how");
     onHowToUse?.();
@@ -1182,6 +1222,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   stopBtn.addEventListener("click", handleStop);
   clearBtn.addEventListener("click", handleClear);
   loopBtn.addEventListener("click", handleLoopToggle);
+  shareBtn.addEventListener("click", handleShare);
   rootBtn.addEventListener("click", () => handlePathToggle("root"));
   tonalBtn.addEventListener("click", () => handlePathToggle("tonal"));
   pianoBtn.addEventListener("click", () => handleModeToggle("piano"));
@@ -1201,6 +1242,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   fPlayBtn.addEventListener("click", handlePlay);
   fStopBtn.addEventListener("click", handleStop);
   fLoopBtn.addEventListener("click", handleLoopToggle);
+  fShareBtn.addEventListener("click", handleShare);
   fClearBtn.addEventListener("click", handleClear);
 
   // ── Public interface ───────────────────────────────────────────────

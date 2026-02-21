@@ -35,6 +35,12 @@ Android tablet long-press opened "Download/Share/Print" dialog instead of sustai
 
 **Scrollable sidebar**: Content (title, tabs, panels) wrapped in scroll container. Info footer buttons pinned at bottom.
 
+### Share Button (D27)
+
+Link SVG icon in sidebar transport row (between Loop and Clear) and floating strip. `onShare` callback in `main.ts` returns full URL string from `window.location.origin + pathname + generateShareUrl(chords, tempo, grid)`. Sidebar handles clipboard copy: `navigator.clipboard.writeText()` with fallback to `textarea + execCommand('copy')` for non-HTTPS contexts (local network testing). Brief ✓ checkmark feedback on button for 1.5s. Enabled only when a progression is loaded.
+
+**Default tempo 150 BPM**
+
 **Default tempo 150 BPM** (D26): On page load and Clear. Persistence default, AudioTransport default, and Clear handler all updated.
 
 ### Bug Fixes During Implementation
@@ -51,8 +57,8 @@ Android tablet long-press opened "Download/Share/Print" dialog instead of sustai
 | `RU/src/interaction-controller.ts` | Wire `onPinchZoom` → `cameraController.zoom()` |
 | `RU/src/resize-controller.ts` | `MIN_TRI_SIZE_PX` 40→25 |
 | `RU/src/renderer.ts` | `-webkit-touch-callout: none` CSS, `contextmenu` event listener |
-| `INT/src/sidebar.ts` | Breakpoint 1024, floating transport DOM+CSS, auto-hide on Play, scrollable wrapper |
-| `INT/src/main.ts` | Clear: +camera.reset +setInputText +setTempo(150), removed PipelineError references |
+| `INT/src/sidebar.ts` | Breakpoint 1024, floating transport DOM+CSS, auto-hide on Play, scrollable wrapper, Share button |
+| `INT/src/main.ts` | Clear: +camera.reset +setInputText +setTempo(150), removed PipelineError refs, onShare callback |
 | `INT/src/index.ts` | Removed PipelineError export |
 | `AE/src/audio-context.ts` | DEFAULT_TEMPO 120→150 |
 | `PD/src/types.ts` | Default settings tempo_bpm 120→150 |

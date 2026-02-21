@@ -96,10 +96,11 @@ Key decisions: POL-D1 (sidebar), D9 (two tabs), D11 (transport), D15 (root verte
 - **Grid size:** `MIN_TRI_SIZE_PX` lowered from 40 to 25 — roughly doubles the lattice on tablets.
 - **Context menu prevention:** `contextmenu` event + `-webkit-touch-callout: none` on SVG — suppresses Android tablet long-press "Download/Share" dialog.
 - **Breakpoint raised:** 768px → 1024px — sidebar is always hamburger-overlay on phones and tablets (both orientations).
-- **Floating transport strip:** Play/Stop, Loop, Clear buttons below hamburger on mobile. Visible when progression loaded + sidebar closed. Auto-syncs with sidebar button states.
+- **Floating transport strip:** Play/Stop, Loop, Share, Clear buttons below hamburger on mobile. Visible when progression loaded + sidebar closed. Auto-syncs with sidebar button states.
 - **Auto-hide on Play:** Sidebar closes automatically on mobile when Play is tapped.
 - **Scrollable sidebar:** Content (title, tabs, panels) scrolls; info footer buttons stay pinned at bottom.
 - **Default tempo:** 150 BPM on page load and Clear (was 120).
+- **Share button:** Link SVG icon in transport row + floating strip. Generates full URL from `window.location` + `encodeShareUrl(chords, tempo, grid)`. Copies to clipboard with textarea+execCommand fallback for non-HTTPS. Brief ✓ feedback on button.
 
 **Files:** `RU/src/gesture-controller.ts`, `camera-controller.ts`, `interaction-controller.ts`, `resize-controller.ts`, `renderer.ts`; `INT/src/sidebar.ts`, `main.ts`, `index.ts`, `progression-pipeline.ts`; `AE/src/audio-context.ts`; `PD/src/types.ts`.
 **Tests:** RU 367, INT 239.
@@ -196,6 +197,7 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | D24 | 02-21 | Floating transport strip on mobile (below hamburger) when progression loaded + sidebar closed |
 | D25 | 02-21 | Auto-hide sidebar on Play (mobile); sidebar open/close manual via hamburger only |
 | D26 | 02-21 | Default tempo 150 BPM (page load + Clear) |
+| D27 | 02-22 | Share button: URL from window.location + encodeShareUrl, clipboard copy with fallback, ✓ feedback |
 
 ### Open
 

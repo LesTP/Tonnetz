@@ -58,6 +58,7 @@ import {
   initPersistence,
   checkUrlHash,
   updateSettings,
+  generateShareUrl,
 } from "./persistence-wiring.js";
 import { createKeyboardShortcuts } from "./keyboard-shortcuts.js";
 import { log } from "./logger.js";
@@ -360,6 +361,16 @@ const sidebar: Sidebar = createSidebar({
     if (audioState.immediatePlayback) {
       audioState.immediatePlayback.padMode = enabled;
     }
+  },
+  onShare: (): string | null => {
+    if (currentChordSymbols.length === 0) return null;
+    const tempo = audioState.transport?.getTempo() ?? 150;
+    const hash = generateShareUrl({
+      chords: currentChordSymbols,
+      tempo_bpm: tempo,
+      grid: "1/4",
+    });
+    return `${window.location.origin}${window.location.pathname}${hash}`;
   },
   initialTempo: persistence.settings.tempo_bpm,
 });
