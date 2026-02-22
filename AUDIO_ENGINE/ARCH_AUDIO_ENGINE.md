@@ -1,7 +1,7 @@
 # ARCH_AUDIO_ENGINE.md
 
-Version: Draft 0.5
-Date: 2026-02-15
+Version: Draft 0.6
+Date: 2026-02-22
 
 ---
 
@@ -22,6 +22,10 @@ AE-D9 Interactive playback wiring (triangle → playPitchClasses, not playShape)
 AE-D10 Scheduler auto-stop must notify transport — Closed
 AE-D11 Preserve currentChordIndex across pause/resume — Closed
 AE-D12 Reset voice-leading state on stop — Closed
+AE-D13 Staccato/Legato playback mode (POL-D19) — Closed
+AE-D14 Hard-stop at chord boundary + 10ms fade-out (POL Phase 3a) — Closed
+AE-D15 VoiceHandle.cancelRelease() for voice carry-forward (POL Phase 3b/3c) — Closed
+AE-D16 Fixed per-voice gain 0.24 (no dynamic normalization) — Closed
 
 ---
 
@@ -43,16 +47,27 @@ OscillatorNode (sine, −2 cents)     ──┘
 | Oscillator 2 type | `"sine"` | Adds fundamental body |
 | Detune | ±2–4 cents | Chorusing; exact value tuned during implementation |
 | Mix ratio | 0.5 / 0.5 | Equal blend; adjustable |
-| LP filter cutoff | ~2000 Hz | Softens upper harmonics |
+| LP filter cutoff | 1500 Hz | Softens upper harmonics (revised from 2000, POL Phase 3a) |
 | LP filter Q | ~1.0 | Gentle rolloff, no resonant peak |
-| Attack | ~50 ms | Fast enough for interaction responsiveness |
+| Attack | 120 ms | Softer fade-in; chord transitions less percussive (revised from 50ms, POL Phase 3a) |
 | Decay | ~200 ms | Settles to sustain level |
 | Sustain | ~0.7 | Sustained pad level |
-| Release | ~500 ms | Overlapping tails for chord blending (AE-D5) |
+| Release | ~500 ms | Musical release tail |
+| Per-voice mixGain | 0.24 | Fixed gain per voice (AE-D16) |
 
-### Voice-Count Normalization
+### Gain Normalization (AE-D16)
 
-Master gain scaled by `1 / sqrt(voiceCount)` to prevent clipping with 3–4 simultaneous notes while maintaining perceived loudness.
+Per-voice `mixGain` is fixed at 0.24. With a maximum of 4 simultaneous voices, the sum is `4 × 0.24 = 0.96`, always under 1.0. Master gain stays at 1.0 permanently.
+
+The previous dynamic normalization (`1/√n`) caused transient clipping because the master gain was set *after* voice creation — voices briefly attacked into an un-normalized gain of 1.0. Fixed per-voice gain eliminates this race.
+
+### VoiceHandle Extensions (AE-D15)
+
+`VoiceHandle` exposes `release(when?)` and `stop()` as before, plus:
+
+- **`cancelRelease()`** — resets the `released` flag, clears the pending cleanup timer (`releaseCleanupId`), cancels the envelope ramp, and restores the sustain level (`peakGain × sustainLevel`). This enables voice carry-forward for sustained repeated chords (Phase 3b) and per-voice continuation in Legato mode (Phase 3c).
+- **`release()`** no longer calls `osc.stop()` — oscillators stay alive; cleanup is deferred via `setTimeout → handle.stop()`. This allows `cancelRelease()` to reclaim a voice mid-release.
+- **`stop()`** uses a 10ms envelope fade-out (`linearRampToValueAtTime(0, t + 0.01)`) before stopping oscillators, preventing DC clicks from instant disconnects (AE-D14).
 
 ### Node Budget
 
@@ -209,13 +224,19 @@ secondsToBeats(seconds, bpm) = (seconds / 60) × bpm
 #### Per-Chord Scheduling
 
 `scheduleChordVoices()` for each chord in the lookahead window:
-1. Extract pitch classes from `chord.shape.covered_pcs`
-2. Apply voice-leading (`voiceLead` or `voiceInRegister` for first chord)
-3. Create voices via `createVoice()` at `slot.startTime`
-4. Schedule release at `slot.endTime`
-5. Normalize master gain by `1 / √(voiceCount)`
+1. **Hard-stop previous voices** (AE-D14): if `idx > 0`, call `voice.stop()` on all previous chord's voices before creating new ones. Prevents release-tail overlap that causes clipping.
+2. Extract pitch classes from `chord.shape.covered_pcs`
+3. **Chord boundary decision tree** (AE-D13, AE-D15):
+   - If `samePitchClasses(prevPcs, currentPcs)` → **carry all voices forward** (both modes): `cancelRelease()` on each voice, reschedule `release()` at new end time, early return. No new voices created.
+   - Else if `padMode` (Legato) → **per-voice diff**: common MIDI notes get `cancelRelease()` + re-release; departing notes get `release()` with 500ms tail; arriving notes get fresh `createVoice()`.
+   - Else (Staccato) → hard-stop all + fresh attack (step 1 already ran).
+4. Apply voice-leading (`voiceLead` or `voiceInRegister` for first chord)
+5. Create voices via `createVoice()` at `slot.startTime`
+6. Schedule release at `slot.endTime`
 
 Voice-leading state (`prevVoicing`) threads through sequential chord scheduling.
+
+`SchedulerState.padMode` is set at creation via `CreateSchedulerOptions.padMode` and reflects the transport's `getPadMode()` value at the time `play()` is called.
 
 #### Exported Functions
 
@@ -326,6 +347,12 @@ interface AudioTransport {
    */
   getCurrentChordIndex(): number;
 
+  /**
+   * Returns the current playback mode.
+   * "piano" = Staccato (hard-stop at boundary), "pad" = Legato (per-voice continuation).
+   */
+  getPadMode(): boolean;
+
   // === Playback Control ===
 
   /**
@@ -333,6 +360,14 @@ interface AudioTransport {
    * @param bpm - Beats per minute (e.g., 120)
    */
   setTempo(bpm: number): void;
+
+  /**
+   * Sets the playback mode.
+   * @param enabled - true for Legato (pad), false for Staccato (piano)
+   * Takes effect on next play() — does not affect in-progress scheduled playback.
+   * For immediate playback, the change is applied immediately via ImmediatePlaybackState.padMode.
+   */
+  setPadMode(enabled: boolean): void;
 
   /**
    * Schedules a progression for playback.
@@ -382,7 +417,9 @@ interface AudioTransport {
 
 ### 6.2 Immediate Playback API
 
-Immediate (non-scheduled) chord playback triggered by user interaction. Uses a stateful pattern: `createImmediatePlayback()` returns an `ImmediatePlaybackState` that manages the master gain node, active voice tracking, and previous voicing for voice-leading continuity. All playback functions require this state as their first argument.
+Immediate (non-scheduled) chord playback triggered by user interaction. Uses a stateful pattern: `createImmediatePlayback()` returns an `ImmediatePlaybackState` that manages the master gain node, active voice tracking, previous voicing for voice-leading continuity, and playback mode (`padMode`). All playback functions require this state as their first argument.
+
+`ImmediatePlaybackState.padMode` is mutable — the integration module flips it directly when the sidebar toggle changes. In Legato mode, `playPitchClasses()` performs the same voice-diff as the scheduler: common tones sustain, departing tones release with a 500ms tail, arriving tones get fresh attacks. Identical consecutive pitch-class sets (e.g., repeated clicks on the same triangle) carry all voices forward via `cancelRelease()`.
 
 ```ts
 /**
@@ -402,7 +439,11 @@ interface PlayOptions {
  * Manages master gain, active voices, and previous voicing for voice-leading.
  * Created once per session via createImmediatePlayback().
  */
-interface ImmediatePlaybackState { /* opaque */ }
+interface ImmediatePlaybackState {
+  /** Mutable playback mode — flipped by sidebar toggle */
+  padMode: boolean;
+  /* ...remaining fields opaque */
+}
 
 /**
  * Initialize the audio system. Must be called after user gesture
@@ -459,7 +500,6 @@ createInteractionController({
   callbacks: {
     onTriangleSelect: (_triId, pcs) => playPitchClasses(playback, pcs),
     onEdgeSelect: (_edgeId, _triIds, pcs) => playPitchClasses(playback, pcs),
-    onDragScrub: (_triId, pcs) => playPitchClasses(playback, pcs),
     onPointerUp: () => stopAll(playback),
   }
 });
@@ -526,7 +566,9 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 | `cross-module.test.ts` | 7 | HC Shape → playShape, HC getTrianglePcs → playPitchClasses, HC getEdgeUnionPcs → playPitchClasses, ChordEvent scheduling, onChordChange subscribers |
 | `conversion.test.ts` | 5 | shapesToChordEvents: empty, single, multiple, custom beatsPerChord, reference preservation |
 | `integration-e2e.test.ts` | 3 | ii–V–I pipeline (HC→AE→events), triangle tap → 3 voices, edge union → 4 voices |
-| **Total** | **172** | |
+| `sustained-repeat.test.ts` | 12 | Sustained repeated chords: carry-forward in both modes, pitch-class equality gate |
+| `legato.test.ts` | 18 | Per-voice continuation: common tone sustain, departing release, arriving attack, padMode plumbing |
+| **Total** | **202** | |
 
 ### Latency Analysis (Static)
 
@@ -600,8 +642,74 @@ Files: audio-context.ts
 
 ---
 
-## 8b. Future Extensions
+## 8b. Playback Mode Decisions
+
+```
+AE-D13: Staccato/Legato playback mode
+Date: 2026-02-19
+Status: Closed
+Priority: Important
+Decision:
+Two playback modes toggled via sidebar: Staccato (hard-stop at chord boundary,
+fresh attack) and Legato (per-voice continuation — common tones sustain,
+departing tones release with 500ms tail, arriving tones fresh attack).
+Both modes sustain identical consecutive chords (voice carry-forward).
+Rationale:
+Staccato suits rhythmic progressions; Legato suits smooth pad-style listening.
+Voice carry-forward for repeated chords is desirable in both modes.
+Revisit if: More than two modes are needed (e.g., a percussive stab mode).
+```
+
+```
+AE-D14: Hard-stop at chord boundary with 10ms fade-out
+Date: 2026-02-19
+Status: Closed
+Priority: Critical
+Bug:
+Previous voices' 500ms release tails overlapped with new voices' attack envelopes,
+sum exceeded 1.0, causing audible crackling/clipping.
+Fix:
+Hard-stop all previous chord's voices before creating new ones (Staccato mode
+default). stop() redesigned: 10ms linearRamp to zero + deferred oscillator stop,
+preventing DC click from instant disconnect.
+Files: synth.ts, scheduler.ts, immediate-playback.ts
+```
+
+```
+AE-D15: VoiceHandle.cancelRelease() for voice carry-forward
+Date: 2026-02-20
+Status: Closed
+Priority: Important
+Decision:
+Added cancelRelease() to VoiceHandle. Resets released flag, clears pending cleanup
+timer, cancels envelope ramp, restores sustain level. release() no longer calls
+osc.stop() — oscillators stay alive for potential reclamation.
+Rationale:
+Both sustained repeated chords (3b) and Legato per-voice continuation (3c) require
+carrying voices across chord boundaries. cancelRelease() is the primitive that
+enables this.
+Revisit if: Never — foundational infrastructure for any voice-reuse pattern.
+```
+
+```
+AE-D16: Fixed per-voice gain 0.24 (no dynamic normalization)
+Date: 2026-02-20
+Status: Closed
+Priority: Critical
+Bug:
+Dynamic masterGain normalization (1/√n) was set after voice creation. During the
+creation loop, voices attacked into un-normalized master gain (1.0), causing
+transient clipping (3 voices × 0.5 × 1.0 = 1.5).
+Fix:
+Set mixGain.gain.value = 0.24 per voice. Max 4 voices: 4 × 0.24 = 0.96 < 1.0.
+Removed all dynamic masterGain normalization. Master gain stays at 1.0.
+Files: synth.ts, immediate-playback.ts, scheduler.ts
+```
+
+---
+
+## 8c. Future Extensions
 
 * sampled instruments
-* richer synthesis
+* richer synthesis (Phase 3d: waveform, reverb, filter exploration)
 * MIDI export

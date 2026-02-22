@@ -1,7 +1,7 @@
 # UX_SPEC.md
 
-Version: Draft 0.6
-Date: 2026-02-18
+Version: Draft 0.7
+Date: 2026-02-22
 
 ---
 
@@ -20,13 +20,14 @@ All pointer/touch interactions are classified by movement:
 
 * **Tap/click** — pointer down + pointer up with movement below drag threshold (~5px or platform default). Eligible for triangle selection and edge-proximity selection.
 * **Drag** — pointer down + movement exceeds drag threshold. Always triggers **camera pan** regardless of start position (triangle, edge, or background). Audio and selection events are not fired during drag.
+* **Pinch** — two-finger gesture (touch only). Triggers **camera zoom** centered between the two pointers. Audio stops on pinch start (same as drag). Drag/tap states are cancelled when a second pointer arrives.
 * **Press-hold** — pointer down, chord plays immediately and sounds for the duration of the hold. There is no distinct sustain mode; "sustain" is simply the natural result of holding the pointer down. If the user begins dragging after holding, pan begins once the drag threshold is exceeded and the chord stops on pointer-up. (UX-D4)
 
 ### Camera navigation
 
 * Drag (any start position) → pan
-* Scroll / pinch → zoom
-* Reset control → reset view
+* Scroll → zoom (desktop)
+* Pinch → zoom (touch; two-finger gesture tracking via `onPinchZoom`)
 
 ### Harmonic interaction
 
@@ -52,7 +53,8 @@ The same proximity radius is used for **visual highlighting**, **audio hit-testi
 * Paste progression → press Play → render path + start playback (POL-D17: no separate Load step)
 * Play/Stop/Loop progression
 * Step forward/back through chords
-* Clear button → dismiss progression and return to Idle Exploration (UX-D5)
+* Clear button → dismiss progression, clear textarea, reset camera, and return to Idle Exploration (UX-D5, POL-D21)
+* Share button → generate full URL + copy to clipboard (POL-D27)
 
 > **Note:** POL-D* decisions referenced throughout this document originate from the MVP Polish module (see `MVP_POLISH/DEVLOG.md`). They are cited here when they modify UX contracts.
 
@@ -112,33 +114,36 @@ The interface is organized into two primary zones with responsive behavior:
 
 | Zone           | Function                                    |
 | -------------- | ------------------------------------------- |
-| Sidebar        | Title/branding, progression input, library browser, playback controls + tempo, reset view |
-| Central Canvas | Tonnetz lattice, interaction surface, info overlay icons (upper-right corner) |
+| Sidebar        | Title/branding, progression input, library browser, playback controls + tempo, Staccato/Legato toggle, Share |
+| Central Canvas | Tonnetz lattice, interaction surface |
 
 ### Responsive Behavior
 
 | Breakpoint | Sidebar | Canvas |
 |------------|---------|--------|
-| Desktop (≥768px) | Permanent left panel, always visible | Fills remaining width |
-| Mobile (<768px) | Hidden by default; revealed via hamburger (☰) button as overlay/dropdown | Full width; interaction unaffected by sidebar state |
+| Desktop (≥1024px) | Permanent left panel, always visible | Fills remaining width |
+| Mobile/Tablet (<1024px) | Hidden by default; revealed via hamburger (☰) button as overlay/dropdown | Full width; interaction unaffected by sidebar state |
 
-- Hamburger button positioned at top-left corner on mobile
+- Hamburger button positioned at top-left corner on mobile/tablet
 - Sidebar dismisses on: outside tap, hamburger tap, or Escape key
 - Canvas viewport dynamically resizes when sidebar appears/disappears on desktop
-- Mobile sidebar overlays the canvas without resizing it
+- Mobile sidebar overlays the canvas without resizing it; sidebar content scrollable with info footer pinned at bottom
+- **Floating transport strip** (mobile only, POL-D24): Play/Stop, Loop, Share, Clear buttons below hamburger in canvas area. Visible when progression loaded + sidebar closed. Auto-syncs with sidebar button states.
+- **Auto-hide on Play** (mobile, POL-D25): sidebar closes automatically when Play is tapped. Sidebar open/close is otherwise manual via hamburger only.
+- Breakpoint raised from 768 to 1024 (POL-D23) — sidebar is always hamburger-overlay on phones and tablets in both orientations
 
 ### Sidebar Content Order (top to bottom)
 
 1. **Header (persistent across tabs)**
-   - **Title / branding** — "Tone Nets" with subtitle "an interactive Tonnetz explorer", rendered larger with no competing interactive elements (POL-D18)
-   - **Tab bar** — two tabs: `▶ Play` (default) | `♫ Library` (POL-D18: monochromatic musical icon)
+   - **Title / branding** — "Tone Nets" (30px) with subtitle "an interactive Tonnetz explorer" (17px), centered, full-width, visually separated from tabs by thin grey border (POL-D18)
+   - **Tab bar** — two tabs: `▶ Play` (default) | `● Library` (circle icon, POL-D18)
 
 2. **Tab: Play** (doing — active controls)
    - **Progression input** — textarea for paste/type
    - **Playback controls** — standard transport icons (POL-D11):
-     - ▶ Play (auto-loads from textarea if needed), ■ Stop, 🔁 Loop (toggle), ✕ Clear
-   - **Tempo controller** — slider (20–960 BPM) + BPM display (POL-D17: no Italian markings)
-   - **Reset View** — darker grey font for visibility (POL-D18)
+     - ▶ Play (auto-loads from textarea if needed), ■ Stop, 🔁 Loop (geometric SVG cycle icon, toggle), 🔗 Share (link icon, POL-D27), ✕ Clear (also resets camera + textarea, POL-D21)
+   - **Tempo controller** — slider (20–960 BPM, default 150) + BPM display (POL-D17, POL-D26: no Italian markings)
+   - **Staccato / Legato toggle** — playback mode switch (POL-D19)
 
 3. **Tab: Library** (choosing — browse and select)
    - **Filter tabs** — All | By Genre | By Harmonic Feature
@@ -147,14 +152,14 @@ The interface is organized into two primary zones with responsive behavior:
      - Detail (expanded): comment, roman numerals, tempo, full chords, Load button
    - Selecting "Load" from a card → loads progression + auto-switches to Play tab
 
-4. **Canvas overlay icons** (upper-right corner of canvas area; POL-D18)
-   - `?` → "How to Use": interaction guide, keyboard shortcuts, supported chord symbols, input tips, library usage
-   - `ⓘ` → "What This Is": Tonnetz history & theory, harmonic geometry, credits/author
-   - Semi-transparent at rest, opaque on hover; open full-viewport overlay modals
+4. **Info buttons** (pinned at sidebar bottom, POL-D18)
+   - "How / to use" (pink) → interaction guide, keyboard shortcuts, supported chord symbols, input tips, library usage
+   - "What / this is" (blue) → Tonnetz history & theory, harmonic geometry, credits/author
+   - Open full-viewport overlay modals
 
 ### 4b. Progression Library
 
-Bundled library of ~25 curated progressions. Static data (not user-generated; user save/load is PD's domain).
+Bundled library of 26 curated progressions. Static data (not user-generated; user save/load is PD's domain).
 
 **Three browsing views:**
 1. **All (alphabetical)** — flat list sorted by title
@@ -167,7 +172,7 @@ Bundled library of ~25 curated progressions. Static data (not user-generated; us
 
 ---
 
-> **Legacy note:** The previous three-zone layout APIs are superseded by the sidebar design (POL-D1). See [Appendix: Superseded APIs](#appendix-superseded-apis).
+> **Legacy note:** The previous three-zone layout APIs are superseded by the sidebar design (POL-D1). See [SPEC.md — Appendix: Superseded APIs](SPEC.md#appendix-superseded-apis).
 
 ---
 
@@ -225,13 +230,14 @@ This means Chord Selected can produce audio → silence → pan → silence with
 
 ## 7. Progression Focus Policy
 
-When a progression is loaded and rendered as a path, chord placement uses **chain focus**:
+When a progression is loaded and rendered as a path, chord placement uses **blended chain focus** (refined in MVP Polish Entry 18):
 
 * The first chord is placed relative to the current viewport center (initial focus).
-* Each subsequent chord uses the preceding chord shape's centroid as its placement focus.
-* If the progression path drifts beyond the visible viewport, the user corrects via pan/zoom.
+* Each subsequent chord uses a blended focus: `CHAIN_BLEND` (0.61) × previous triangle centroid + (1 − CHAIN_BLEND) × running cluster center (mean of all placed centroids). The cluster center acts as a gravity well that keeps placements compact without lagging on modulating progressions.
+* Distance-gated root reuse: when a root pitch class recurs within `REUSE_THRESHOLD` (1.5 world units) of its prior placement, the prior position is preferred (prevents visually confusing leaps for repeated roots).
+* After path rendering, the camera auto-centers to frame the entire progression path (POL-D20, via `camera.fitToBounds()`).
 
-See HC-D11 in ARCH_HARMONY_CORE.md.
+See HC-D11 in ARCH_HARMONY_CORE.md. Known limitations: Giant Steps (symmetric tritone jumps) and Tristan chord Am placement require a future global optimizer.
 
 ---
 
@@ -259,7 +265,7 @@ UX introduces the following interface expectations:
 | UI state machine | `createUIStateController()` | ✅ Implemented |
 | Clear button integration | `UIStateController.clearProgression()` + `ControlPanel` | ✅ Implemented |
 
-> Three legacy Rendering/UI APIs (`createLayoutManager`, `createControlPanel`, `createToolbar`) have been superseded. See [Appendix: Superseded APIs](#appendix-superseded-apis).
+> Three legacy Rendering/UI APIs (`createLayoutManager`, `createControlPanel`, `createToolbar`) have been superseded. See [SPEC.md — Appendix: Superseded APIs](SPEC.md#appendix-superseded-apis).
 
 ### Audio Engine
 
@@ -373,12 +379,13 @@ Date: 2026-02-13
 Status: Closed
 Priority: Important
 Decision:
-A visible Clear button in the control panel dismisses the loaded progression and
-returns the UI to Idle Exploration state.
+Clear button dismisses the loaded progression, clears the textarea input,
+resets camera pan/zoom, and returns the UI to Idle Exploration state (POL-D21:
+Clear absorbs Reset View).
 Rationale:
-Explicit, always discoverable, works on both desktop and mobile.
-Keyboard shortcut (Escape) may be added later as a convenience.
-Revisit if: User testing shows a need for additional dismissal gestures.
+Explicit, always discoverable, works on both desktop and mobile. Single button
+for full reset reduces cognitive load.
+Revisit if: Users need independent camera-reset vs progression-clear actions.
 ```
 
 ```
@@ -401,13 +408,4 @@ Revisit if: Users request the ability to interrupt playback by tapping a chord.
 
 ## Appendix: Superseded APIs
 
-The following Rendering/UI APIs were superseded by `createSidebar()` in the Integration module (POL-D1). Legacy exports are retained for test compatibility.
-
-| Original API | Role | Replacement |
-|--------------|------|-------------|
-| `createLayoutManager(options)` | Three-zone page layout | `createSidebar()` |
-| `createControlPanel(options)` | Playback/transport controls | `createSidebar()` |
-| `createToolbar(options)` | Toolbar strip | `createSidebar()` |
-| `LayoutManager` / `ControlPanel` / `Toolbar` types | Associated interfaces | Sidebar internal state |
-
-**Reason:** The original three-zone layout was replaced by a two-zone sidebar design during MVP Polish. See POL-D1 in `MVP_POLISH/DEVLOG.md` and SPEC.md [Appendix: Superseded APIs] for the canonical reference.
+See [SPEC.md — Appendix: Superseded APIs](SPEC.md#appendix-superseded-apis) for the canonical list of superseded Rendering/UI APIs (`createLayoutManager`, `createControlPanel`, `createToolbar`, and associated types) replaced by `createSidebar()` in the Integration module (POL-D1).

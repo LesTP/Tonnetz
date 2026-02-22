@@ -1,7 +1,7 @@
 # ARCH_RENDERING_UI.md
 
-Version: Draft 0.5
-Date: 2026-02-13
+Version: Draft 0.6
+Date: 2026-02-22
 
 ---
 
@@ -52,7 +52,7 @@ Window size in anchor coordinates adapts to the rendering surface:
 | Tablet (~768px) | 18×18 anchors | ~648 triangles, ~361 nodes |
 | Phone (<768px) | 12×12 anchors | ~288 triangles, ~169 nodes |
 
-The window size is chosen so that individual triangles remain large enough for comfortable touch interaction. The renderer selects bounds at initialization based on container dimensions and a **minimum triangle screen size** threshold (e.g., triangle side ≥ ~40px on screen). If the container is resized across a breakpoint, the window can be rebuilt with new bounds.
+The window size is chosen so that individual triangles remain large enough for comfortable touch interaction. The renderer selects bounds at initialization based on container dimensions and a **minimum triangle screen size** threshold (`MIN_TRI_SIZE_PX = 25`, revised from 40 in Phase 4a — roughly doubles the lattice on tablets). If the container is resized across a breakpoint, the window can be rebuilt with new bounds.
 
 Future option:
 
@@ -102,7 +102,7 @@ Initial camera computes scale so the active window fills the container:
 scale = min(containerWidth, containerHeight) / windowWorldExtent
 ```
 
-A minimum triangle screen size is enforced (~40px side length) to ensure touch usability. If the computed scale would produce triangles smaller than this threshold, the window bounds are reduced (fewer anchors) rather than shrinking triangles.
+A minimum triangle screen size is enforced (`MIN_TRI_SIZE_PX = 25`, revised from 40 in Phase 4a) to ensure touch usability. If the computed scale would produce triangles smaller than this threshold, the window bounds are reduced (fewer anchors) rather than shrinking triangles.
 
 Zoom is applied as a multiplier on this base scale via the SVG `viewBox`.
 
@@ -133,6 +133,18 @@ All drag gestures trigger **camera pan**, regardless of start position (triangle
 * **Drag** (pointer movement ≥ threshold): always camera pan — no audio, no selection events
 
 See UX-D3 (Superseded) in UX_SPEC.md §11.
+
+### Pinch-to-Zoom (RU-D18)
+
+Two-finger touch gesture for camera zoom (Phase 4a). The gesture controller tracks active pointers via `Map<number, {x, y}>`. When a second pointer arrives:
+
+1. Enters pinch mode — cancels any active drag/tap state
+2. Stops audio (`onPointerUp` fired to trigger `stopAll`)
+3. On each move with 2 pointers, computes scale factor from inter-pointer distance change
+4. Fires `onPinchZoom(worldCenter, factor)` callback
+5. Integration module wires this to `cameraController.zoom(factor, anchorX, anchorY)`
+
+Pinch gestures prevent browser default behavior (`touchstart` with `{ passive: false }` + `preventDefault()`). Context menu suppressed on SVG via `contextmenu` event listener + `-webkit-touch-callout: none` CSS to prevent Android long-press dialogs.
 
 ---
 
@@ -170,7 +182,7 @@ Status: Closed
 **RU-D6: Layout zone awareness**
 Status: Closed (superseded by POL-D1/POL-D9)
 
-Renderer must support the layout zones. The original three-zone layout (Toolbar, Canvas, Control Panel) via `createLayoutManager()`, `createControlPanel()`, and `createToolbar()` is superseded by the Integration module's `createSidebar()` (two-tab sidebar: Play | Library, with responsive hamburger overlay). The RU layout components remain exported for backward compatibility but are unused in the current application.
+Renderer must support the layout zones. The original three-zone layout (Toolbar, Canvas, Control Panel) via `createLayoutManager()`, `createControlPanel()`, and `createToolbar()` is superseded by the Integration module's `createSidebar()` (two-tab sidebar: Play | Library, with responsive hamburger overlay). The RU layout components remain exported for backward compatibility but are unused in the current application. See [SPEC.md — Appendix: Superseded APIs](../SPEC.md#appendix-superseded-apis) for the full supersession table.
 
 Canvas viewport must dynamically resize when panels expand or collapse. Renderer re-renders on container resize (via internal `ResizeObserver`). If container resize crosses a responsive window breakpoint, the renderer may rebuild window indices with new bounds (RU-D10).
 
@@ -238,6 +250,9 @@ Actual exported API surface from `src/index.ts`:
 | `applyZoom(camera, factor, anchorX, anchorY)` | Function | `camera.ts` | Zoom with anchor stability |
 | `CameraState` | Type | `camera.ts` | `{ centerX, centerY, zoom }` |
 | `windowWorldExtent(bounds)` | Function | `camera.ts` | World-space bounding box of window |
+| `pointsWorldExtent(points)` | Function | `camera.ts` | World-space bounding box from arbitrary points (POL-D20) |
+| `computeBaseExtent(gridExtent, cW, cH)` | Function | `camera.ts` | Aspect-fit base dimensions (shared by `computeViewBox` and `fitToBounds`) |
+| `MIN_ZOOM`, `MAX_ZOOM`, `DEFAULT_ZOOM` | Consts | `camera.ts` | Zoom clamp bounds and fallback |
 | `WorldExtent` | Type | `camera.ts` | `{ readonly minX, minY, maxX, maxY: number }` |
 | `ViewBox` | Type | `camera.ts` | `{ minX, minY, width, height }` |
 | `svgEl(tag, attrs?)` | Function | `svg-helpers.ts` | Create SVG-namespaced element |
@@ -249,16 +264,16 @@ Actual exported API surface from `src/index.ts`:
 | `SvgScaffold` | Type | `renderer.ts` | Scaffold return type |
 | `LayerId` | Type | `renderer.ts` | Layer ID union type |
 | `createCameraController(svg, cW, cH, bounds)` | Function | `camera-controller.ts` | Sole viewBox writer (RU-DEV-D5) |
-| `CameraController` | Type | `camera-controller.ts` | `{ getCamera, getViewBox, panStart, panMove, panEnd, updateDimensions, reset, destroy }` |
+| `CameraController` | Type | `camera-controller.ts` | `{ getCamera, getViewBox, panStart, panMove, panEnd, zoom, fitToBounds, updateDimensions, reset, destroy }` |
 | `createResizeController(container, scaffold, onResize?)` | Function | `resize-controller.ts` | ResizeObserver + debounce + breakpoint |
 | `ResizeController` | Type | `resize-controller.ts` | `{ destroy }` |
 | `ResizeCallback` | Type | `resize-controller.ts` | Resize event payload type |
 | `hitTest(worldX, worldY, radius, indices)` | Function | `hit-test.ts` | Proximity-circle hit classification |
 | `computeProximityRadius(factor?)` | Function | `hit-test.ts` | Radius in world units |
 | `HitResult`, `HitTriangle`, `HitEdge`, `HitNone` | Types | `hit-test.ts` | Discriminated union result types |
-| `createGestureController(options)` | Function | `gesture-controller.ts` | Tap/drag disambiguation (UX-D3) |
+| `createGestureController(options)` | Function | `gesture-controller.ts` | Tap/drag/pinch disambiguation (UX-D3, RU-D18) |
 | `GestureController` | Type | `gesture-controller.ts` | `{ destroy }` |
-| `GestureControllerOptions`, `GestureCallbacks` | Types | `gesture-controller.ts` | Options and callback types |
+| `GestureControllerOptions`, `GestureCallbacks` | Types | `gesture-controller.ts` | Options and callback types (includes `onPinchZoom`) |
 | `createInteractionController(options)` | Function | `interaction-controller.ts` | Orchestration: gesture→hit-test→selection events |
 | `InteractionController` | Type | `interaction-controller.ts` | `{ destroy }` |
 | `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types |
@@ -325,8 +340,28 @@ Status: Closed
 Camera is implemented via SVG `viewBox` attribute manipulation:
 
 * **Pan:** Translate the viewBox origin. Drag on background shifts viewBox `(minX, minY)`.
-* **Zoom:** Scale viewBox `width` and `height`. Scroll/pinch adjusts the viewBox dimensions around the pointer position.
+* **Zoom:** Scale viewBox `width` and `height`. Scroll (desktop) or pinch (touch, RU-D18) adjusts the viewBox dimensions around the pointer position. `CameraController.zoom(factor, anchorX, anchorY)` applies the zoom with anchor stability.
 * **Reset:** Restore viewBox to the initial fit-to-viewport values.
+* **Fit to bounds (POL-D20):** `CameraController.fitToBounds(extent, padding?)` centers camera on the extent midpoint and computes zoom to frame the padded extent. Used by the integration module to auto-center the viewport on progression load.
+
+### Auto-Center on Progression Load (RU-D17, POL-D20)
+
+After a progression is loaded and rendered as a path, the integration module auto-centers the camera to frame the entire progression:
+
+1. Map shape centroids to world coordinates via `latticeToWorld()`
+2. Compute extent via `pointsWorldExtent()`
+3. Bias extent rightward by 1.0 world unit (chord shapes extend right of root centroids in the equilateral layout)
+4. Call `camera.fitToBounds(biasedExtent)`
+
+**`fitToBounds(extent, padding?)` details:**
+- Hybrid padding: `margin = max(rawExtent × padding, 1.5)` — fractional 20% for large progressions, absolute floor (1.5 world units ≈ triangle edge + marker radius) for short ones
+- Degenerate bbox (single chord) falls back to `DEFAULT_ZOOM`
+- Zoom clamped to `[MIN_ZOOM, MAX_ZOOM]`
+
+**Supporting functions:**
+- `pointsWorldExtent(points): WorldExtent | null` — computes world-space bounding box from an array of `{x, y}` points. Peer to `windowWorldExtent`, arbitrary point input.
+- `computeBaseExtent(gridExtent, containerWidth, containerHeight): { baseW, baseH }` — extracted aspect-fit base dimension logic (shared by `computeViewBox` and `fitToBounds`; DRYs the zoom-to-viewBox-size relationship).
+- `MIN_ZOOM`, `MAX_ZOOM`, `DEFAULT_ZOOM` exported from `camera.ts` (were module-private; needed by `fitToBounds` for clamping and fallback).
 
 ViewBox-based camera is native SVG behavior, avoids double-transform issues, and keeps coordinate math simple. All world-coordinate calculations remain valid regardless of camera state because SVG's built-in viewBox→viewport mapping handles the screen transform.
 
@@ -361,6 +396,8 @@ Consistent with Harmony Core's zero-dependency approach.
 * RU-D13 ViewBox-based camera (pan/zoom via viewBox manipulation)
 * RU-D14 Zero runtime dependencies (native DOM API + thin SVG helpers)
 * RU-D16 Defensive error handling (console warnings, no API changes)
+* RU-D17 Auto-center camera on progression load (POL-D20)
+* RU-D18 Pinch-to-zoom (two-finger touch gesture, Phase 4a)
 
 ---
 
@@ -420,9 +457,9 @@ function renderShape(layerChords, layerDots, shape, indices, options?) {
 | `renderProgressionPath` | Logs warning, cleans up partial elements, returns no-op handle. |
 | `highlightTriangle` | Logs warning, returns no-op handle. |
 | `highlightShape` | Logs warning, returns no-op handle. |
-| `createLayoutManager` | Logs warning if DOM structure fails. Returns manager with degraded behavior. |
-| `createControlPanel` | Logs warning if DOM structure fails. Returns panel with no-op methods. |
-| `createToolbar` | Logs warning if DOM structure fails. Returns toolbar with no-op methods. |
+| `createLayoutManager` | Logs warning if DOM structure fails. Returns manager with degraded behavior. (Superseded — see [SPEC.md appendix](../SPEC.md#appendix-superseded-apis)) |
+| `createControlPanel` | Logs warning if DOM structure fails. Returns panel with no-op methods. (Superseded — see [SPEC.md appendix](../SPEC.md#appendix-superseded-apis)) |
+| `createToolbar` | Logs warning if DOM structure fails. Returns toolbar with no-op methods. (Superseded — see [SPEC.md appendix](../SPEC.md#appendix-superseded-apis)) |
 
 ### Error Categories
 
@@ -562,4 +599,36 @@ Rationale:
 Consistent with Harmony Core's zero-dependency approach. The SVG creation boilerplate
 is minimal. Full control over the DOM tree. No bundler required for MVP.
 Revisit if: Dynamic data-binding complexity makes a lightweight framework worthwhile.
+```
+
+```
+RU-D17: Auto-center camera on progression load
+Date: 2026-02-19
+Status: Closed
+Priority: Important
+Decision:
+After loading a progression, the camera auto-fits to frame the entire path.
+CameraController.fitToBounds(extent, padding?) centers camera on the extent
+midpoint and computes zoom to fit. Hybrid padding: fractional 20% for large
+progressions, absolute floor (1.5 world units) for short ones.
+Rationale:
+Previous behavior required manual pan/zoom after loading a progression. Auto-center
+makes the progression immediately visible without user intervention.
+Revisit if: Users need to preserve camera position across progression loads.
+```
+
+```
+RU-D18: Pinch-to-zoom
+Date: 2026-02-21
+Status: Closed
+Priority: Important
+Decision:
+Two-finger touch gesture for camera zoom. Gesture controller tracks active
+pointers, computes scale factor from inter-pointer distance change, fires
+onPinchZoom callback. Audio stops on pinch start (same as drag). Context menu
+suppressed on SVG to prevent Android long-press dialogs.
+Rationale:
+Pinch-to-zoom is the expected mobile gesture for spatial exploration. Without it,
+users could only zoom via scroll wheel (unavailable on touch devices).
+Revisit if: Three-finger gestures or other multi-touch interactions are needed.
 ```

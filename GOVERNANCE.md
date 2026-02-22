@@ -19,6 +19,14 @@ Every module maintains two files:
 
 Architecture documents (ARCH_*.md) live separately when contracts are consumed by other modules.
 
+### DEVPLAN Post-Completion Cleanup
+
+As phases complete, DEVPLAN sections accumulate implementation detail (rationale, rejected alternatives, narrative) that duplicates the DEVLOG. This creates a stale-read risk: a cold-start session may encounter the *planned* version of a decision rather than the *actual* version.
+
+**Rule:** When a phase is completed and logged in DEVLOG, reduce its DEVPLAN section to a one-line summary with a DEVLOG entry reference. Retain only material that serves as a **forward reference** for future work — grammar tables, open issues, constraints still in effect. Rationale, rejected alternatives, and implementation narrative belong exclusively in DEVLOG.
+
+The DEVPLAN should get *shorter* as work progresses. A cold-start session reads the DEVPLAN for "where are we and what's next" and the DEVLOG for "what happened and why."
+
 ### Cold Start Summary
 
 DEVPLAN opens with:
@@ -191,15 +199,19 @@ For Refine phases, plan a **time budget**, not a step count.
 1. **Discuss:** specific changes, files affected, decisions needed
 2. **Code/Debug**
 3. **Verify:** run tests (Build) or show to human (Refine)
-4. **Update DEVLOG** after verification passes
-5. **Commit**
+4. **Confirm:** human explicitly approves the step before proceeding. For Build work with passing tests and straightforward changes, confirmation may be a brief acknowledgment. For Refine, documentation, and cross-cutting work, **do not proceed until the human signals approval.** "Tests pass" is necessary but not sufficient.
+5. **Update DEVLOG** after confirmation
+6. **Commit**
 
 ### Phase Completion
 
 1. Run phase-level tests (Build) or human sign-off (Refine)
 2. Review (simplify, remove dead code)
 3. Update DEVLOG, documentation pass
-4. Commit
+4. **Propagate contract changes** to upstream documents (see §Contract Change Propagation)
+5. **DEVPLAN cleanup** — reduce completed phase to summary + DEVLOG reference (see §DEVPLAN Post-Completion Cleanup)
+6. **Human confirms** phase closure
+7. Commit
 
 ---
 
@@ -212,3 +224,40 @@ Before integrating modules A and B:
 3. **Bridge logic** — document any adapter/conversion needed
 
 No module imports from the integration/orchestration layer. Subsystems do not import from each other except for shared types from upstream dependencies.
+
+---
+
+## Contract Change Propagation
+
+During module Build, information flows forward: SPEC → ARCH docs → code. During cross-cutting work (integration, polish, refactoring), information flows backward: code changes produce decisions that modify upstream contracts (ARCH docs, SPEC, UX_SPEC). Without an explicit propagation rule, upstream documents silently drift.
+
+### Contract-Change Markers
+
+When a DEVLOG entry modifies a shared contract (any ARCH_*.md, SPEC.md, or UX_SPEC.md), include a **`### Contract Changes`** section listing the affected documents and the specific contract modified:
+
+```
+### Contract Changes
+- ARCH_AUDIO_ENGINE.md §6.1: +setPadMode/getPadMode on AudioTransport
+- UX_SPEC.md §4: sidebar content order updated (Clear absorbs Reset View)
+- SPEC.md §Integration: test counts updated
+```
+
+If no shared contracts were modified, omit the section.
+
+### Propagation Rules
+
+**Immediate** (same session): Changes that modify a cross-module API signature or type. Test: *"Would a cold-start session on another module produce incorrect code by reading the current ARCH doc?"* If yes, propagate now.
+
+**Phase boundary** (batched): All other contract changes. At phase completion, scan the DEVLOG's Contract Changes markers since the last sync and update all listed documents.
+
+### Cross-Cutting Track Scope Declaration
+
+Cross-cutting work tracks (integration, polish, refactoring) should declare their upstream document scope in the DEVPLAN Cold Start Summary:
+
+```
+**Documents in scope:**
+- SPEC.md, UX_SPEC.md
+- ARCH_AUDIO_ENGINE.md, ARCH_HARMONY_CORE.md, ARCH_RENDERING_UI.md
+```
+
+This primes cold-start sessions to know which documents may need sync relative to this track.

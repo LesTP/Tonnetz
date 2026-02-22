@@ -1,7 +1,7 @@
 # ARCH_HARMONY_CORE.md
 
-Version: Draft 0.4
-Date: 2026-02-13
+Version: Draft 0.5
+Date: 2026-02-22
 
 ---
 
@@ -208,10 +208,16 @@ Algorithm:
 1. if triad is diminished or augmented → emit dot-only shape (see HC-D5)
 2. compute triad pitch signature
 3. find candidate triangles via `sigToTris`
-4. select candidate closest to focus `(u0,v0)` using lattice distance
+4. select candidate closest to focus `(u0,v0)` using **world-coordinate** Euclidean distance:
+   ```
+   dx = (a.u - b.u) + (a.v - b.v) * 0.5
+   dy = (a.v - b.v) * √3/2
+   dist² = dx² + dy²
+   ```
+   (Revised per MVP Polish Entry 16 — lattice-coordinate distance distorts diagonal comparisons in the equilateral layout.)
 5. output as main triangle
 
-Focus coordinate supplied by UI.
+Focus coordinate supplied by UI (or by the progression mapper — see HC-D11).
 
 ---
 
@@ -316,18 +322,44 @@ Public API provides `getEdgeUnionPcs(edgeId, indices)`.
 
 ## 9. Progression Focus Policy
 
-### HC-D11: Chain focus policy
+### HC-D11: Blended chain focus policy
 
-Status: Closed
+Status: Closed (revised 2026-02-20 per MVP Polish Entry 18)
 
-When mapping a progression to shapes, each chord's placement focus is derived from the preceding chord's centroid:
+When mapping a progression to shapes, each chord's placement focus is a blend of the previous chord's triangle centroid and a running cluster center:
 
 ```
-focus_0 = initial focus (supplied by UI, e.g., viewport center)
-focus_n = centroid_uv(shape_{n-1})   for n > 0
+focus_0        = initial focus (supplied by UI, e.g., viewport center)
+triCentroid_n  = geometric centroid of shape_{n-1}'s main triangle
+                 (arithmetic mean of three vertices, NOT centroid_uv which is the root vertex)
+clusterCenter  = running mean of all triCentroids placed so far
+focus_n        = CHAIN_BLEND × triCentroid_{n-1} + (1 − CHAIN_BLEND) × clusterCenter
 ```
 
-If the resulting path drifts beyond the visible viewport, the user corrects via pan/zoom. The harmonic subsystem does not constrain placement to viewport bounds.
+**Constants:**
+- `CHAIN_BLEND = 0.61` — weights the previous chord's centroid slightly over the cluster center. Tuned empirically to balance local continuity (chain) with global compactness (cluster gravity).
+- `REUSE_THRESHOLD = 1.5` (world units) — distance-gated root reuse (see below).
+
+**Why triangle centroid, not root vertex:** `centroid_uv` (HC-D9) is the root vertex position, used for path rendering. For placement focus, using a triangle corner systematically overshoots by ~50% per step because the focus starts at the far corner rather than the geometric center. Triangle centroid (`triCentroid`) eliminates this bias.
+
+**Why cluster gravity:** Pure chain focus (previous centroid only) has no memory of where the overall cluster lives. When equidistant candidates exist, it can pick the directionally wrong one (observed in Adagio's `Gm Cm → D7`). The running cluster center acts as a gravity well that biases placement toward the existing cluster.
+
+**Distance-gated root reuse:**
+
+`mapProgressionToShapes` maintains a `placedRoots: Map<number, NodeCoord>` remembering the first placement of each root pitch class. When the same root recurs:
+- `proximityTri` = candidate nearest to blended focus (normal behavior)
+- `reuseTri` = candidate nearest to prior root placement
+- Reuse wins if `reuseDist ≤ proxDist × REUSE_THRESHOLD` (within 50% of proximity distance)
+
+This prevents visually confusing leaps when a root repeats (e.g., `Dm C Dm` → second Dm snaps to first Dm's position).
+
+**All distances** in both `placement.ts` and `progression.ts` use world-coordinate Euclidean distance (see HC-D6), ensuring visual perception matches algorithmic selection.
+
+**Known limitations:**
+- Giant Steps: symmetric tritone jumps produce visually spreading paths. The local greedy algorithm cannot resolve this — requires a future two-pass global optimizer.
+- Tristan chord Am: local algorithm picks the geometrically nearest Am, which may not be the musically expected one. No `CHAIN_BLEND` value fixes this.
+
+If the resulting path drifts beyond the visible viewport, the camera auto-centers to frame the entire path (POL-D20, via `camera.fitToBounds()` in the integration module). The harmonic subsystem does not constrain placement to viewport bounds.
 
 ---
 
@@ -378,7 +410,7 @@ Notes:
 - `getAdjacentTriangles` requires `indices` for edge-based adjacency lookup.
 - `computeChordPcs` takes decomposed args (rootPc, quality, extension), not a Chord object, to allow use independent of the parser.
 - `decomposeChordToShape` takes a `focus` parameter (in addition to `mainTri` and `indices`) for dot-only centroid computation (HC-D9 fallback).
-- `mapProgressionToShapes` uses chain focus policy (HC-D11). The `initialFocus` parameter sets the focus for the first chord; subsequent chords use the preceding shape's centroid.
+- `mapProgressionToShapes` uses blended chain focus policy (HC-D11). The `initialFocus` parameter sets the focus for the first chord; subsequent chords use a blend of the preceding shape's triangle centroid and the running cluster center (`CHAIN_BLEND = 0.61`). Distance-gated root reuse (`REUSE_THRESHOLD = 1.5`) snaps repeated roots to their prior placement when nearby.
 
 ---
 
@@ -408,7 +440,7 @@ Notes:
 * HC-D8: simplification deferred
 * HC-D9: centroid as root vertex position (revised per POL-D15)
 * HC-D10: edge union chord computation
-* HC-D11: chain focus policy for progressions
+* HC-D11: blended chain focus policy for progressions (revised: centroid focus + cluster gravity + root reuse)
 
 ---
 

@@ -1,7 +1,7 @@
 # SPEC.md — Tonnetz Interactive Harmonic Explorer
 
-Version: Draft 0.5
-Date: 2026-02-18
+Version: Draft 0.6
+Date: 2026-02-22
 
 ---
 
@@ -195,7 +195,8 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | `computeViewBox(camera, cW, cH, bounds)` | Camera state→SVG viewBox |
 | `applyPan(camera, dx, dy, bounds?, clampFactor?)` | Pan with optional boundary clamping |
 | `applyZoom(camera, factor, anchorX, anchorY)` | Zoom with anchor stability |
-| `createCameraController(svg, cW, cH, bounds)` | Sole viewBox writer controller |
+| `pointsWorldExtent(points)` | World-space bounding box from arbitrary points (POL-D20) |
+| `createCameraController(svg, cW, cH, bounds)` | Sole viewBox writer controller (includes `zoom()`, `fitToBounds()`) |
 
 ## SVG Rendering
 
@@ -211,7 +212,7 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | Function | Description |
 |----------|-------------|
 | `hitTest(worldX, worldY, radius, indices)` | Proximity-circle hit classification |
-| `createGestureController(options)` | Tap/drag disambiguation |
+| `createGestureController(options)` | Tap/drag/pinch disambiguation (includes `onPinchZoom`) |
 | `createInteractionController(options)` | Orchestration: gesture→hit-test→selection events |
 
 ## Highlighting
@@ -292,26 +293,27 @@ Audio Engine handles chord voicing, Web Audio synthesis, and playback scheduling
 | `secondsToBeats(seconds, bpm)` | Convert seconds to beats at tempo |
 | `shapesToChordEvents(shapes, beatsPerChord?)` | Convert `Shape[]` → `ChordEvent[]` (sequential, equal duration) |
 
-## AudioTransport (14 methods — ARCH §6.1)
+## AudioTransport (16 methods — ARCH §6.1)
 
 | Group | Methods |
-|-------|---------|
+|-------|--------|
 | Time queries | `getTime()`, `getContext()` |
-| State queries | `getState()`, `isPlaying()`, `getTempo()`, `getCurrentChordIndex()` |
-| Playback control | `setTempo(bpm)`, `scheduleProgression(events)`, `play()`, `stop()`, `pause()`, `cancelSchedule()` |
+| State queries | `getState()`, `isPlaying()`, `getTempo()`, `getCurrentChordIndex()`, `getPadMode()` |
+| Playback control | `setTempo(bpm)`, `setPadMode(enabled)`, `scheduleProgression(events)`, `play()`, `stop()`, `pause()`, `cancelSchedule()` |
 | Event subscriptions | `onStateChange(cb)`, `onChordChange(cb)` |
 
 ## Key Types
 
 | Type | Description |
 |------|-------------|
-| `AudioTransport` | 14-method cross-module transport contract |
+| `AudioTransport` | 16-method cross-module transport contract |
 | `TransportState` | Snapshot: `{ playing, tempo, currentChordIndex, totalChords }` |
 | `ChordEvent` | Scheduled chord: `{ shape, startBeat, durationBeats }` |
 | `PlaybackStateChange` | Event payload: `{ playing, timestamp }` |
 | `ChordChangeEvent` | Event payload: `{ chordIndex, shape, timestamp }` |
 | `ImmediatePlaybackState` | Opaque state for immediate playback (master gain, voices, voicing) |
 | `PlayOptions` | Options: `{ register?, velocity?, duration? }` |
+| `PlaybackMode` | `"piano" \| "pad"` — staccato vs legato playback (POL-D19) |
 | `InitAudioOptions` | Options: `{ AudioContextClass?, initialTempo? }` |
 | `VoiceHandle` | Per-voice handle: `{ midi, release(when?), stop() }` |
 
@@ -347,6 +349,7 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 | Transport → Animation | AE → RU | `AudioTransport.getTime()` in rAF loop | Smooth path progress animation |
 | UI → Audio | RU → AE | Sidebar callbacks → `AudioTransport.play()` / `.stop()` | Transport control buttons |
 | UI → Audio | RU → AE | Sidebar tempo slider → `AudioTransport.setTempo(bpm)` | Tempo control (POL-D1, resolves INT-D8) |
+| UI → Audio | RU → AE | Sidebar Staccato/Legato toggle → `AudioTransport.setPadMode()` + `immediatePlayback.padMode` | Playback mode (POL-D19) |
 
 ### Persistence ↔ Other Modules
 
@@ -356,22 +359,24 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 | URL → Progression | PD → HC → RU + AE | `decodeShareUrl(hash)` → `parseChordSymbol()` each → `mapProgressionToShapes()` → `UIState.loadProgression()` | Auto-load shared progression from URL fragment |
 | Load → Progression | PD → HC → RU + AE | `loadProgression(id)` → same parse pipeline | Load saved progression from local storage |
 | Save ← UI | RU → PD | Sidebar save action → `saveProgression({ title, tempo_bpm, chords })` | Persist current progression locally |
-| Share ← UI | RU → PD | Sidebar share action → `encodeShareUrl(prog)` → clipboard / URL bar | Generate shareable URL |
+| Share ← UI | RU → PD | Share button → `encodeShareUrl(chords, tempo, grid)` → full URL → clipboard (with textarea+execCommand fallback for non-HTTPS) (POL-D27) | Generate shareable URL |
 | Settings ← UI | RU → PD | Tempo change, view prefs → `saveSettings(partial)` | Persist user preferences |
 | Duration → Beats | Integration | Each chord token = 4 beats (one bar). `shapesToChordEvents(shapes)` produces `ChordEvent[]` directly — no grid conversion needed (POL-D17). |
 
 ### Data Flow: Progression Load Pipeline
 
 ```
-PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120 }
+PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 150 }
   │
-  ├─→ HC: parseChordSymbol() each → Chord[]
+  ├─→ INT: cleanChordSymbol() each (aliases, slash bass, unsupported → stripped)
+  ├─→ HC: parseChordSymbol() each → Chord[] (unrecognized symbols silently dropped)
   ├─→ HC: mapProgressionToShapes(chords, focus, indices) → Shape[]
   │
   ├─→ RU: UIState.loadProgression(shapes)
   ├─→ RU: renderProgressionPath(shapes)
+  ├─→ RU: camera.fitToBounds(pathExtent) (auto-center viewport, POL-D20)
   │
-  ├─→ AE: setTempo(120)
+  ├─→ AE: setTempo(150)
   └─→ AE: shapesToChordEvents(shapes) → scheduleProgression(events)
 ```
 
@@ -429,7 +434,7 @@ All items must be verified before starting integration module development.
 - [x] `parseChordSymbol()` handles all MVP chord grammar (HC-D4)
 - [x] `mapProgressionToShapes()` implements chain focus (HC-D11)
 - [x] `getEdgeUnionPcs()` returns `number[] | null` (boundary edge = null)
-- [x] All tests passing (168 tests)
+- [x] All tests passing (178 tests)
 - [x] No runtime dependencies on UI, audio, or storage
 
 ### Rendering/UI
@@ -442,18 +447,18 @@ All items must be verified before starting integration module development.
 - [x] `createUIStateController()` implements all state transitions (idle → chord-selected → progression-loaded → playback-running)
 - [x] `createControlPanel()` exposes play/stop/clear callbacks (legacy API; see [Superseded APIs appendix](#appendix-superseded-apis))
 - [x] `createLayoutManager()` provides three-zone layout (legacy API; see [Superseded APIs appendix](#appendix-superseded-apis))
-- [x] All tests passing (344 tests including 20 AE contract tests)
+- [x] All tests passing (367 tests including 19 AE contract tests)
 - [x] No runtime dependencies on audio or storage
 
 ### Audio Engine
 
-- [x] `initAudio()` → `AudioTransport` with all 14 interface methods
+- [x] `initAudio()` → `AudioTransport` with all 16 interface methods
 - [x] `createImmediatePlayback()` / `playPitchClasses()` / `playShape()` / `stopAll()` operational
 - [x] `AudioTransport.scheduleProgression()` / `play()` / `stop()` / `pause()` operational
 - [x] `AudioTransport.onChordChange()` / `onStateChange()` fire correctly
 - [x] `shapesToChordEvents()` converts `Shape[]` → `ChordEvent[]`
 - [x] Voice-leading (`voiceLead`) threads across sequential chords
-- [x] All tests passing (172 tests)
+- [x] All tests passing (202 tests)
 - [x] No runtime dependencies on UI or storage
 
 ### Persistence/Data
@@ -464,6 +469,14 @@ All items must be verified before starting integration module development.
 - [x] Schema version field present in all stored records
 - [x] All tests passing (108 tests)
 - [x] No runtime dependencies on UI, audio, or harmony logic
+
+### Integration Module
+
+- [x] All tests passing (239 tests)
+- [x] Sidebar with two-tab layout (Play | Library), responsive hamburger overlay
+- [x] Floating transport strip on mobile (POL-D24)
+- [x] Share button with clipboard copy and fallback (POL-D27)
+- [x] Chord input cleaning pipeline: aliases, slash bass strip, silent drop of unrecognized symbols (POL-D7, D22)
 
 ### Cross-Module Compatibility
 
@@ -607,6 +620,8 @@ Deliver playable harmonic instrument with progression visualization.
 
 * ~~save/load library UI~~ (shipped in MVP Polish Phase 2)
 * ~~loop playback controls~~ (shipped in MVP Polish Phase 1)
+* ~~audio quality: envelope cleanup, sustained repeated chords, legato mode~~ (shipped in MVP Polish Phase 3)
+* ~~Staccato/Legato playback toggle~~ (shipped in MVP Polish Phase 3, POL-D19)
 * transposition via Tonnetz motion
 * improved voice-leading engine
 
@@ -673,11 +688,12 @@ Deliver playable harmonic instrument with progression visualization.
 
 # Known Limitations (v1)
 
-* limited chord grammar (no augmented extended chords; no 9/11/13 tensions)
+* limited chord grammar (no augmented extended chords; no 9/11/13 tensions); input cleaning accepts common aliases (ø, Δ, dash-as-minor, slash bass, sus, 9th shorthands) but strips unsupported extensions
 * diminished and augmented triads rendered as dot clusters, not triangles
-* no shared progression library
-* simple synthesis model
+* ~~no shared progression library~~ (shipped: 26 curated progressions, MVP Polish Phase 2)
+* simple synthesis model (dual-oscillator pad; Staccato/Legato toggle available)
 * minimal voice-leading optimization
+* placement heuristics use local greedy algorithm with cluster gravity — symmetric progressions (Giant Steps) and certain voicing-dependent placements (Tristan chord Am) require a future global optimizer
 
 ---
 
