@@ -132,270 +132,56 @@ Key decisions: POL-D1 (sidebar), D9 (two tabs), D11 (transport), D15 (root verte
 
 ### Phase 3d: Synthesis Exploration (Refine)
 
-**Objective:** Improve the pad sound toward an ethereal/angelic quality through three cumulative experiments. Each adds a different dimension: richer tone → organic motion → spatial depth. Values are starting points — final values emerge from listening sessions (Refine regime).
+**Objective:** Build a preset-toggle system with 6 baked sound presets. User A/B tests all presets, picks favorites to keep. Losers are discarded in a cleanup step.
 
-**Reference:** `AUDIO_ENGINE/SOUND_SCULPTING.md` — deep research on Web Audio pad synthesis techniques, filter design heuristics, LFO modulation, delay-based space, and three recipe presets.
+**Regime:** Refine. Step 1 (infrastructure + presets) is Build. Step 2 (listening) is the Refine feedback loop. Step 3 (cleanup) is Build.
 
-**Regime:** Refine. Goals and constraints specified; parameter values emerge from the feedback loop. Each experiment: apply change → listen to progressions (Staccato + Legato) + interactive taps → keep / adjust / revert.
+**Reference:** `AUDIO_ENGINE/SOUND_SCULPTING.md` (pad synthesis), `AUDIO_ENGINE/SOUND_SCULPTING_1.md` (organ emulation + PeriodicWave).
 
 **Constraints:**
-- Per-voice changes confined to `AUDIO_ENGINE/src/synth.ts` (signal chain + defaults)
-- Global effects (delay) added in `synth.ts` or a new `effects.ts`, wired once in `createImmediatePlayback` / scheduler
-- No changes to `VoiceHandle` interface, scheduler, transport, or integration wiring
-- Node budget: ≤8 nodes per voice × 4 voices = 32 per-voice nodes + ≤8 global nodes
-- Fixed per-voice gain 0.24 stays (AE-D16)
-- Experiments are cumulative — each builds on the previous, but must be testable independently
+- No changes to `VoiceHandle` interface or transport API
+- Node budget: ≤8 nodes per voice × 4 voices = 32 per-voice + ≤8 global
+- Per-voice gain stays ≤0.24 (AE-D16 principle: 4 voices < 1.0)
+- Presets are baked parameter objects — no user-adjustable knobs
 
-**Current signal chain (5 nodes/voice):**
-```
-Osc1 (triangle, +3¢) ──┐
-                         ├──► mixGain (0.24) ──► LP (1500Hz, Q=1) ──► ADSR envelope ──► destination
-Osc2 (sine, −3¢)     ──┘
-```
+#### Step 1: Preset Infrastructure + All Presets (Build)
 
-**Current parameters:** attack 120ms, decay 200ms, sustain 0.7, release 500ms, filter 1500Hz.
+**New files:**
+- `AUDIO_ENGINE/src/presets.ts` — `SynthPreset` type + 6 preset definitions + PeriodicWave builders
+- `AUDIO_ENGINE/src/effects.ts` — global delay/effects chain, configurable per preset
 
-**Why the current sound is thin:** Triangle+sine doesn't give the filter much harmonic material to sculpt. Pad lushness comes from the ear hearing slow beating/chorus and a wide band of harmonics being gently shaped by filtering and modulation. The current ±3 cent detune is on the subtle end. (See SOUND_SCULPTING.md §Oscillator choices.)
+**Modified files:**
+- `AUDIO_ENGINE/src/synth.ts` — `createVoice()` accepts `SynthPreset` parameter (falls back to `SYNTH_DEFAULTS` for backward compat)
+- `AUDIO_ENGINE/src/immediate-playback.ts` — `ImmediatePlaybackState.preset` field; pass to `createVoice()`
+- `AUDIO_ENGINE/src/scheduler.ts` — `CreateSchedulerOptions.preset`; pass to `createVoice()`
+- `AUDIO_ENGINE/src/index.ts` — export `SynthPreset`, preset objects, effects API
+- `INTEGRATION/src/sidebar.ts` — preset `<select>` dropdown (below Staccato/Legato toggle)
+- `INTEGRATION/src/main.ts` — wire dropdown to `ImmediatePlaybackState.preset` + `AudioTransport`
 
-**Test progressions:** ii–V–I (Dm7 G7 Cmaj7), Adagio for Strings, 12-Bar Blues, Giant Steps. Test both Staccato and Legato modes, interactive taps, and hold-then-release.
+**6 Presets:**
 
-#### 3d-A: Richer Oscillators + Filter Bloom ("Warm Pad Foundation")
+| # | Name | Character | Oscillators | Filter | Envelope | LFO | Delay |
+|---|------|-----------|-------------|--------|----------|-----|-------|
+| 1 | `"classic"` | Current sound (baseline) | triangle+sine, ±3¢ | LP 1500Hz | A 120ms, R 500ms | none | none |
+| 2 | `"warm-pad"` | Warm subtractive pad | saw+tri, ±5¢ | LP 900Hz + bloom | A 350ms, R 1.4s | none | single 55ms |
+| 3 | `"breathing-pad"` | Animated pad with movement | saw+tri, ±5¢ | LP 900Hz + bloom | A 350ms, R 1.4s | filter 0.09Hz ±120Hz | single 55ms |
+| 4 | `"cathedral"` | Pipe organ + bloom | PeriodicWave principals + sine sub | LP 4200Hz | A 12ms, R 80ms | none | dual 61ms/89ms |
+| 5 | `"electric-organ"` | B3/Leslie drawbar organ | PeriodicWave drawbars (noteHz/2) | LP 3200Hz | A 6ms, R 30ms | pitch 0.8Hz (rotary) | none |
+| 6 | `"glass"` | Glass harmonica / ethereal | sine+sine, ±8¢ | LP 3600Hz | A 280ms, R 1.6s | pitch 0.25Hz ±3¢ | single 38ms |
 
-Swap one oscillator to sawtooth for harmonic richness. Add filter bloom envelope (cutoff rises during attack, settles during sustain). Widen detune. Slow the attack. This is the highest-ROI change — richer source + filter sculpting is the core of every pad preset.
+**PeriodicWave definitions (built once at init, reused across voices):**
 
-**Signal chain change (6 nodes/voice — +1 for separate osc mix gains):**
-```
-Osc1 (sawtooth, −5¢) ──► oscGain1 (0.10) ──┐
-                                              ├──► LP filter ──► ADSR envelope ──► destination
-Osc2 (triangle, +5¢) ──► oscGain2 (0.07) ──┘
-```
+Cathedral principals: `partials: [0, 1.00, 0.42, 0.18, 0.10, 0.06, 0.05, 0, 0.03]`
 
-Separate mix gains allow balancing saw (loud, buzzy) against triangle (soft, mellow). The saw provides harmonic material for the filter; the triangle adds body without harshness.
+Electric organ drawbars (freq = noteHz/2): `partials: [0, 0.58, 0.95, 0.55, 0.62, 0, 0.28, 0, 0.24, 0, 0.16, 0, 0.12, 0, 0, 0, 0.08]`
 
-| Parameter | Current | Starting value | Rationale |
-|-----------|---------|----------------|-----------|
-| `osc1Type` | triangle | **sawtooth** | Rich harmonics — the classic subtractive pad starting point. Filter removes harshness. |
-| `osc2Type` | sine | **triangle** | Warmer than sine, adds odd-harmonic body without saw's buzziness |
-| `detuneCents` | 3 | **5** | Wider chorus — noticeably lusher. ±5 is in the "warm, stable" range. |
-| `osc1Gain` | 0.24 (shared) | **0.10** | Saw is louder/brighter — lower mix level |
-| `osc2Gain` | (shared) | **0.07** | Triangle quieter to sit behind the saw |
-| `filterCutoff` | 1500 Hz | **900 Hz** | Lower cutoff tames saw harmonics — warm, not buzzy |
-| `filterQ` | 1.0 | **0.85** | Slightly lower Q — gentle rolloff, no resonant peak |
-| `attackTime` | 0.12s | **0.35s** | Slower attack — notes fade in as washes |
-| `decayTime` | 0.2s | **0.6s** | Longer decay — more gradual settle to sustain |
-| `sustainLevel` | 0.7 | **0.78** | Slightly higher — less "punch then drop" |
-| `releaseTime` | 0.5s | **1.4s** | Longer release tail — notes linger and blend |
+#### Step 2: Listen & Refine
 
-**Filter bloom envelope** (new — schedule on `filter.frequency` alongside ADSR):
-```
-note-on:  setValueAtTime(550, oscStart)
-attack:   linearRampToValueAtTime(1250, oscStart + attackTime)
-settle:   setTargetAtTime(900, oscStart + attackTime, 0.35)
-```
-Start dark (550Hz), brighten during attack (1250Hz), settle to steady-state (900Hz). The `setTargetAtTime` with time constant 0.35s creates an exponential decay toward the sustain cutoff — sounds more natural than a linear ramp back down.
+Play test progressions (ii–V–I, Adagio, 12-Bar Blues, Giant Steps) through each preset in both Staccato and Legato modes. Also test interactive taps and single-note node taps. User feedback → keep / discard / adjust parameters.
 
-**Crackling hypothesis:** The 350ms attack (vs current 120ms) buries mobile onset crackling — the same `ctx.currentTime` staleness produces an inaudible difference in a slow ramp. The longer release (1.4s) similarly smooths offset artifacts.
+#### Step 3: Lock & Clean
 
-**Interactive feel concern:** 350ms attack may feel sluggish for taps. If so, split by context:
-- `attackTime` = 0.15s for interactive (keep snappy)
-- `padAttackTime` = 0.35s for scheduled playback
-- `createVoice()` accepts optional `attackOverride`; scheduler passes `padAttackTime` when `padMode` is true
-
-**Listen for:**
-- Does the saw+triangle combo feel "warm and full" or "buzzy"? Adjust `osc1Gain` (saw level) and `filterCutoff` (how much buzz the filter removes).
-- Does the filter bloom add a pleasant "opening" to each chord? Or is it too dramatic? Reduce bloom range (try 700→1100 instead of 550→1250).
-- Legato mode: do common-tone sustains blend better with the richer harmonics?
-- Staccato mode: does the longer release cause overlap issues? (Should not — hard-stop at boundary still fires.)
-
-#### 3d-B: Slow LFO on Filter Cutoff ("Breathing Motion")
-
-Add one LFO oscillator per voice modulating the LP filter cutoff. Creates organic "breathing" — the harmonics gently open and close. Much slower than my original proposal, based on research: 0.07–0.15 Hz reads as organic drift, not wobble.
-
-**Signal chain addition (8 nodes/voice — +2 for LFO + depth gain):**
-```
-Osc1 (saw, −5¢) ──► oscGain1 ──┐
-                                 ├──► LP filter ◄── LFO depth gain ◄── LFO (sine, 0.09Hz)
-Osc2 (tri, +5¢) ──► oscGain2 ──┘        │
-                                     ADSR envelope ──► destination
-```
-
-| Parameter | Starting value | Rationale |
-|-----------|----------------|-----------|
-| LFO type | sine | Smooth, symmetrical sweep |
-| LFO rate | **0.09 Hz** | One cycle every ~11 seconds. Research: 0.05–0.15Hz for "breathing." Slow enough to feel organic, not a musical effect. |
-| LFO depth | **±120 Hz** | Filter sweeps ~780–1020Hz around the 900Hz cutoff. Harmonic content gently opens and closes. |
-
-**Implementation (in `createVoice`):**
-```ts
-const lfo = ctx.createOscillator();
-lfo.type = "sine";
-lfo.frequency.value = 0.09;
-const lfoDepth = ctx.createGain();
-lfoDepth.gain.value = 120;
-lfo.connect(lfoDepth);
-lfoDepth.connect(filter.frequency);  // modulates cutoff ± depth
-lfo.start(oscStart);
-```
-
-LFO lifecycle: starts with the voice's oscillators, stopped/disconnected in `stop()` and release cleanup. No ADSR needed.
-
-**Why per-voice, not global:** Each voice starts its LFO at a different time, so the LFOs naturally phase-drift. 4 voices with unsynchronized 11-second LFO cycles create a complex, evolving harmonic texture — far richer than a single global LFO that moves all voices in lockstep.
-
-**Listen for:**
-- Is the breathing audible as gentle movement, or inaudible? If too subtle, increase depth to ±180–200Hz.
-- Is it too obvious / swooshy? Reduce depth to ±80Hz or slow rate to 0.06Hz.
-- Does the filter bloom (3d-A) interact well with the LFO, or do they fight? The bloom is a one-shot onset event; the LFO is continuous. They should complement — bloom provides the attack character, LFO provides the sustain animation.
-
-#### 3d-C: Global Feedback Delay with Damping ("Room Space")
-
-Add a shared delay effect after the per-voice chain. A single feedback delay in the early-reflection range (35–80ms) with LP damping in the feedback path creates a sense of space without muddiness. This is **not** a reverb — it's a "room smear" that adds depth cheaply.
-
-**Global effect chain (4 nodes, shared — NOT per-voice):**
-```
-Per-voice destination (master gain)
-    │
-    ├──► dryGain (0.84) ──────────────────────────────────────┐
-    │                                                          ├──► final output
-    └──► DelayNode (55ms) ──► dampingLP (2400Hz) ──► feedbackGain (0.33) ──┐  │
-              ▲                                                              │  │
-              └──────────────────────────────────────────────────────────────┘  │
-              │                                                                 │
-              └──► wetGain (0.16) ─────────────────────────────────────────────┘
-```
-
-| Parameter | Starting value | Rationale |
-|-----------|----------------|-----------|
-| Delay time | 55 ms | Early reflection zone — perceived as "room" not "echo" |
-| Feedback gain | 0.33 | Moderate — 3–4 audible repeats before silence |
-| Damping LP cutoff | 2400 Hz | Repeats get progressively darker — prevents metallic ringing |
-| Damping LP Q | 0.3 | Gentle rolloff |
-| Wet mix | 0.16 | Subtle — space without washing out chord clarity |
-| Dry mix | 0.84 | Dry + wet ≈ 1.0 |
-
-**Implementation location:** New function `createDelayEffect(ctx, destination)` in `synth.ts` (or new `effects.ts`). Returns an AudioNode that per-voice chains connect to (replaces direct connection to `ctx.destination`). Called once during audio init, not per voice.
-
-**Node budget:** 4 global nodes (DelayNode + BiquadFilterNode + 2× GainNode). Total system: 8 per-voice × 4 voices + 4 global = 36. Acceptable.
-
-**Web Audio cycle rule:** `DelayNode` in a feedback loop requires `delayTime` ≥ one render quantum (~2.9ms at 44.1kHz). Our 55ms is well above this threshold.
-
-**Listen for:**
-- Does the delay add a sense of depth/space? Or is it audible as a distinct echo? If echoey, reduce delay time to 35–40ms and/or reduce wet mix to 0.12.
-- Does the damping keep repeats clean? If metallic, lower the damping LP cutoff to 1800Hz.
-- Does it muddy fast chord changes in Staccato mode? If so, reduce feedback to 0.2 so repeats die faster.
-- Interactive taps: does a single note feel "placed in a room"? Or does the delay add an unwanted slap?
-
-#### Experiment Execution Order (Direction 1)
-
-1. **A first** — establishes the tonal foundation. The oscillator swap + filter bloom is the biggest perceptual change. If the saw+triangle combo feels right, keep for B and C. If too buzzy, try saw+sine or triangle+triangle as fallbacks.
-2. **B on top of A** — adds organic motion. The slow LFO animates the harmonics that A introduced. If A's lower cutoff makes the sound too dark, the LFO's sweep reopens it periodically.
-3. **C on top of A+B** — adds spatial depth. The delay should be tried last because it's a global effect that may mask or enhance issues in the per-voice chain.
-
-**If the "angelic choir" direction is preferred over "warm dark pad":** Try square+sawtooth (instead of sawtooth+triangle) with higher cutoff (1850Hz), higher Q (1.25), and longer attack (0.65s). See SOUND_SCULPTING.md "Bright angelic choir pad" recipe.
-
----
-
-#### Direction 2: Cathedral Organ (alternative tonal character)
-
-A fundamentally different approach based on organ emulation research (see `AUDIO_ENGINE/SOUND_SCULPTING_1.md`). Instead of sculpting a pad from raw oscillator waveforms, use **PeriodicWave** to bake a precise harmonic spectrum into a single oscillator — the same technique real drawbar organs use. Combined with a dual-delay cathedral bloom, this produces a warm, spacious, recognizably "organ" sound.
-
-**Why consider this direction:** The current triangle+sine sound is thin because the filter has little harmonic material to work with. Direction 1 fixes this by switching to sawtooth. Direction 2 fixes it differently — by designing the exact harmonic spectrum upfront with `PeriodicWave`, controlling each partial's amplitude individually. This gives organ-like warmth without the saw's buzziness, and uses **fewer nodes per voice** (no separate mix gains needed).
-
-##### 3d-D: PeriodicWave Organ Tone + Sub-Octave ("Cathedral Voice")
-
-Replace both oscillators with: one `PeriodicWave` oscillator (warm principal spectrum) + one sine sub-octave. The PeriodicWave encodes a custom harmonic series — fundamental + controlled upper partials — in a single oscillator node.
-
-**Signal chain (6 nodes/voice):**
-```
-Osc1 (PeriodicWave "principal") ──► oscGain1 (0.55) ──┐
-                                                        ├──► LP filter ──► ADSR envelope ──► destination
-Osc2 (sine, noteHz/2)           ──► oscGain2 (0.30) ──┘
-```
-
-**PeriodicWave "warm principal" partial amplitudes:**
-```
-Partial  1: 1.00   (8′ foundation)
-Partial  2: 0.42   (4′ octave)
-Partial  3: 0.18   (12th flavor)
-Partial  4: 0.10   (2′)
-Partial  5: 0.06
-Partial  6: 0.05
-Partial  8: 0.03
-```
-
-Built once at init, reused across all voices: `ctx.createPeriodicWave(real, imag)` where `imag[n]` = partial amplitude, `real[n]` = 0. Normalize so `Σ amplitudes × 1.8 < 1.0` to prevent clipping.
-
-| Parameter | Starting value | Rationale |
-|-----------|----------------|-----------|
-| `osc1` | PeriodicWave at `noteHz` | Custom harmonic spectrum — warm principals with gentle upper brightness |
-| `osc2` | sine at `noteHz / 2` | Sub-octave foundation — adds depth and body |
-| `osc1Gain` | 0.55 | Principal voice carries the timbre |
-| `osc2Gain` | 0.30 | Sub sits underneath — felt more than heard |
-| `filterCutoff` | 4200 Hz | Higher than Direction 1 — PeriodicWave harmonics are already controlled, filter mainly removes harshness |
-| `filterQ` | 0.75 | Gentle — no resonant peak |
-| `attackTime` | 0.012s | Near-instant organ onset — not a pad wash |
-| `releaseTime` | 0.080s | Quick release — bloom comes from the delay, not the voice |
-
-**Optional "chiff"** (pipe speech cue, no extra nodes): on note-on, briefly open filter cutoff to 6200Hz, ramp back to 4200Hz over 30ms. Adds subtle articulation to each chord.
-
-**Listen for:**
-- Does the PeriodicWave sound "organ-like" or "synthetic"? Adjust partial amplitudes — more upper partials = brighter/reedier, fewer = warmer/flutier.
-- Does the sub-octave add body or muddiness? Reduce `osc2Gain` to 0.15 if muddy.
-- Is the instant attack jarring compared to the pad? If the app "needs" to feel pad-like, try 0.05–0.10s attack as a compromise.
-
-##### 3d-E: Dual Feedback Delay ("Cathedral Bloom")
-
-Upgrade from Direction 1's single delay to **two feedback delays with different times**. Different delay times create denser, more natural-sounding early reflections — closer to a real room than a single echo.
-
-**Global effect chain (8 nodes, shared):**
-```
-Per-voice destination (master gain)
-    │
-    ├──► dryGain (0.78) ────────────────────────────────────────────────────┐
-    │                                                                        ├──► final output
-    └──► wetGain (0.22) ──┬──► Delay1 (61ms) ──► dampLP1 (2900Hz) ──► fb1 (0.33) ──► Delay1
-                          │                                    │
-                          └──► Delay2 (89ms) ──► dampLP2 (2400Hz) ──► fb2 (0.28) ──► Delay2
-                                                               │
-                              Delay1 out + Delay2 out ──────────────────────┘
-```
-
-| Parameter | Delay 1 | Delay 2 | Rationale |
-|-----------|---------|---------|-----------|
-| Delay time | 61 ms | 89 ms | Different prime-ish values — avoids phase alignment that sounds metallic |
-| Feedback gain | 0.33 | 0.28 | Delay 2 slightly shorter-lived — creates asymmetric decay |
-| Damping LP cutoff | 2900 Hz | 2400 Hz | Delay 2 darker — mimics distant reflections absorbing highs |
-| Damping LP Q | 0.3 | 0.3 | Gentle rolloff in both |
-| Wet mix | 0.22 | | Slightly wetter than Direction 1's single delay |
-| Dry mix | 0.78 | | |
-
-**Node count:** 8 global (2× DelayNode + 2× BiquadFilterNode + 2× GainNode feedback + dryGain + wetGain). With 6-node voices: 6 × 4 + 8 = 32 nodes total.
-
-**Listen for:**
-- Does the dual delay create a sense of "room" or "cathedral"? Compare with Direction 1's single delay.
-- Is the bloom too long / too washy? Reduce feedback gains to 0.25/0.20.
-- Does the asymmetric decay sound natural? If it sounds like two distinct echoes instead of a diffuse wash, reduce delay time difference (try 55ms/72ms).
-
-##### Direction 2 Execution Order
-
-1. **D first** — PeriodicWave + sub-octave establishes the organ character. Use Direction 1's single delay (3d-C) as initial space for quick comparison.
-2. **E replaces C** — swap single delay for dual delay. Listen for the bloom improvement.
-3. **Compare D+E (organ) vs A+B+C (pad)** — play the same progressions through both. The organ direction should feel more "spacious and churchy"; the pad direction more "floating and synthetic."
-
----
-
-#### Final Deliverable
-
-The Refine outcome may be:
-- **(a) One preset** — the winner from the A/B/C vs D/E comparison, locked into `SYNTH_DEFAULTS`.
-- **(b) Two or three selectable presets** — if both directions sound good for different music. This would require a preset selector UI element in the sidebar (small scope: dropdown or toggle next to Staccato/Legato).
-
-If (b): presets are baked parameter sets (not user-adjustable knobs). Each preset defines oscillator config, filter, envelope, and delay parameters. The `createVoice()` function takes a preset object instead of reading `SYNTH_DEFAULTS` directly. Global delay is reconfigured per preset (or shared with preset-specific wet/dry). **UI decision deferred to the Refine feedback loop.**
-
-Update `ARCH_AUDIO_ENGINE.md §2b` with final parameter values, signal chain diagram, and node budget. If PeriodicWave is used, document the partial amplitude table.
-
-**Files touched:** `AUDIO_ENGINE/src/synth.ts` (per-voice chain + defaults + PeriodicWave construction), possibly new `AUDIO_ENGINE/src/effects.ts` (global delay), `AUDIO_ENGINE/src/immediate-playback.ts` and `AUDIO_ENGINE/src/scheduler.ts` (wire global delay as destination). ARCH doc on completion.
-
-**Reference material:** `AUDIO_ENGINE/SOUND_SCULPTING.md` (pad synthesis), `AUDIO_ENGINE/SOUND_SCULPTING_1.md` (organ emulation + PeriodicWave technique).
+Remove discarded presets. If one winner → remove dropdown, lock into `SYNTH_DEFAULTS`. If 2+ → keep dropdown. Update `ARCH_AUDIO_ENGINE.md §2b`.
 
 ### Phase 4: Mobile UAT (remaining)
 
