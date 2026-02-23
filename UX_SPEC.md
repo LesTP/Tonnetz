@@ -189,13 +189,13 @@ Primary interface states:
 
 State transitions:
 
-* Idle → Chord Selected (triangle or edge-proximity interaction)
+* Idle → Chord Selected (triangle, edge-proximity, or node interaction)
 * Idle → Progression Loaded (paste/import)
 * Chord Selected → Progression Loaded (paste/import dismisses current selection)
+* Progression Loaded → Chord Selected (triangle, edge-proximity, or node interaction — audio plays, highlight shown; progression path remains rendered) (POL-D28, revises INT-D6)
 * Progression Loaded → Playback Running (play)
 * Playback Running → Progression Loaded (stop)
 * Playback Running → Playback Running (tap/click is ignored during active playback; user must stop first) (UX-D6)
-* Progression Loaded → Progression Loaded (tap/click is ignored while a progression is loaded; user clears progression first to return to exploration) (INT-D6)
 * Progression Loaded → Idle Exploration (clear button) (UX-D5)
 * Chord Selected → Idle Exploration (tap empty space or timeout)
 

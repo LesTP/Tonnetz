@@ -783,7 +783,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   const inputLabel = el("label");
   inputLabel.textContent = "Progression:";
   const textarea = el("textarea", C.textarea, {
-    placeholder: "Enter chords (e.g., Dm7 | G7 | Cmaj7)",
+    placeholder: "Enter chords (e.g., Dm7 G7 Cmaj7)",
     "data-testid": "progression-input",
   });
   textarea.rows = 3;

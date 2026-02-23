@@ -209,14 +209,14 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return e;
 }
 
-/** Collapse repeated chords into a pipe-delimited preview string. */
+/** Collapse repeated chords into a space-delimited preview string. */
 function chordPreview(chords: readonly string[], maxLen = 40): string {
   const unique: string[] = [];
   let prev = "";
   for (const c of chords) {
     if (c !== prev) { unique.push(c); prev = c; }
   }
-  const full = unique.join(" | ");
+  const full = unique.join(" ");
   return full.length > maxLen ? full.slice(0, maxLen - 1) + "…" : full;
 }
 

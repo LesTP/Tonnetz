@@ -260,7 +260,7 @@ function handleLoadProgression(text: string): void {
   if (chords.length === 0) return;
   if (loadProgressionFromChords(chords)) {
     // Update textarea with cleaned chord symbols (e.g., "Gaug7" → "Gaug")
-    sidebar.setInputText(currentChordSymbols.join(" | "));
+    sidebar.setInputText(currentChordSymbols.join(" "));
   }
 }
 
@@ -398,7 +398,7 @@ const libraryUI = createLibraryUI({
     // Load progression
     const chords = [...entry.chords];
     if (loadProgressionFromChords(chords)) {
-      sidebar.setInputText(chords.join(" | "));
+      sidebar.setInputText(chords.join(" "));
       sidebar.switchToTab("play");
     }
   },

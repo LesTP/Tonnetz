@@ -5,6 +5,136 @@ Started: 2026-02-16
 
 ---
 
+## Entry 26 — Phase 3d Synthesis Exploration Plan (Discuss)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Design session: planned Phase 3d (synthesis exploration) with two directions informed by deep research. No code changes.
+
+### Research Inputs
+
+Two research documents produced via external deep research and added to the repository:
+
+1. **`AUDIO_ENGINE/SOUND_SCULPTING.md`** — Web Audio pad synthesis techniques. Key findings:
+   - Triangle+sine (current) is thin because the filter has little harmonic material to sculpt. At least one saw or square oscillator needed for lush pads.
+   - Filter bloom envelope (cutoff rises during attack, settles during sustain) matters more than most people expect for pad warmth.
+   - LFO breathing rates should be much slower than typical — 0.05–0.15 Hz (7–20 second cycles), not 0.3 Hz.
+   - Simple feedback delay with LP damping in the loop (35–80ms, feedback 0.2–0.4) adds spaciousness cheaply.
+   - Three concrete recipes: warm dark pad (saw+tri, LP 900Hz, slow LFO), bright angelic choir (square+saw, LP 1850Hz, Q=1.25), glassy ethereal (saw+saw ±9¢, LP 3600Hz, detune LFO).
+   - iOS mute switch blocks Web Audio — worth surfacing in UX copy.
+
+2. **`AUDIO_ENGINE/SOUND_SCULPTING_1.md`** — Web Audio organ emulation. Key findings:
+   - **PeriodicWave is the drawbar cheat code** — `ctx.createPeriodicWave()` bakes a custom harmonic spectrum into a single oscillator. One node encodes what would otherwise need 7–9 separate oscillators. Dramatically better node efficiency than raw waveform types.
+   - Organ envelopes are gate-like (near-instant attack/release with anti-click ramps), not ADSR pads. Bloom comes from global space, not voice release.
+   - Dual feedback delays (different times, different damping) create denser, more natural cathedral bloom than a single delay.
+   - Three concrete presets: warm cathedral (PeriodicWave principals + sine sub-octave + dual-delay bloom, 32 nodes), small church positiv (single PeriodicWave, no FX, 16 nodes), Leslie electric organ (drawbar PeriodicWave + rotary LFO + crossover + doppler, 26 nodes).
+   - The `noteHz/2` trick maps all 9 drawbar footages to integer harmonics of a single PeriodicWave oscillator.
+
+### Plan Revisions
+
+The original Phase 3d was a one-line placeholder ("waveform combinations, reverb, filter tuning"). Replaced with a structured two-direction plan:
+
+**Direction 1: Ethereal Pad** (3 cumulative experiments)
+- **3d-A:** Sawtooth+triangle oscillators, separate mix gains, ±5¢ detune, filter bloom envelope (550→1250→900Hz), slower ADSR (attack 0.35s, release 1.4s). 6 nodes/voice. Addresses both "thin sound" and mobile crackling (slow attack buries timing errors).
+- **3d-B:** Per-voice LFO on filter cutoff at 0.09Hz ±120Hz. Organic breathing motion. 8 nodes/voice.
+- **3d-C:** Global feedback delay with LP damping (55ms, feedback 0.33, damping 2400Hz). 4 global nodes.
+
+**Direction 2: Cathedral Organ** (2 experiments, alternative character)
+- **3d-D:** PeriodicWave "warm principal" (7 controlled partials) + sine sub-octave. Near-instant attack (12ms). Optional chiff (30ms filter cutoff spike). 6 nodes/voice.
+- **3d-E:** Dual feedback delays (61ms/89ms, different damping). Richer cathedral bloom. 8 global nodes.
+
+**Execution:** Direction 1 tried cumulatively (A→B→C). Direction 2 tried independently (D→E). Finalists compared on same progression set. Outcome may be one winner or 2–3 selectable presets (UI decision deferred to Refine feedback loop).
+
+### Key Corrections from Research
+
+| Original assumption | Correction | Source |
+|---------------------|------------|--------|
+| Sine+sine ("Glass Organ") as Experiment C | **Dropped** — going less harmonic makes the sound thinner, not more ethereal | SOUND_SCULPTING.md |
+| LFO rate 0.3 Hz | **Slowed to 0.09 Hz** — 0.05–0.15 Hz reads as organic drift, not wobble | SOUND_SCULPTING.md |
+| Single delay for space | **Dual delays** (different times/damping) for denser, more natural bloom | SOUND_SCULPTING_1.md |
+| Raw oscillator types only | **PeriodicWave** option — custom harmonic spectrum in 1 node, organ-quality tone | SOUND_SCULPTING_1.md |
+| One preset outcome assumed | **Two or three presets** possible if both directions sound good | Both |
+
+### No Files Changed (code)
+
+Planning-only entry. DEVPLAN updated, research documents added to `AUDIO_ENGINE/`.
+
+---
+
+## Entry 25 — Node Interaction & Interaction Policy Decisions (Discuss)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Design session: planned Phase 4e (node interaction — single-note playback on lattice node tap) and revised the interaction suppression policy. Two decisions opened. No code changes.
+
+### Decisions
+
+```
+POL-D28: Relax interaction suppression in progression-loaded state
+Date: 2026-02-23
+Status: Closed
+Priority: Important
+Decision:
+Allow interactive exploration (triangle, edge, and node taps → audio + highlight)
+while a progression is loaded but not playing. Suppress interaction only during
+active playback (playback-running). Revises INT-D6 (Option A → Option C).
+Rationale:
+The original suppression was flagged as "slightly restrictive" with an explicit
+revisit condition: "User testing shows progression-loaded tap suppression is
+frustrating." That condition was met — users expect to explore the lattice while
+viewing a progression path. The progression path overlay remains rendered;
+interactive highlight coexists with it.
+Implementation scope:
+- interaction-wiring.ts: isPlaybackSuppressed() removes "progression-loaded"
+- ui-state.ts: selectChord() permits progression-loaded → chord-selected
+- UX_SPEC.md §5: state transition table updated
+Revisit if: Coexisting progression path + interactive highlight causes visual
+clutter. Could add a "dim path while exploring" treatment.
+```
+
+```
+POL-D29: Node selection highlight — orange disc with note label
+Date: 2026-02-23
+Status: Closed
+Priority: Important
+Decision:
+Tapping a lattice node shows the same orange disc used for the active chord
+marker during progression playback (ACTIVE_MARKER_FILL #e76f51, radius 0.32
+world units). Disc is centered on the tapped node and displays the note name
+(white label, same font as path centroid labels). Appears on pointer-down,
+disappears on pointer-up or drag-start.
+Rationale:
+Reuses an existing, tested visual element. The orange disc is already
+recognizable as "something is playing." Consistent marker vocabulary across
+interactive and playback modes. No new color/shape design needed.
+Implementation scope:
+- path-renderer.ts: export ACTIVE_MARKER_RADIUS + ACTIVE_MARKER_FILL (or
+  extract createMarkerDisc helper)
+- main.ts: create/position/hide disc on node pointer-down/up lifecycle
+Revisit if: Orange disc at 0.32 radius feels too large on nodes (overlaps
+neighboring nodes at close zoom). Could scale radius with zoom or use a
+smaller variant.
+```
+
+### Phase 4e Plan
+
+Added Phase 4e (Node Interaction — Single-Note Playback) to DEVPLAN with 5 steps:
+1. **4e-1:** Interaction policy revision (POL-D28) — `isPlaybackSuppressed()`, `selectChord()`, UX_SPEC
+2. **4e-2:** HitNode in hit-test — `HitNode` type, node proximity before edge, `NODE_HIT_RADIUS = 0.20`
+3. **4e-3:** Interaction dispatch — `onNodeSelect` callback, `playPitchClasses([pc])` on pointer-down
+4. **4e-4:** Node highlight — orange disc with note name, pointer-down/up lifecycle
+5. **4e-5:** Node size increase — `NODE_RADIUS` 0.15 → 0.20 (Refine tuning pass)
+
+### Contract Changes
+- UX_SPEC.md §5: added `Progression Loaded → Chord Selected` transition (POL-D28); removed INT-D6 self-loop suppression; added node interaction as trigger for `Idle → Chord Selected`
+- INTEGRATION/DEVPLAN.md: INT-D6 status updated to `Closed → Revised by POL-D28`; gotcha line updated
+
+---
+
 ## Entry 24 — Loop Mode: Equal-Duration Last Chord (Staccato Cut)
 
 **Date:** 2026-02-23

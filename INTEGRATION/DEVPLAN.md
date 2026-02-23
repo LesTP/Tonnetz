@@ -26,7 +26,7 @@ Top-level orchestrator for the Tonnetz Interactive Harmonic Explorer. Wires all 
 - `onPointerDown` fires with `WorldPoint` before tap/drag classification — integration must hit-test here for immediate audio per UX-D4
 - `InteractionCallbacks` fire with pitch classes, not Shapes — integration wires directly to `playPitchClasses()` (AE-D9)
 - `playPitchClasses()` during `Playback Running` state must be suppressed — integration checks UIState (UX-D6)
-- `UIStateController.selectChord()` silently rejects calls from both `progression-loaded` and `playback-running` — integration suppresses audio in both states to match (INT-D6 Closed: Option A)
+- `UIStateController.selectChord()` silently rejects calls from `playback-running` — integration suppresses audio to match (UX-D6). ~~Previously also rejected from `progression-loaded` (INT-D6 Option A)~~ — revised by POL-D28: interaction now allowed in `progression-loaded` (Option C)
 - `getEdgeUnionPcs()` returns `null` for boundary edges — must null-guard before passing to AE
 - `shape.covered_pcs` is a `Set<number>` — AE's `playShape()` handles the spread internally
 - PD `grid` string (`"1/4"`) → beat value (`1`) conversion is not bidirectional — we parse once at load time
@@ -468,21 +468,24 @@ at that point, extend AE's API to accept number | number[].
 ```
 INT-D6: Interactive playback in progression-loaded state
 Date: 2026-02-15
-Status: Closed
+Status: Closed → Revised by POL-D28 (2026-02-23)
 Priority: Important
-Decision: Option A — suppress audio in progression-loaded state.
-Rationale:
+Original decision: Option A — suppress audio in progression-loaded state.
+Revised decision (POL-D28): Option C — allow interaction (audio + highlight)
+in progression-loaded state; suppress only during playback-running.
+UIStateController.selectChord() now permits progression-loaded → chord-selected.
+Progression path remains rendered. Node interaction (POL-D29) also uses this
+policy.
+Rationale (original):
 UIStateController.selectChord() already silently rejects from
 progression-loaded (no visual highlight). Allowing audio without visual
 feedback creates a confusing mismatch. Suppressing both keeps behavior
 consistent: user clears progression first, then explores interactively.
-No module changes required.
-Trade-offs:
-Slightly restrictive — user cannot preview chords while a progression
-is displayed. Acceptable for MVP.
-Revisit if: User testing shows progression-loaded tap suppression is
-frustrating — at that point consider Option C (add progression-loaded →
-chord-selected transition to UIStateController).
+Rationale (revision):
+User testing showed the restriction was frustrating — users expected to
+explore the lattice while viewing a progression path. The "revisit if"
+condition was met. Option C (the planned escape hatch) adopted.
+See: MVP_POLISH/DEVPLAN.md §Phase 4e-1, UX_SPEC.md §5.
 ```
 
 ```
