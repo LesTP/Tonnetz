@@ -78,11 +78,11 @@ describe("initAudio — Phase 1b", () => {
     expect(transport.isPlaying()).toBe(false);
   });
 
-  it("getTempo() returns default 120 BPM", async () => {
+  it("getTempo() returns default 150 BPM", async () => {
     const transport = await initAudio({
       AudioContextClass: asMock(MockAudioContext),
     });
-    expect(transport.getTempo()).toBe(120);
+    expect(transport.getTempo()).toBe(150);
   });
 
   it("getTempo() returns custom initial tempo", async () => {
@@ -131,7 +131,7 @@ describe("getState()", () => {
     });
     const state = transport.getState();
     expect(state.playing).toBe(false);
-    expect(state.tempo).toBe(120);
+    expect(state.tempo).toBe(150);
     expect(state.currentChordIndex).toBe(-1);
     expect(state.totalChords).toBe(0);
   });
@@ -161,9 +161,9 @@ describe("setTempo()", () => {
       AudioContextClass: asMock(MockAudioContext),
     });
     transport.setTempo(0);
-    expect(transport.getTempo()).toBe(120);
+    expect(transport.getTempo()).toBe(150);
     transport.setTempo(-10);
-    expect(transport.getTempo()).toBe(120);
+    expect(transport.getTempo()).toBe(150);
   });
 });
 

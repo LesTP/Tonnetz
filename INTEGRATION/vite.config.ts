@@ -3,6 +3,9 @@ import path from "path";
 
 export default defineConfig({
   root: ".",
+  server: {
+    host: true,
+  },
   resolve: {
     alias: {
       "harmony-core": path.resolve(__dirname, "../HARMONY_CORE/src/index.ts"),

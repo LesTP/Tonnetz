@@ -200,7 +200,7 @@ describe("CameraController — zoom", () => {
       }));
     }
     const cam = ctx.ctrl.getCamera();
-    expect(cam.zoom).toBeGreaterThanOrEqual(0.25);
+    expect(cam.zoom).toBeGreaterThanOrEqual(0.15);
   });
 
   it("zoom anchor stability — world point near pointer stays approximately fixed", () => {

@@ -24,6 +24,26 @@ export const SYNTH_DEFAULTS = {
   releaseTime: 0.5,
 } as const;
 
+/**
+ * Safety offset for scheduling Web Audio events on mobile devices.
+ *
+ * On mobile/tablet, the AudioContext renders in large buffer chunks
+ * (512–1024 samples = 12–23ms). ctx.currentTime on the main thread
+ * only updates once per buffer, so it can be 12–23ms stale by the time
+ * our JavaScript reads it. Events scheduled at ctx.currentTime land in
+ * the past on the audio thread, causing:
+ *   - Onset: envelope ramp partially elapsed → first sample not silent
+ *   - Offset: fade-out ramp end in the past → instant snap to 0 (click)
+ *
+ * Scheduling events at ctx.currentTime + safeOffset guarantees they land
+ * in a future audio buffer. The offset is derived from ctx.baseLatency
+ * (when available) which equals the buffer duration, or falls back to
+ * a conservative 25ms (covers 1024 samples at 44.1kHz).
+ */
+function safeOffset(ctx: AudioContext): number {
+  return (ctx as { baseLatency?: number }).baseLatency ?? 0.025;
+}
+
 // ── MIDI → frequency ─────────────────────────────────────────────────
 
 /** Convert MIDI note number to frequency in Hz. A4 = 440 Hz = MIDI 69. */
@@ -68,7 +88,11 @@ export function createVoice(
   velocity: number = 100,
   when?: number,
 ): VoiceHandle {
+  const offset = safeOffset(ctx);
   const now = when ?? ctx.currentTime;
+  // Oscillators start in the future to guarantee the envelope is at 0
+  // before any signal reaches the destination. See safeOffset() docs.
+  const oscStart = now + offset;
   const freq = midiToFreq(midi);
   const peakGain = velocity / 127;
 
@@ -109,14 +133,19 @@ export function createVoice(
   filter.Q.value = filterQ;
 
   // Envelope gain (ADSR)
+  // gain.value = 0 as immediate backstop; setValueAtTime anchors the
+  // automation timeline. Envelope holds at 0 from now → oscStart, then
+  // attack ramp begins when oscillators start producing signal.
   const envGain = ctx.createGain();
+  envGain.gain.value = 0;
   envGain.gain.setValueAtTime(0, now);
+  envGain.gain.setValueAtTime(0, oscStart);
   // Attack: ramp to peak
-  envGain.gain.linearRampToValueAtTime(peakGain, now + attackTime);
+  envGain.gain.linearRampToValueAtTime(peakGain, oscStart + attackTime);
   // Decay: ramp to sustain
   envGain.gain.linearRampToValueAtTime(
     peakGain * sustainLevel,
-    now + attackTime + decayTime,
+    oscStart + attackTime + decayTime,
   );
 
   // Connect: osc1,osc2 → mixGain → filter → envGain → destination
@@ -126,9 +155,9 @@ export function createVoice(
   filter.connect(envGain);
   envGain.connect(destination);
 
-  // Start oscillators
-  osc1.start(now);
-  osc2.start(now);
+  // Start oscillators at the safe future time
+  osc1.start(oscStart);
+  osc2.start(oscStart);
 
   let released = false;
   let stopped = false;
@@ -188,14 +217,21 @@ export function createVoice(
       if (stopped) return;
       stopped = true;
       released = true;
-      // Short fade-out (10ms) to avoid DC click from instant disconnect,
-      // but far shorter than releaseTime (500ms) so no audible overlap
-      // with the next chord's attack. (Phase 3a envelope cleanup)
-      const fadeOut = 0.01;
+      // Cancel any pending release cleanup timer
+      if (releaseCleanupId !== null) {
+        clearTimeout(releaseCleanupId);
+        releaseCleanupId = null;
+      }
+      // Fade-out long enough (50ms) to survive stale ctx.currentTime on
+      // mobile (12–23ms staleness). Unlike createVoice's safeOffset, we
+      // do NOT push t into the future here — that would cancel the
+      // envelope automation scheduled at oscStart when ctx.currentTime
+      // hasn't changed between voice creation and stop (same audio buffer).
+      const fadeOut = 0.05;
       const t = ctx.currentTime;
       try {
         envGain.gain.cancelScheduledValues(t);
-        envGain.gain.setValueAtTime(envGain.gain.value, t);
+        envGain.gain.setValueAtTime(peakGain * sustainLevel, t);
         envGain.gain.linearRampToValueAtTime(0, t + fadeOut);
         osc1.stop(t + fadeOut + 0.01);
         osc2.stop(t + fadeOut + 0.01);

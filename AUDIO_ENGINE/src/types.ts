@@ -104,6 +104,12 @@ export interface AudioTransport {
   /** Returns true if pad mode is active. */
   getPadMode(): boolean;
 
+  /** Sets loop mode: last chord hard-stops at endTime (no release tail). */
+  setLoop(enabled: boolean): void;
+
+  /** Returns true if loop mode is active. */
+  getLoop(): boolean;
+
   // === Event Subscriptions ===
 
   /** Subscribes to playback state changes. Returns unsubscribe function. */

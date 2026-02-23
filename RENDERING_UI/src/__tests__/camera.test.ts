@@ -300,10 +300,10 @@ describe("applyZoom", () => {
     expect(zoomed.zoom).toBe(12);
   });
 
-  it("clamps zoom at minimum (0.25)", () => {
-    const cam = { centerX: 0, centerY: 0, zoom: 0.3 };
+  it("clamps zoom at minimum (0.15)", () => {
+    const cam = { centerX: 0, centerY: 0, zoom: 0.2 };
     const zoomed = applyZoom(cam, 0.5, 0, 0);
-    expect(zoomed.zoom).toBe(0.25);
+    expect(zoomed.zoom).toBe(0.15);
   });
 
   it("zoom factor < 1 zooms out", () => {

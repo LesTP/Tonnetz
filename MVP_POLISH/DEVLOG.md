@@ -5,6 +5,203 @@ Started: 2026-02-16
 
 ---
 
+## Entry 24 — Loop Mode: Equal-Duration Last Chord (Staccato Cut)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Fixed loop playback so the last chord has the same duration as all other chords. Previously the last chord played for an extra 550ms (release tail + margin) before the loop restarted. Now in loop mode, the scheduler hard-stops all voices at the last chord's `endTime` and fires `onComplete` immediately. Single (non-loop) playback retains the graceful release tail.
+
+### Root Cause
+
+The scheduler's completion check waited for `lastSlot.endTime + releaseTime (500ms) + 0.05s` before firing `onComplete`. This was a deliberate fix from Entry 17 to prevent crackling when voices were hard-stopped during their release tail. But it made the last chord perceptibly longer than all others, and in loop mode the 550ms gap was audible between iterations.
+
+The release tail only matters for the **last chord** — every other chord's release is killed by the next chord's hard-stop at the boundary. So the asymmetry was: internal boundaries = staccato cut, last chord = 550ms fade.
+
+### Fix
+
+Added a `loop` flag to `CreateSchedulerOptions` / `SchedulerState`. The scheduler's completion check now branches:
+
+- **Loop mode (`loop: true`):** completes at `lastSlot.endTime`. Hard-stops all voices (same as a staccato chord boundary), disconnects master gain, fires `onComplete` immediately. No release tail.
+- **Normal mode (`loop: false`):** existing behavior — waits for release tail + 50ms margin, voices self-clean via `setTimeout`.
+
+Added `setLoop(enabled)` / `getLoop()` to `AudioTransport` interface. `main.ts` wires the sidebar loop toggle to `transport.setLoop()`.
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `AE/src/scheduler.ts` | `loop` on `CreateSchedulerOptions` + `SchedulerState`; completion check branches on `state.loop`: hard-stop at `endTime` (loop) vs wait for release tail (normal) |
+| `AE/src/audio-context.ts` | `loop` state variable; passed to `createScheduler`; `setLoop()`/`getLoop()` on transport |
+| `AE/src/types.ts` | `setLoop(enabled: boolean)` + `getLoop(): boolean` on `AudioTransport` |
+| `INT/src/main.ts` | `handleLoopToggle` calls `transport.setLoop(enabled)` |
+
+### Test Results
+
+AE 202, INT 239 — all passing, 0 type errors.
+
+---
+
+## Entry 23 — Progression Viewport Clipping on Small Devices
+
+**Date:** 2026-02-23
+
+### Summary
+
+Long progressions clipped the left edge of the lattice on phone-sized screens. Fixed with three constant changes: rightward-biased initial placement focus, lower minimum zoom, and smaller minimum triangle size. Also fixed a regression where `safeOffset` in `stop()`/`release()`/`cancelRelease()` silenced audio on mobile.
+
+### Problem
+
+On phone-sized screens, longer progressions (8+ chords) frequently extended beyond the left edge of the rendered grid. Two contributing factors: (1) initial placement focus at lattice origin gives no room for leftward drift (most progressions move left via fifth motion); (2) grid and zoom floors were too restrictive for small screens.
+
+### Fix: Three Constants
+
+| File | Constant | Before | After | Effect |
+|------|----------|--------|-------|--------|
+| `INT/src/main.ts` | initial focus `u` | `0` | `Math.floor(bounds.uMax * 0.25)` | Placement starts 25% rightward, giving room for leftward drift |
+| `RU/src/camera.ts` | `MIN_ZOOM` | `0.25` | `0.15` | `fitToBounds` can pull back further for long progressions |
+| `RU/src/resize-controller.ts` | `MIN_TRI_SIZE_PX` | `25` | `18` | Larger grid on phones (more nodes before hitting edges) |
+
+### Audio Regression: safeOffset in stop()/release()/cancelRelease()
+
+During mobile testing of the viewport fix, discovered that the `safeOffset` applied to `stop()`, `release()` (immediate case), and `cancelRelease()` in Entry 21 caused **complete audio silence** on all mobile devices. Root cause: on mobile, `ctx.currentTime` can be the same value at both touchstart (voice creation) and touchend (stop) — they're in the same audio buffer. When `stop()` used `ctx.currentTime + offset`, `cancelScheduledValues(t)` cancelled the exact envelope automation that `createVoice` had scheduled at `oscStart = now + offset` (same value), leaving the envelope at 0 permanently.
+
+**Fix:** Removed `safeOffset` from `stop()`, `release()`, and `cancelRelease()` — these need to act ASAP on already-playing voices, not be delayed. The `safeOffset` is now applied **only** in `createVoice` for oscillator start timing. For `stop()`, the stale-timing crackle is addressed by increasing the fade-out from 10ms to 50ms (survives 23ms staleness without needing a future offset).
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `INT/src/main.ts` | Initial focus: `{ u: 0, v: 0 }` → `{ u: Math.floor(bounds.uMax * 0.25), v: 0 }` |
+| `RU/src/camera.ts` | `MIN_ZOOM` 0.25→0.15 |
+| `RU/src/resize-controller.ts` | `MIN_TRI_SIZE_PX` 25→18 |
+| `AE/src/synth.ts` | `stop()`: removed safeOffset, fadeOut 10→50ms. `release()`: removed safeOffset for immediate case. `cancelRelease()`: removed safeOffset. `safeOffset` retained only in `createVoice` for oscillator start. |
+
+### Test Results
+
+AE 202, RU 367, INT 239 — all passing, 0 type errors.
+
+---
+
+## Entry 22 — iOS Safari Compatibility Issues (iPhone 12 mini, iOS 18.6.2)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Initial iOS Safari testing revealed four distinct issues. No fixes attempted — observations documented for Phase 4d (cross-device UAT).
+
+### Issues Observed
+
+**1. SVG text labels mispositioned.**
+Node labels (note names) are shifted relative to their circles/triangles. Likely cause: Safari's non-standard handling of `dominant-baseline` on SVG `<text>` elements. Safari ignores or misinterprets `dominant-baseline: central` / `middle`, causing vertical offset. Known WebKit bug. Fix: use `dy="0.35em"` as a cross-browser alternative to `dominant-baseline`.
+
+**2. Progression font colors wrong (white instead of dark grey).**
+After loading a progression, grid node labels appear white. Likely cause: the `grid-highlighter.ts` mutate-grid approach sets `fill` on node circles — if the label `<text>` elements share or inherit fill from the same parent, the highlight fill (white for centroid labels, or active chord colors) may bleed into grid labels. Alternatively, the path renderer's white centroid note-name labels may be rendered on top of grid labels without proper z-ordering in Safari's SVG renderer.
+
+**3. No audio (interactive or scheduled).**
+Tapping triangles produces no sound. Likely cause: iOS Safari's stricter autoplay policy. The `AudioContext` must be created AND `resume()`-ed within a **synchronous** user gesture handler. The current `ensureAudio()` in `interaction-wiring.ts` is async (`await initAudio()`), which may break the gesture-handler chain on iOS — the `AudioContext.resume()` promise resolves outside the original gesture, and Safari blocks it. This is the most common iOS Web Audio issue.
+
+**4. Playback does not progress.**
+Play button does not toggle to Stop; no chord animation. This is a downstream consequence of issue 3 — if `AudioTransport` never initializes, `transport.play()` is never called, `onStateChange` never fires, and the UI state never transitions to `playback-running`.
+
+### Recommended Fixes (for Phase 4d)
+
+| Issue | Approach |
+|-------|----------|
+| Label positioning | Replace `dominant-baseline` with `dy="0.35em"` on all SVG `<text>` elements |
+| Font colors | Audit `grid-highlighter.ts` fill mutations — ensure `<text>` fill is not affected by circle/triangle highlighting. May need separate `fill` attribute on text vs circle |
+| Audio not playing | Create `AudioContext` synchronously in the first gesture handler (not async). Call `ctx.resume()` synchronously. Defer `createImmediatePlayback` to after resume resolves, but the context must exist before the gesture handler returns |
+| Playback not progressing | Will resolve when audio initializes correctly |
+
+### No Files Changed
+
+Observation-only entry. No code changes.
+
+---
+
+## Entry 21 — Mobile Audio Crackling Investigation
+
+**Date:** 2026-02-23
+
+### Summary
+
+Investigated loud crackling at chord onset and offset on mobile/tablet devices. Multiple fixes applied, with partial success on newer devices (Pixel 6) but persistent crackling on budget tablet (Galaxy Tab A7 Lite). Root cause identified as stale `ctx.currentTime` on mobile devices with large audio buffers. Deferred to Phase 3d / Phase 4c for further investigation with device-specific diagnostic data.
+
+### Symptom
+
+Loud, distinct crackle at the start and end of every chord during both interactive (tap/hold) and scheduled (progression) playback. Severity correlates with device age/power:
+
+| Device | Result |
+|--------|--------|
+| Desktop (any) | Clean — no crackling |
+| Pixel 6 (phone) | Clean or minimal after safeOffset fix |
+| Galaxy Tab A7 Lite (budget tablet, 2021, MediaTek MT8768T) | Loud, persistent crackling at every chord onset/offset |
+
+Both Staccato and Legato modes affected. Not a gain clipping issue — the gain math (max `4 × 0.24 × 0.787 = 0.755`) is well under 1.0.
+
+### Root Cause Analysis
+
+On mobile/tablet, `AudioContext` renders in large buffer chunks (512–2048 samples = 12–46ms). `ctx.currentTime` on the main thread only updates once per buffer, so by the time JavaScript reads it and schedules Web Audio events, the time value can be 12–46ms **in the past** from the audio thread's perspective.
+
+**Onset crackle:** `createVoice()` scheduled `envGain.gain.setValueAtTime(0, now)` and `osc.start(now)` where `now` was stale. On the audio thread, both events resolved to the past. The oscillators started immediately, but the envelope's ramp was partially elapsed — the first sample of output was at 10–30% of peak gain instead of 0, producing a click.
+
+**Offset crackle:** `stop()` scheduled a 10ms fade-out ramp ending at `ctx.currentTime + 0.01`. On the tablet, `ctx.currentTime` was 20–46ms stale, so `t + 0.01` was still in the past. The audio thread resolved the ramp instantly to 0 — no fade, just a DC discontinuity at sustain level.
+
+### Fixes Applied
+
+**Fix 1: Known sustain level in `stop()` (Entry 17 pattern)**
+Replaced `envGain.gain.value` read (stale on main thread) with `peakGain * sustainLevel` (known value from closure) in `stop()`. Same pattern already used in `release()` since Entry 17. This eliminated the `gain.value` stale-read discontinuity but didn't address the stale-time issue.
+
+**Fix 2: `envGain.gain.value = 0` at creation**
+Set `GainNode.value = 0` directly before scheduling automation, closing the gap where the default value (1.0) could leak through during the automation processing delay. Helped on desktop/phone but insufficient for tablet with larger buffers.
+
+**Fix 3: `safeOffset` — schedule all events in the future**
+Added `safeOffset(ctx)` function returning `ctx.baseLatency ?? 0.025` (25ms fallback). Applied throughout `createVoice()`, `stop()`, `release()` (immediate case), and `cancelRelease()`:
+- **Onset:** oscillators start at `now + safeOffset`; envelope holds at 0 from `now` through `oscStart`, then attack ramp begins at `oscStart`. Guarantees gain is exactly 0 when oscillators produce first sample.
+- **Offset:** fade-out ramp starts at `ctx.currentTime + safeOffset` instead of `ctx.currentTime`, guaranteeing the 10ms ramp end is in the future on the audio thread.
+
+This fixed the Pixel 6 but not the Galaxy Tab A7 Lite — the tablet's actual buffer latency likely exceeds the 25ms fallback, and `ctx.baseLatency` may not be available or accurate on its older Chrome/Android version.
+
+### Why It Remains Unsolved on Galaxy Tab
+
+1. **No diagnostic data from the device.** We don't know the actual `ctx.baseLatency`, `ctx.sampleRate`, or buffer size on the Galaxy Tab. The 25ms fallback was chosen conservatively but may need to be 50–100ms for this hardware.
+
+2. **Cannot test from code analysis.** This is a Refine problem (per GOVERNANCE.md) — correctness requires human perception on the actual device. Automated tests use mocks that don't simulate real-time audio buffer behavior.
+
+3. **Possible alternative causes not yet investigated:**
+   - Audio driver / hardware resampling artifacts (MediaTek audio subsystem)
+   - Chrome Android version differences in Web Audio event processing
+   - `ctx.baseLatency` unavailable or inaccurate → fallback too small
+   - Main-thread contention (SVG mutation during audio) causing buffer underruns
+
+### Attempted but Not Applied
+
+- **DynamicsCompressorNode as limiter** — would mask clipping artifacts but doesn't address the root timing issue. Deferred as a potential mitigation.
+- **Brute-force 100ms offset** — not tested; would confirm whether the timing theory is correct for this tablet or whether the cause is entirely different.
+
+### Recommended Next Steps (for Phase 3d or 4c)
+
+1. **Add diagnostic logging** to report `ctx.sampleRate`, `ctx.baseLatency`, `ctx.outputLatency`, `ctx.state` on device
+2. **Brute-force test:** temporarily set offset to 100ms, test on Galaxy Tab — if crackle disappears, the timing theory is confirmed and the offset just needs tuning
+3. **If timing theory confirmed:** use `ctx.baseLatency` with a multiplier (e.g., `2× baseLatency`) or let the user configure audio latency
+4. **If timing theory NOT confirmed:** investigate DynamicsCompressorNode, explicit `sampleRate` in AudioContext constructor, or accept as a known limitation of budget hardware
+
+### Files Changed
+
+| File | Changes |
+|------|---------|
+| `AE/src/synth.ts` | `safeOffset()` function; `createVoice()`: oscStart = now + offset, envelope hold at 0 through oscStart; `stop()`: schedule at t + offset, known sustain level; `release()`: offset for immediate case; `cancelRelease()`: offset for timing |
+| `AE/src/__tests__/audio-context.test.ts` | Default tempo assertions 120→150 (pre-existing fix, POL-D26) |
+| `INT/vite.config.ts` | `server.host: true` for network access (tablet testing) |
+
+### Test Results
+
+AE 202 — all passing, 0 type errors.
+
+---
+
 ## Entry 20 — Phase 4a: Mobile Touch + Responsive Layout
 
 **Date:** 2026-02-21

@@ -148,7 +148,10 @@ const pathHandleProxy: PathHandle = {
  * Returns true on success, false on parse error.
  */
 function loadProgressionFromChords(chords: string[]): boolean {
-  const focus: CentroidCoord = { u: 0, v: 0 };
+  const focus: CentroidCoord = {
+    u: Math.floor(resizeCtrl.getBounds().uMax * 0.25),
+    v: 0,
+  };
   const indices = resizeCtrl.getIndices();
 
   const result = loadProgressionPipeline({
@@ -321,6 +324,9 @@ function handleTempoChange(bpm: number): void {
 
 function handleLoopToggle(enabled: boolean): void {
   log.info("playback", `Loop ${enabled ? "enabled" : "disabled"}`);
+  if (audioState.transport) {
+    audioState.transport.setLoop(enabled);
+  }
 }
 
 function handlePathModeChange(mode: "root" | "tonal"): void {

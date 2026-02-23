@@ -33,8 +33,8 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 **Phase:** Phases 0–3, header redesign, and Phase 4a (mobile touch + layout) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4d (remaining mobile UAT), then Phase 5.
 **Blocked/Broken:** None.
-**Open decisions:** POL-D5 (mobile proximity radius — may be adequate as-is), D14 (m7b5 triangles — deferred post-MVP).
-**Known limitations:** Giant Steps symmetric jumps; Tristan chord Am placement (both require global optimizer).
+**Open decisions:** D14 (m7b5 triangles — deferred post-MVP).
+**Known limitations:** Giant Steps symmetric jumps; Tristan chord Am placement (both require global optimizer); mobile audio crackling on budget tablets (see Entry 21); iOS Safari rendering + audio issues (see Entry 22).
 
 ---
 
@@ -152,6 +152,8 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 |-------|--------|-------|
 | Giant Steps symmetric jumps | Known limitation | Requires two-pass global optimizer (future) |
 | Tristan chord Am placement | Known limitation | Local algorithm picks left Am; no CHAIN_BLEND value fixes it |
+| Mobile audio crackling (budget tablets) | Deferred to Phase 3d/4c | Stale `ctx.currentTime` on large-buffer devices. `safeOffset` fix helped Pixel 6, not Galaxy Tab A7 Lite. Need device diagnostic data + brute-force offset test. See Entry 21 |
+| iOS Safari: labels, colors, no audio, no playback | Deferred to Phase 4d | iPhone 12 mini, iOS 18.6.2. Four issues: `dominant-baseline` label positioning, highlight fill bleeding into text, async AudioContext blocked by autoplay policy, playback UI not progressing. See Entry 22 |
 
 ## Resolved Issues
 
@@ -164,6 +166,9 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | Placement jumps | Centroid focus + cluster gravity (Entry 18) |
 | Drag jitter | Screen-space deltas (Entry 13) |
 | Chord continues during drag | `onDragStart` stops audio (Entry 13) |
+| Progression viewport clipping on small screens | Rightward focus bias (25% of grid width), MIN_ZOOM 0.25→0.15, MIN_TRI_SIZE_PX 25→18 (Entry 23) |
+| safeOffset audio regression on mobile | safeOffset removed from stop/release/cancelRelease, kept only in createVoice; stop fadeOut 10→50ms (Entry 23) |
+| Loop last-chord duration asymmetry | Loop mode: scheduler hard-stops at endTime instead of waiting for release tail; `setLoop`/`getLoop` on AudioTransport (Entry 24) |
 
 ---
 
@@ -198,10 +203,10 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | D25 | 02-21 | Auto-hide sidebar on Play (mobile); sidebar open/close manual via hamburger only |
 | D26 | 02-21 | Default tempo 150 BPM (page load + Clear) |
 | D27 | 02-22 | Share button: URL from window.location + encodeShareUrl, clipboard copy with fallback, ✓ feedback |
+| D5 | 02-16 | Mobile proximity radius 0.12 world units — confirmed adequate on Pixel 6, Galaxy Tab A7 Lite, iPhone 12 mini |
 
 ### Open
 
 | # | Date | Decision | Status |
 |---|------|----------|--------|
-| D5 | 02-16 | Mobile proximity radius | Deferred to Phase 4a |
 | D14 | 02-17 | m7b5 non-root triangle placement | Deferred post-MVP |

@@ -103,6 +103,8 @@ export interface SchedulerState {
   stopped: boolean;
   /** Pad mode: per-voice continuation at chord boundaries (3c). */
   readonly padMode: boolean;
+  /** Loop mode: hard-stop at last chord endTime instead of waiting for release tail. */
+  readonly loop: boolean;
 }
 
 // ── Scheduler creation ───────────────────────────────────────────────
@@ -119,6 +121,8 @@ export interface CreateSchedulerOptions {
   onComplete?: () => void;
   /** Pad mode: per-voice continuation at chord boundaries (3c). Default: false (piano mode). */
   padMode?: boolean;
+  /** Loop mode: cut cleanly at last chord endTime (no release tail). Default: false. */
+  loop?: boolean;
 }
 
 /**
@@ -173,6 +177,7 @@ export function createScheduler(opts: CreateSchedulerOptions): SchedulerState {
     onComplete: opts.onComplete ?? null,
     stopped: false,
     padMode: opts.padMode ?? false,
+    loop: opts.loop ?? false,
   };
 }
 
@@ -309,17 +314,30 @@ function tick(state: SchedulerState): void {
   }
 
   // Check if playback is complete (all chords have ended).
-  // Delay by releaseTime so the last chord's release tail plays out.
-  // Don't call stopScheduler — voices are already in their release
-  // tails and will self-clean via setTimeout. Hard-stopping would
-  // cancel the smooth ramp and cause a click.
+  // In loop mode: hard-stop at endTime (same as staccato chord boundary)
+  // so all chords have equal duration. No release tail.
+  // In normal mode: delay by releaseTime so the last chord fades out
+  // gracefully. Voices self-clean via their release setTimeout.
   if (state.chords.length > 0) {
     const lastSlot = state.chords[state.chords.length - 1];
-    if (now >= lastSlot.endTime + SYNTH_DEFAULTS.releaseTime + 0.05) {
+    const completionTime = state.loop
+      ? lastSlot.endTime
+      : lastSlot.endTime + SYNTH_DEFAULTS.releaseTime + 0.05;
+    if (now >= completionTime) {
       state.stopped = true;
       if (state.timerHandle !== null) {
         clearInterval(state.timerHandle);
         state.timerHandle = null;
+      }
+      // In loop mode, hard-stop all voices (staccato cut)
+      if (state.loop) {
+        for (const slot of state.chords) {
+          for (const voice of slot.voices) {
+            voice.stop();
+          }
+          slot.voices = [];
+        }
+        state.masterGain.disconnect();
       }
       if (state.onComplete) {
         state.onComplete();
