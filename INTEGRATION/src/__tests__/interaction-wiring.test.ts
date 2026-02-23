@@ -1,14 +1,15 @@
 /**
- * Tests for interaction-wiring.ts — Phase 3a/3b/3c.
+ * Tests for interaction-wiring.ts — Phase 3a/3b/3c + Phase 4d-1.
  *
  * Phase 3a: Lazy audio initialization (createAppAudioState, ensureAudio)
  * Phase 3b: onPointerDown immediate audio (UX-D4)
  * Phase 3c: Post-classification wiring (select, pointer-up, state gating)
+ * Phase 4d-1: Synchronous ensureAudio for iOS Safari compatibility
  *
  * Strategy:
  * - Uses real HC functions (buildWindowIndices, getTrianglePcs, getEdgeUnionPcs)
  * - Uses real RU UIStateController and hitTest
- * - Mocks AE audio functions (initAudio, createImmediatePlayback, playPitchClasses, stopAll)
+ * - Mocks AE audio functions (initAudioSync, createImmediatePlayback, playPitchClasses, stopAll)
  *   via vi.mock() since AudioContext is not available in test environment.
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
@@ -28,7 +29,7 @@ import type { UIStateController, WorldPoint } from "rendering-ui";
 
 // ── Mock AE module ──────────────────────────────────────────────────
 
-// Mock the entire audio-engine module: initAudio, createImmediatePlayback,
+// Mock the entire audio-engine module: initAudioSync, createImmediatePlayback,
 // playPitchClasses, stopAll. We replace them with vi.fn() stubs.
 vi.mock("audio-engine", () => {
   const mockTransport = {
@@ -61,6 +62,7 @@ vi.mock("audio-engine", () => {
   };
 
   return {
+    initAudioSync: vi.fn(() => mockTransport),
     initAudio: vi.fn(async () => mockTransport),
     createImmediatePlayback: vi.fn(() => mockImmediatePlayback),
     playPitchClasses: vi.fn(),
@@ -74,7 +76,7 @@ vi.mock("audio-engine", () => {
 
 // Import mock references for assertions
 import {
-  initAudio,
+  initAudioSync,
   playPitchClasses as mockPlayPitchClasses,
   stopAll as mockStopAll,
   // @ts-expect-error — test-only exports from mock
@@ -98,7 +100,7 @@ beforeEach(() => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// Phase 3a: Lazy Audio Initialization
+// Phase 3a / 4d-1: Synchronous Audio Initialization
 // ═══════════════════════════════════════════════════════════════════
 
 describe("createAppAudioState", () => {
@@ -106,39 +108,38 @@ describe("createAppAudioState", () => {
     const state = createAppAudioState();
     expect(state.transport).toBeNull();
     expect(state.immediatePlayback).toBeNull();
-    expect(state.initPromise).toBeNull();
   });
 });
 
 describe("ensureAudio", () => {
-  it("creates AudioTransport on first call", async () => {
-    const result = await ensureAudio(audioState);
-    expect(initAudio).toHaveBeenCalledOnce();
+  it("creates AudioTransport synchronously on first call", () => {
+    const result = ensureAudio(audioState);
+    expect(initAudioSync).toHaveBeenCalledOnce();
     expect(result.transport).toBe(__mockTransport);
     expect(result.immediatePlayback).toBe(__mockImmediatePlayback);
   });
 
-  it("caches and returns same instance on second call (no double-init)", async () => {
-    const first = await ensureAudio(audioState);
-    const second = await ensureAudio(audioState);
-    expect(initAudio).toHaveBeenCalledOnce();
+  it("caches and returns same instance on second call (no double-init)", () => {
+    const first = ensureAudio(audioState);
+    const second = ensureAudio(audioState);
+    expect(initAudioSync).toHaveBeenCalledOnce();
     expect(second.transport).toBe(first.transport);
     expect(second.immediatePlayback).toBe(first.immediatePlayback);
   });
 
-  it("populates audioState after init", async () => {
+  it("populates audioState after init", () => {
     expect(audioState.transport).toBeNull();
-    await ensureAudio(audioState);
+    ensureAudio(audioState);
     expect(audioState.transport).toBe(__mockTransport);
     expect(audioState.immediatePlayback).toBe(__mockImmediatePlayback);
   });
 
-  it("deduplicates concurrent calls via shared promise", async () => {
-    const p1 = ensureAudio(audioState);
-    const p2 = ensureAudio(audioState);
-    const [r1, r2] = await Promise.all([p1, p2]);
-    expect(initAudio).toHaveBeenCalledOnce();
-    expect(r1.transport).toBe(r2.transport);
+  it("is synchronous — returns value, not Promise", () => {
+    const result = ensureAudio(audioState);
+    // If ensureAudio were async, result would be a Promise with .then
+    expect(result).not.toBeInstanceOf(Promise);
+    expect(result.transport).toBeDefined();
+    expect(result.immediatePlayback).toBeDefined();
   });
 });
 
@@ -165,7 +166,7 @@ describe("onPointerDown (Phase 3b)", () => {
     return { x: 99999, y: 99999 };
   }
 
-  it("triggers playPitchClasses on triangle hit", async () => {
+  it("triggers playPitchClasses synchronously on triangle hit", () => {
     const callbacks = createInteractionWiring({
       audioState,
       uiState,
@@ -174,10 +175,8 @@ describe("onPointerDown (Phase 3b)", () => {
 
     callbacks.onPointerDown!(getTriangleCenter());
 
-    // Wait for the async ensureAudio to resolve
-    await vi.waitFor(() => {
-      expect(mockPlayPitchClasses).toHaveBeenCalled();
-    });
+    // ensureAudio is synchronous — playPitchClasses fires in same frame
+    expect(mockPlayPitchClasses).toHaveBeenCalled();
 
     // Should have been called with pitch classes (3 for triad, 4 for edge union)
     const pcs = (mockPlayPitchClasses as Mock).mock.calls[0][1];
@@ -185,7 +184,7 @@ describe("onPointerDown (Phase 3b)", () => {
     expect(pcs.length).toBeLessThanOrEqual(4);
   });
 
-  it("does not trigger audio on background hit (HitNone)", async () => {
+  it("does not trigger audio on background hit (HitNone)", () => {
     const callbacks = createInteractionWiring({
       audioState,
       uiState,
@@ -193,14 +192,10 @@ describe("onPointerDown (Phase 3b)", () => {
     });
 
     callbacks.onPointerDown!(getBackgroundPoint());
-
-    // Give async path time to resolve
-    await new Promise((r) => setTimeout(r, 20));
     expect(mockPlayPitchClasses).not.toHaveBeenCalled();
   });
 
-  it("suppresses audio during playback-running state (UX-D6)", async () => {
-    // Load a dummy progression to get to progression-loaded state
+  it("suppresses audio during playback-running state (UX-D6)", () => {
     const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
       uiState.loadProgression([dummyShape]);
       uiState.startPlayback();
@@ -213,12 +208,10 @@ describe("onPointerDown (Phase 3b)", () => {
     });
 
     callbacks.onPointerDown!(getTriangleCenter());
-
-    await new Promise((r) => setTimeout(r, 20));
     expect(mockPlayPitchClasses).not.toHaveBeenCalled();
   });
 
-  it("suppresses audio during progression-loaded state (INT-D6)", async () => {
+  it("suppresses audio during progression-loaded state (INT-D6)", () => {
     const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
       uiState.selectChord(dummyShape);
     uiState.loadProgression([dummyShape]);
@@ -231,12 +224,10 @@ describe("onPointerDown (Phase 3b)", () => {
     });
 
     callbacks.onPointerDown!(getTriangleCenter());
-
-    await new Promise((r) => setTimeout(r, 20));
     expect(mockPlayPitchClasses).not.toHaveBeenCalled();
   });
 
-  it("triggers lazy audio init on first pointer down", async () => {
+  it("triggers lazy audio init on first pointer down", () => {
     expect(audioState.transport).toBeNull();
 
     const callbacks = createInteractionWiring({
@@ -247,10 +238,7 @@ describe("onPointerDown (Phase 3b)", () => {
 
     callbacks.onPointerDown!(getTriangleCenter());
 
-    await vi.waitFor(() => {
-      expect(initAudio).toHaveBeenCalledOnce();
-    });
-
+    expect(initAudioSync).toHaveBeenCalledOnce();
     expect(audioState.transport).toBe(__mockTransport);
   });
 });
@@ -260,8 +248,8 @@ describe("onPointerDown (Phase 3b)", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("Post-classification callbacks (Phase 3c)", () => {
-  it("onPointerUp calls stopAll when audio is initialized", async () => {
-    await ensureAudio(audioState);
+  it("onPointerUp calls stopAll when audio is initialized", () => {
+    ensureAudio(audioState);
     vi.clearAllMocks();
 
     const callbacks = createInteractionWiring({
@@ -285,8 +273,8 @@ describe("Post-classification callbacks (Phase 3c)", () => {
     expect(mockStopAll).not.toHaveBeenCalled();
   });
 
-  it("onPointerUp still fires during playback-running (stop is always safe)", async () => {
-    await ensureAudio(audioState);
+  it("onPointerUp still fires during playback-running (stop is always safe)", () => {
+    ensureAudio(audioState);
     vi.clearAllMocks();
 
     const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
@@ -303,8 +291,8 @@ describe("Post-classification callbacks (Phase 3c)", () => {
     expect(mockStopAll).toHaveBeenCalledOnce();
   });
 
-  it("idle state allows pointer-down audio callback", async () => {
-    await ensureAudio(audioState);
+  it("idle state allows pointer-down audio callback", () => {
+    ensureAudio(audioState);
     vi.clearAllMocks();
 
     expect(uiState.getState()).toBe("idle");
@@ -320,8 +308,8 @@ describe("Post-classification callbacks (Phase 3c)", () => {
     expect(mockStopAll).toHaveBeenCalledOnce();
   });
 
-  it("chord-selected state allows pointer-down audio callback", async () => {
-    await ensureAudio(audioState);
+  it("chord-selected state allows pointer-down audio callback", () => {
+    ensureAudio(audioState);
     vi.clearAllMocks();
 
     const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };

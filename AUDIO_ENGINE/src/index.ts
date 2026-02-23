@@ -19,7 +19,7 @@ export type {
 } from "./types.js";
 
 // AudioContext initialization
-export { initAudio } from "./audio-context.js";
+export { initAudio, initAudioSync } from "./audio-context.js";
 
 // Voicing model (ARCH §3)
 export { nearestMidiNote, voiceInRegister, voiceLead } from "./voicing.js";

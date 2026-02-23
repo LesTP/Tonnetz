@@ -91,6 +91,7 @@ vi.mock("audio-engine", () => {
 
   return {
     initAudio: vi.fn(async () => mockTransport),
+    initAudioSync: vi.fn(() => mockTransport),
     createImmediatePlayback: vi.fn(() => mockImmediatePlayback),
     playPitchClasses: vi.fn(),
     playShape: vi.fn(),
@@ -192,7 +193,7 @@ async function loadAndWire(text: string) {
   mockControlPanel.setProgressionLoaded(true);
 
   // Simulate main.ts: ensureAudio + schedule + wire transport
-  const { transport } = await ensureAudio(audioState);
+  const { transport } = ensureAudio(audioState);
   transport.setTempo(120);
   transport.scheduleProgression(result.events);
 

@@ -1,12 +1,14 @@
 /**
  * AudioContext initialization and AudioTransport factory.
  *
- * initAudio() creates an AudioContext (resuming if suspended per browser
- * autoplay policy) and returns an AudioTransport instance that serves as
- * the shared transport timebase for both Audio Engine and Rendering/UI.
+ * initAudioSync() creates an AudioContext synchronously and calls resume()
+ * within the same call stack — required for iOS Safari autoplay policy.
+ * initAudio() is an async wrapper that awaits the resume() promise for
+ * callers that need the fully-resolved context (tests, non-gesture paths).
  *
  * Phase 1b: Time/state queries fully implemented.
  * Phase 2: Transport control methods connected to the scheduler engine.
+ * Phase 4d-1: Synchronous init for iOS Safari compatibility (POL-D28).
  */
 
 import type {
@@ -28,25 +30,11 @@ import {
 const DEFAULT_TEMPO = 150;
 
 /**
- * Initialize the audio system. Must be called after a user gesture
- * (browser autoplay policy requires user interaction before AudioContext
- * can produce sound).
- *
- * @param options - Optional configuration. Tests inject MockAudioContext
- *   via options.AudioContextClass.
- * @returns AudioTransport instance
+ * Build an AudioTransport from an already-created AudioContext.
+ * Pure factory — no async, no resume. Used by both initAudioSync and initAudio.
  */
-export async function initAudio(
-  options?: InitAudioOptions,
-): Promise<AudioTransport> {
-  const Ctor = options?.AudioContextClass ?? globalThis.AudioContext;
-  const ctx = new Ctor();
-
-  if (ctx.state === "suspended") {
-    await ctx.resume();
-  }
-
-  let tempo = options?.initialTempo ?? DEFAULT_TEMPO;
+function buildTransport(ctx: AudioContext, initialTempo?: number): AudioTransport {
+  let tempo = initialTempo ?? DEFAULT_TEMPO;
   let playing = false;
   let currentChordIndex = -1;
   let scheduledEvents: readonly ChordEvent[] = [];
@@ -85,8 +73,6 @@ export async function initAudio(
   }
 
   const transport: AudioTransport = {
-    // === Time Queries ===
-
     getTime(): number {
       return ctx.currentTime;
     },
@@ -94,8 +80,6 @@ export async function initAudio(
     getContext(): AudioContext {
       return ctx;
     },
-
-    // === State Queries ===
 
     getState(): TransportState {
       return {
@@ -118,8 +102,6 @@ export async function initAudio(
       return currentChordIndex;
     },
 
-    // === Playback Control ===
-
     setTempo(bpm: number): void {
       if (bpm <= 0) return;
       tempo = bpm;
@@ -133,12 +115,10 @@ export async function initAudio(
       if (scheduledEvents.length === 0) return;
       if (playing) return;
       playing = true;
-      // Only reset chord index on fresh start; preserve on resume from pause
       if (pausedBeatOffset === 0) {
         currentChordIndex = 0;
       }
 
-      // Create and start the scheduler
       scheduler = createScheduler({
         ctx,
         destination: ctx.destination,
@@ -150,7 +130,6 @@ export async function initAudio(
         loop,
         onChordChange: emitChordChange,
         onComplete() {
-          // Progression ended naturally — transition transport state
           playing = false;
           currentChordIndex = -1;
           pausedBeatOffset = 0;
@@ -213,8 +192,6 @@ export async function initAudio(
       return loop;
     },
 
-    // === Event Subscriptions ===
-
     onStateChange(callback: (event: PlaybackStateChange) => void): () => void {
       stateListeners.add(callback);
       return () => {
@@ -231,4 +208,56 @@ export async function initAudio(
   };
 
   return transport;
+}
+
+/**
+ * Initialize the audio system synchronously (Phase 4d-1).
+ *
+ * Creates an AudioContext and calls resume() in the same synchronous call
+ * stack. On iOS Safari, this is required — resume() must be called within
+ * the user gesture handler. The resume() Promise is fire-and-forget; the
+ * context transitions to "running" before the next audio buffer renders.
+ *
+ * @param options - Optional configuration. Tests inject MockAudioContext
+ *   via options.AudioContextClass.
+ * @returns AudioTransport instance (synchronous — no Promise)
+ */
+export function initAudioSync(
+  options?: InitAudioOptions,
+): AudioTransport {
+  const Ctor = options?.AudioContextClass ?? globalThis.AudioContext;
+  const ctx = new Ctor();
+
+  if (ctx.state === "suspended") {
+    // Call resume() synchronously — do NOT await.
+    // iOS Safari unblocks the context as a side effect of calling resume()
+    // within a user gesture handler. The Promise resolves later but the
+    // context is already usable for scheduling.
+    void ctx.resume();
+  }
+
+  return buildTransport(ctx, options?.initialTempo);
+}
+
+/**
+ * Initialize the audio system (async version).
+ *
+ * Thin wrapper around initAudioSync that awaits ctx.resume() for callers
+ * that need the fully-resolved context (tests, non-gesture code paths).
+ * Existing tests use this — preserved for backward compatibility.
+ *
+ * @param options - Optional configuration.
+ * @returns AudioTransport instance (async)
+ */
+export async function initAudio(
+  options?: InitAudioOptions,
+): Promise<AudioTransport> {
+  const Ctor = options?.AudioContextClass ?? globalThis.AudioContext;
+  const ctx = new Ctor();
+
+  if (ctx.state === "suspended") {
+    await ctx.resume();
+  }
+
+  return buildTransport(ctx, options?.initialTempo);
 }

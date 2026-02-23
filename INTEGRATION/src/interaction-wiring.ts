@@ -17,7 +17,7 @@ import { getTrianglePcs, getEdgeUnionPcs } from "harmony-core";
 
 import type { AudioTransport, ImmediatePlaybackState } from "audio-engine";
 import {
-  initAudio,
+  initAudioSync,
   createImmediatePlayback,
   playPitchClasses,
   stopAll,
@@ -31,14 +31,12 @@ import type {
 } from "rendering-ui";
 import { hitTest, computeProximityRadius } from "rendering-ui";
 
-// ── Phase 3a: Lazy Audio Initialization ─────────────────────────────
+// ── Phase 3a / 4d-1: Synchronous Audio Initialization ───────────────
 
 /** Mutable holder for lazily-initialized audio state (INT-D3). */
 export interface AppAudioState {
   transport: AudioTransport | null;
   immediatePlayback: ImmediatePlaybackState | null;
-  /** Resolves when audio init is in progress to prevent double-init. */
-  initPromise: Promise<void> | null;
 }
 
 /** Create a fresh uninitialized audio state holder. */
@@ -46,22 +44,24 @@ export function createAppAudioState(): AppAudioState {
   return {
     transport: null,
     immediatePlayback: null,
-    initPromise: null,
   };
 }
 
 /**
- * Ensure audio is initialized, lazy-init on first call (INT-D3).
+ * Ensure audio is initialized, lazy-init on first call (INT-D3, Phase 4d-1).
  *
- * - First call: creates AudioContext + ImmediatePlaybackState, caches both.
+ * Synchronous: creates AudioContext and calls resume() in the same call stack.
+ * On iOS Safari, this is required — resume() must be called within the user
+ * gesture handler, not after an await (which breaks the gesture chain).
+ *
+ * - First call: creates AudioContext + ImmediatePlaybackState synchronously.
  * - Subsequent calls: returns cached instances immediately.
- * - Concurrent calls during init: dedup via shared promise.
  *
  * Must be called from a user gesture handler (browser autoplay policy).
  */
-export async function ensureAudio(
+export function ensureAudio(
   state: AppAudioState,
-): Promise<{ transport: AudioTransport; immediatePlayback: ImmediatePlaybackState }> {
+): { transport: AudioTransport; immediatePlayback: ImmediatePlaybackState } {
   if (state.transport && state.immediatePlayback) {
     return {
       transport: state.transport,
@@ -69,21 +69,12 @@ export async function ensureAudio(
     };
   }
 
-  if (!state.initPromise) {
-    state.initPromise = (async () => {
-      const transport = await initAudio();
-      const immediatePlayback = createImmediatePlayback(transport);
-      state.transport = transport;
-      state.immediatePlayback = immediatePlayback;
-    })();
-  }
+  const transport = initAudioSync();
+  const immediatePlayback = createImmediatePlayback(transport);
+  state.transport = transport;
+  state.immediatePlayback = immediatePlayback;
 
-  await state.initPromise;
-
-  return {
-    transport: state.transport!,
-    immediatePlayback: state.immediatePlayback!,
-  };
+  return { transport, immediatePlayback };
 }
 
 // ── Phase 3b/3c: Interaction Callbacks Factory ──────────────────────
@@ -128,84 +119,60 @@ export function createInteractionWiring(
     proximityRadius = computeProximityRadius(),
   } = options;
 
-  /**
-   * Monotonic generation counter to prevent the async ensureAudio race.
-   *
-   * Problem: on the very first click, ensureAudio is truly async (~5-20ms).
-   * If the user releases the pointer before the promise resolves,
-   * onPointerUp calls stopAll() *before* playPitchClasses() runs,
-   * leaving voices playing indefinitely.
-   *
-   * Solution: increment on pointer-down, increment again on pointer-up.
-   * The async callback checks that generation hasn't changed; if it has,
-   * the pointer was already released so we skip playing.
-   */
-  let pointerGeneration = 0;
+// ── Phase 3b: onPointerDown → immediate audio (UX-D4) ──────────
 
-  // ── Phase 3b: onPointerDown → immediate audio (UX-D4) ──────────
+const onPointerDown = (world: WorldPoint): void => {
+  if (isPlaybackSuppressed(uiState)) return;
 
-  const onPointerDown = (world: WorldPoint): void => {
-    if (isPlaybackSuppressed(uiState)) return;
+  const indices = getIndices();
+  const hit: HitResult = hitTest(world.x, world.y, proximityRadius, indices);
 
-    const indices = getIndices();
-    const hit: HitResult = hitTest(world.x, world.y, proximityRadius, indices);
+  if (hit.type === "none") return;
 
-    if (hit.type === "none") return;
+  // ensureAudio is synchronous (Phase 4d-1) — AudioContext created and
+  // resume() called within this gesture handler's call stack, which is
+  // required for iOS Safari autoplay policy.
+  const { immediatePlayback } = ensureAudio(audioState);
 
-    const gen = ++pointerGeneration;
+  let pcs: readonly number[] | null = null;
 
-    // Fire-and-forget: ensureAudio is async but we don't want to block
-    // the gesture handler. On first call there's a one-time ~5-20ms delay;
-    // subsequent calls resolve synchronously from cache (INT-D3).
-    void ensureAudio(audioState).then(({ immediatePlayback }) => {
-      // If pointer was released while we were awaiting, don't start sound
-      if (gen !== pointerGeneration) return;
-
-      let pcs: readonly number[] | null = null;
-
-      if (hit.type === "triangle") {
-        const triRef = indices.triIdToRef.get(hit.triId);
-        if (triRef) {
-          pcs = getTrianglePcs(triRef);
-        }
-      } else if (hit.type === "edge") {
-        pcs = getEdgeUnionPcs(hit.edgeId, indices);
-      }
-
-      if (pcs && pcs.length > 0) {
-        playPitchClasses(immediatePlayback, pcs);
-      }
-    });
-  };
-
-  // ── Phase 3c: Post-classification callbacks ─────────────────────
-
-  const onTriangleSelect = (_triId: TriId, _pcs: number[]): void => {
-    if (isPlaybackSuppressed(uiState)) return;
-    // Audio already playing from onPointerDown (UX-D4).
-    // Visual highlighting now handled in onPointerDown wrapper (main.ts).
-  };
-
-  const onEdgeSelect = (
-    _edgeId: EdgeId,
-    _triIds: [TriId, TriId],
-    _pcs: number[],
-  ): void => {
-    if (isPlaybackSuppressed(uiState)) return;
-    // Audio already playing from onPointerDown.
-    // Visual highlighting now handled in onPointerDown wrapper (main.ts).
-  };
-
-  const onPointerUp = (): void => {
-    // Bump generation so any in-flight async ensureAudio won't start playing
-    pointerGeneration++;
-
-    // Always stop audio on pointer up, even if state is now suppressed
-    // (user might have started a drag before state changed).
-    if (audioState.immediatePlayback) {
-      stopAll(audioState.immediatePlayback);
+  if (hit.type === "triangle") {
+    const triRef = indices.triIdToRef.get(hit.triId);
+    if (triRef) {
+      pcs = getTrianglePcs(triRef);
     }
-  };
+  } else if (hit.type === "edge") {
+    pcs = getEdgeUnionPcs(hit.edgeId, indices);
+  }
+
+  if (pcs && pcs.length > 0) {
+    playPitchClasses(immediatePlayback, pcs);
+  }
+};
+
+// ── Phase 3c: Post-classification callbacks ─────────────────────
+
+const onTriangleSelect = (_triId: TriId, _pcs: number[]): void => {
+  if (isPlaybackSuppressed(uiState)) return;
+  // Audio already playing from onPointerDown (UX-D4).
+  // Visual highlighting now handled in onPointerDown wrapper (main.ts).
+};
+
+const onEdgeSelect = (
+  _edgeId: EdgeId,
+  _triIds: [TriId, TriId],
+  _pcs: number[],
+): void => {
+  if (isPlaybackSuppressed(uiState)) return;
+  // Audio already playing from onPointerDown.
+  // Visual highlighting now handled in onPointerDown wrapper (main.ts).
+};
+
+const onPointerUp = (): void => {
+  if (audioState.immediatePlayback) {
+    stopAll(audioState.immediatePlayback);
+  }
+};
 
   return {
     onPointerDown,

@@ -31,10 +31,10 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phases 0–3, header redesign, and Phase 4a (mobile touch + layout) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4d (remaining mobile UAT), then Phase 4e (node interaction), then Phase 5.
+**Phase:** Phases 0–3, header redesign, Phase 4a (mobile touch + layout), and Phase 4d-1 (iOS audio fix) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4c (mobile UAT), then Phase 4d-2/3 (iOS cosmetics, conditional), then Phase 4e (node interaction), then Phase 5.
 **Blocked/Broken:** None.
 **Open decisions:** D14 (m7b5 triangles — deferred post-MVP).
-**Known limitations:** Mobile audio crackling on budget tablets (see Entry 21); iOS Safari rendering + audio issues (see Entry 22). Giant Steps and Tristan chord placement deferred post-MVP.
+**Known limitations:** Mobile audio crackling on budget tablets (see Entry 21). iOS Safari cosmetic issues (labels, colors) unconfirmed on iOS 14.x — conditional on physical device verification. Giant Steps and Tristan chord placement deferred post-MVP.
 
 ---
 
@@ -420,36 +420,9 @@ Update `ARCH_AUDIO_ENGINE.md §2b` with final parameter values, signal chain dia
 
 **Step ordering:** 4d-1 is the only confirmed blocker. 4d-2 and 4d-3 are conditional — execute only if reproduced on a physical device after 4d-1 is complete.
 
-#### 4d-1: Synchronous AudioContext creation (Issue 3 + Issue 4)
+#### 4d-1: Synchronous AudioContext creation (Issue 3 + Issue 4) ✅
 
-iOS Safari requires `AudioContext` creation and `resume()` to occur **synchronously within the user gesture call stack**. The current `ensureAudio()` is async — `await initAudio()` yields to the event loop, breaking the gesture chain. Safari blocks `resume()` when it resolves outside the gesture.
-
-Issue 4 (playback not progressing) is a downstream consequence: if the transport never initializes, `play()` is never called and the UI never transitions to `playback-running`.
-
-**Changes:**
-
-| File | Change |
-|------|--------|
-| `AUDIO_ENGINE/src/audio-context.ts` | Add `initAudioSync(options?): AudioTransport` — creates `AudioContext` and calls `ctx.resume()` synchronously (no `await`). Existing `initAudio()` becomes a thin async wrapper: `initAudioSync()` + `await ctx.resume()` for callers that need the fully-resolved promise. |
-| `INTEGRATION/src/interaction-wiring.ts` | `ensureAudio()` calls `initAudioSync()` on first invocation (synchronous, in gesture stack). `createImmediatePlayback()` runs in same synchronous frame. Subsequent calls return cached state (existing fast path, unchanged). Remove `async` from `ensureAudio()` signature — return type becomes `{ transport, immediatePlayback }` (not Promise). |
-| `INTEGRATION/src/interaction-wiring.ts` | `onPointerDown()`: remove `void ensureAudio(...).then(...)` async pattern — call `ensureAudio()` synchronously, then `playPitchClasses()` in same frame. |
-| `INTEGRATION/src/main.ts` | All other `ensureAudio()` call sites: update to synchronous usage (no `await`). |
-| `AUDIO_ENGINE/src/index.ts` | Export `initAudioSync` alongside `initAudio`. |
-
-**Why this works:** `ctx.resume()` returns a Promise, but on iOS Safari the context is unblocked as a side effect of calling `resume()` synchronously inside a gesture handler — the Promise resolution is irrelevant. On Chrome, `resume()` resolves immediately regardless of sync/async. The `AudioContext` enters `"running"` state before the current frame's audio buffer is processed, so `createVoice()` / `osc.start()` calls in the same tick work correctly.
-
-**Risk:** `createImmediatePlayback()` connects a master gain to `ctx.destination`. This must succeed even if the context is technically still transitioning from `"suspended"` → `"running"` in the same tick. Web Audio spec guarantees that node connections are valid in any context state — only `start()` scheduling depends on the context running. Low risk, but verify on-device.
-
-**Tests:**
-- [ ] `initAudioSync()` returns `AudioTransport` synchronously (no Promise)
-- [ ] `initAudioSync()` calls `ctx.resume()` (verify via mock)
-- [ ] `ensureAudio()` returns cached state on second call (unchanged behavior)
-- [ ] `ensureAudio()` is synchronous — no Promise in return type
-- [ ] Existing `initAudio()` still works (async wrapper, test compat preserved)
-- [ ] `onPointerDown` → `playPitchClasses` in same synchronous frame (no `.then()`)
-- [ ] Regression: Chrome desktop interactive + scheduled playback still works
-- [ ] Device: iOS Safari — tap triangle → audio plays
-- [ ] Device: iOS Safari — Play button → playback progresses, chord animation runs
+Implemented. Synchronous `initAudioSync()` + synchronous `ensureAudio()`. iOS Safari audio confirmed working on emulators (iPhone 11/12/13, iOS 14.6). Pending physical device verification. See DEVLOG Entry 27.
 
 #### 4d-2: SVG label positioning — `dominant-baseline` → `dy` (Issue 1) — CONDITIONAL
 
@@ -629,7 +602,7 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| iOS Safari: no audio, no playback | Confirmed across devices | Audio blocked by async `ensureAudio()` — `AudioContext.resume()` outside gesture stack. Reproduced on iPhone 11/12/13 (iOS 14.6 emulator) + iPhone 12 mini (iOS 18.6.2 physical). Fix: 4d-1 (sync AudioContext creation). |
+| iOS Safari: no audio, no playback | Tentatively closed | Fixed by 4d-1 (sync AudioContext). Verified on iOS 14.6 emulators. Pending physical device confirmation (iPhone 12 mini, iOS 18.6.2). See Entry 27. |
 | iOS Safari: labels, colors | Unconfirmed on iOS 14.x | `dominant-baseline` label positioning + highlight fill bleeding — observed on iOS 18.6.2 physical device only, NOT reproduced in iOS 14.6 emulator. May be iOS 18.x-specific or emulator limitation. Conditional: 4d-2, 4d-3. |
 | Mobile audio crackling (budget tablets) | Deferred to Phase 3d/4c | Stale `ctx.currentTime` on large-buffer devices. `safeOffset` fix helped Pixel 6, not Galaxy Tab A7 Lite. Need device diagnostic data + brute-force offset test. See Entry 21 |
 

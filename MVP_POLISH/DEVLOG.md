@@ -5,6 +5,72 @@ Started: 2026-02-16
 
 ---
 
+## Entry 27 — Phase 4d-1: Synchronous AudioContext for iOS Safari (Code)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Implemented synchronous AudioContext creation to fix iOS Safari audio. The `ensureAudio()` function was async (`await initAudio()`) which broke the user gesture chain on iOS — Safari requires `AudioContext.resume()` within the synchronous call stack of the gesture handler. Refactored to synchronous `initAudioSync()` + synchronous `ensureAudio()`. Verified on iOS 14.6 emulators (iPhone 11/12/13). All existing tests pass.
+
+### Root Cause
+
+iOS Safari's autoplay policy requires that `AudioContext` creation and `resume()` occur **synchronously within the user gesture call stack**. The previous code:
+
+```
+pointer-down → ensureAudio() [async] → await initAudio() → await ctx.resume() → playPitchClasses()
+```
+
+The `await` yielded back to the event loop, breaking the gesture-handler chain. When the promise resolved, Safari no longer recognized it as gesture-initiated and blocked the context.
+
+### Fix
+
+**`AUDIO_ENGINE/src/audio-context.ts`:**
+- Extracted `buildTransport(ctx, initialTempo)` — pure synchronous factory that creates the transport object from an existing AudioContext. Used by both sync and async init paths.
+- Added `initAudioSync(options?)` — creates `AudioContext`, calls `ctx.resume()` synchronously (fire-and-forget, no await), passes context to `buildTransport()`. Returns `AudioTransport` synchronously.
+- Preserved `initAudio(options?)` as thin async wrapper — `new AudioContext()` + `await ctx.resume()` + `buildTransport()`. Existing tests use this path.
+
+**`INTEGRATION/src/interaction-wiring.ts`:**
+- `ensureAudio()` changed from `async` to synchronous. Calls `initAudioSync()` on first invocation. Return type: `{ transport, immediatePlayback }` (was `Promise<...>`).
+- Removed `initPromise` field from `AppAudioState` — no longer needed (no async dedup required).
+- `onPointerDown()` calls `ensureAudio()` directly + `playPitchClasses()` in the same synchronous frame. Removed the `.then()` pattern and the `pointerGeneration` counter (no async race possible).
+
+**`INTEGRATION/src/main.ts`:**
+- `handleLoadProgression()`: `void ensureAudio(...).then(...)` → synchronous `const { transport } = ensureAudio(...)`.
+- `handlePlay()`: same pattern — synchronous call.
+
+### Tests
+
+- AE: 202 passed (unchanged — `initAudio` preserved for test compat)
+- INT: 239 passed
+  - `ensureAudio` tests converted from async to synchronous
+  - New test: "is synchronous — returns value, not Promise"
+  - Pointer-down tests no longer need `vi.waitFor` or `setTimeout` delays
+  - Mock updated: `initAudioSync` added alongside `initAudio`
+
+### Verification
+
+- ✅ iOS 14.6 emulator (iPhone 11/12/13, Firefox): audio plays on tap
+- ✅ Chrome desktop: no regression
+
+Pending: physical iOS device verification (iPhone 12 mini, iOS 18.6.2).
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `AUDIO_ENGINE/src/audio-context.ts` | +`buildTransport()`, +`initAudioSync()`, refactored `initAudio()` |
+| `AUDIO_ENGINE/src/index.ts` | +export `initAudioSync` |
+| `INTEGRATION/src/interaction-wiring.ts` | `ensureAudio()` sync, `onPointerDown` sync, removed `initPromise` |
+| `INTEGRATION/src/main.ts` | 2 call sites: async→sync |
+| `INTEGRATION/src/__tests__/interaction-wiring.test.ts` | Tests converted to sync, +`initAudioSync` mock |
+| `INTEGRATION/src/__tests__/integration-flow.test.ts` | +`initAudioSync` mock, removed `await` |
+
+### Contract Changes
+- ARCH_AUDIO_ENGINE.md §6: +`initAudioSync()` exported alongside `initAudio()` (deferred to phase completion doc pass)
+
+---
+
 ## Entry 26 — Phase 3d Synthesis Exploration Plan (Discuss)
 
 **Date:** 2026-02-23

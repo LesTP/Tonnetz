@@ -208,49 +208,48 @@ function loadProgressionFromChords(chords: string[]): boolean {
   // Cache events for loop replay
   scheduledEventsCache = result.events;
 
-  // Schedule on transport (async — needs audio)
-  void ensureAudio(audioState).then(({ transport }) => {
-    transport.setTempo(persistence.settings.tempo_bpm);
-    transport.scheduleProgression(result.events);
+  // Schedule on transport (synchronous — ensureAudio is sync per Phase 4d-1)
+  const { transport } = ensureAudio(audioState);
+  transport.setTempo(persistence.settings.tempo_bpm);
+  transport.scheduleProgression(result.events);
 
   // Wire transport subscriptions once (first load)
-    if (!transportUnsub) {
-      transportUnsub = wireAllTransportSubscriptions({
-        transport,
-        pathHandle: pathHandleProxy,
-        uiState,
-        controlPanel: sidebar,
-      });
+  if (!transportUnsub) {
+    transportUnsub = wireAllTransportSubscriptions({
+      transport,
+      pathHandle: pathHandleProxy,
+      uiState,
+      controlPanel: sidebar,
+    });
 
-      // Handle natural playback completion (BUG 3 fix) + loop (Phase 1b).
-      // handleStop() covers explicit stop; this covers transport auto-stop.
-      transport.onStateChange((event) => {
-        if (!event.playing) {
-          // Skip loop restart if stop/clear was explicit
-          if (explicitStop) {
-            explicitStop = false;
-            deactivateGridHighlight(activeGridHandle);
-            activeGridHandle = null;
-            currentPathHandle?.setActiveChord(-1);
-            return;
-          }
-          // Loop: re-schedule and replay if loop is enabled
-          if (sidebar.isLoopEnabled() && scheduledEventsCache.length > 0) {
-            deactivateGridHighlight(activeGridHandle);
-            activeGridHandle = null;
-            currentPathHandle?.setActiveChord(-1);
-            transport.scheduleProgression(scheduledEventsCache);
-            handlePlay();
-            return;
-          }
-          // Normal completion: clear highlights
+    // Handle natural playback completion (BUG 3 fix) + loop (Phase 1b).
+    // handleStop() covers explicit stop; this covers transport auto-stop.
+    transport.onStateChange((event) => {
+      if (!event.playing) {
+        // Skip loop restart if stop/clear was explicit
+        if (explicitStop) {
+          explicitStop = false;
           deactivateGridHighlight(activeGridHandle);
           activeGridHandle = null;
           currentPathHandle?.setActiveChord(-1);
+          return;
         }
-      });
-    }
-  });
+        // Loop: re-schedule and replay if loop is enabled
+        if (sidebar.isLoopEnabled() && scheduledEventsCache.length > 0) {
+          deactivateGridHighlight(activeGridHandle);
+          activeGridHandle = null;
+          currentPathHandle?.setActiveChord(-1);
+          transport.scheduleProgression(scheduledEventsCache);
+          handlePlay();
+          return;
+        }
+        // Normal completion: clear highlights
+        deactivateGridHighlight(activeGridHandle);
+        activeGridHandle = null;
+        currentPathHandle?.setActiveChord(-1);
+      }
+    });
+  }
 
   return true;
 }
@@ -295,10 +294,9 @@ function handlePlay(): void {
   interactiveGridHandle = null;
   deactivateGridHighlight(activeGridHandle);
   activeGridHandle = null;
-  void ensureAudio(audioState).then(({ transport }) => {
-    transport.play();
-    uiState.startPlayback();
-  });
+  const { transport } = ensureAudio(audioState);
+  transport.play();
+  uiState.startPlayback();
 }
 
 function handleStop(): void {
