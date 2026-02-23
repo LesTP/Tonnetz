@@ -31,7 +31,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phases 0–3, header redesign, Phase 4a (mobile touch + layout), and Phase 4d-1 (iOS audio fix) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4c (mobile UAT), then Phase 4d-2/3 (iOS cosmetics, conditional), then Phase 4e (node interaction), then Phase 5.
+**Phase:** Phases 0–3, header redesign, Phase 4a, Phase 4d-1 (iOS audio), and Phase 4e-1 (interaction policy) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4c (mobile UAT), then Phase 4d-2/3 (iOS cosmetics, conditional), then Phase 4e-2–5 (node interaction), then Phase 5.
 **Blocked/Broken:** None.
 **Open decisions:** D14 (m7b5 triangles — deferred post-MVP).
 **Known limitations:** Mobile audio crackling on budget tablets (see Entry 21). iOS Safari cosmetic issues (labels, colors) unconfirmed on iOS 14.x — conditional on physical device verification. Giant Steps and Tristan chord placement deferred post-MVP.
@@ -485,26 +485,9 @@ After loading a progression, grid node labels turn white instead of dark grey (`
 - POL-D28: Relax interaction suppression in `progression-loaded` state (allow audio + highlight; suppress only during `playback-running`)
 - POL-D29: Node selection highlight = orange disc (same as active chord path marker, `ACTIVE_MARKER_FILL` #e76f51, radius `ACTIVE_MARKER_RADIUS` 0.32) positioned on the tapped node, with note name label inside
 
-#### 4e-1: Interaction policy revision (POL-D28)
+#### 4e-1: Interaction policy revision (POL-D28) ✅
 
-Revises INT-D6 (Option A → Option C). Currently `isPlaybackSuppressed()` returns `true` for both `"progression-loaded"` and `"playback-running"`. After this step, only `"playback-running"` suppresses interaction. Transport controls (Stop, Loop, Clear) remain active during playback as before.
-
-**Changes:**
-
-| File | Change |
-|------|--------|
-| `INTEGRATION/src/interaction-wiring.ts` | `isPlaybackSuppressed()`: remove `"progression-loaded"` from suppression check |
-| `RENDERING_UI/src/ui-state.ts` | `selectChord()`: remove `"progression-loaded"` guard — allow `progression-loaded → chord-selected` transition |
-| `UX_SPEC.md` §5 | Add `Progression Loaded → Chord Selected (tap/click)` transition; remove "tap/click is ignored while a progression is loaded" rule (revises INT-D6) |
-
-**Tests:**
-- [ ] `isPlaybackSuppressed()` returns `false` for `"progression-loaded"`, `true` for `"playback-running"`
-- [ ] `selectChord()` succeeds from `"progression-loaded"` state
-- [ ] Pointer down on triangle during `"progression-loaded"` → audio plays
-- [ ] Pointer down on triangle during `"playback-running"` → suppressed (unchanged)
-- [ ] UI state: `progression-loaded → chord-selected` on tap, progression path remains visible
-
-**Note:** The progression path overlay should remain rendered when transitioning to `chord-selected` — user sees both the path and the interactive highlight. Clearing happens only via Clear button.
+Implemented. Three guards removed `"progression-loaded"` from suppression: `isPlaybackSuppressed()`, `selectChord()`, and `main.ts` onPointerDown highlight wrapper. Audio + visual highlighting both work in `progression-loaded`. See DEVLOG Entry 28.
 
 #### 4e-2: HitNode in hit-test (Build)
 

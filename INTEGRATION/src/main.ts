@@ -471,9 +471,9 @@ const baseInteractionCallbacks = createInteractionWiring({
 const interactionCallbacks = {
   ...baseInteractionCallbacks,
   onPointerDown: (world: { x: number; y: number }) => {
-    // Suppress interactive highlighting during playback or progression-loaded (UX-D6)
+    // Suppress interactive highlighting during active playback only (UX-D6, POL-D28)
     const state = uiState.getState();
-    if (state === "playback-running" || state === "progression-loaded") {
+    if (state === "playback-running") {
       baseInteractionCallbacks.onPointerDown?.(world);
       return;
     }

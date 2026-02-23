@@ -211,7 +211,7 @@ describe("onPointerDown (Phase 3b)", () => {
     expect(mockPlayPitchClasses).not.toHaveBeenCalled();
   });
 
-  it("suppresses audio during progression-loaded state (INT-D6)", () => {
+  it("allows audio during progression-loaded state (POL-D28)", () => {
     const dummyShape = { chord: {} as any, main_tri: null, ext_tris: [], dot_pcs: [], covered_pcs: new Set<number>(), root_vertex_index: null, centroid_uv: { u: 0, v: 0 }, tonal_centroid_uv: { u: 0, v: 0 }, placed_nodes: [{ u: 0, v: 0 }] };
       uiState.selectChord(dummyShape);
     uiState.loadProgression([dummyShape]);
@@ -224,7 +224,7 @@ describe("onPointerDown (Phase 3b)", () => {
     });
 
     callbacks.onPointerDown!(getTriangleCenter());
-    expect(mockPlayPitchClasses).not.toHaveBeenCalled();
+    expect(mockPlayPitchClasses).toHaveBeenCalled();
   });
 
   it("triggers lazy audio init on first pointer down", () => {

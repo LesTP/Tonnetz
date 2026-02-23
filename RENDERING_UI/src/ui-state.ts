@@ -127,9 +127,9 @@ export function createUIStateController(): UIStateController {
     },
 
     selectChord(shape: Shape): void {
-      // Valid from: idle, chord-selected
-      // Invalid from: progression-loaded, playback-running (interaction suppressed)
-      if (state === "progression-loaded" || state === "playback-running") {
+      // Valid from: idle, chord-selected, progression-loaded (POL-D28)
+      // Invalid from: playback-running (interaction suppressed, UX-D6)
+      if (state === "playback-running") {
         return;
       }
 

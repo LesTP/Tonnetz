@@ -98,15 +98,15 @@ describe("createUIStateController — selectChord", () => {
     expect(controller.getSelectedShape()).toBe(shape2);
   });
 
-  it("is ignored in progression-loaded state", () => {
+  it("transitions progression-loaded → chord-selected (POL-D28)", () => {
     const progression = makeProgression();
     controller.loadProgression(progression);
     expect(controller.getState()).toBe("progression-loaded");
 
     const shape = makeShape();
     controller.selectChord(shape);
-    expect(controller.getState()).toBe("progression-loaded");
-    expect(controller.getSelectedShape()).toBeNull();
+    expect(controller.getState()).toBe("chord-selected");
+    expect(controller.getSelectedShape()).toBe(shape);
   });
 
   it("is ignored in playback-running state", () => {

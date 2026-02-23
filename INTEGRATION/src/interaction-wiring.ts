@@ -91,10 +91,9 @@ export interface InteractionWiringOptions {
   proximityRadius?: number;
 }
 
-/** States where interactive playback is suppressed (UX-D6, INT-D6). */
+/** States where interactive playback is suppressed (UX-D6, POL-D28). */
 function isPlaybackSuppressed(uiState: UIStateController): boolean {
-  const state = uiState.getState();
-  return state === "playback-running" || state === "progression-loaded";
+  return uiState.getState() === "playback-running";
 }
 
 /**
@@ -106,8 +105,8 @@ function isPlaybackSuppressed(uiState: UIStateController): boolean {
  * - **onEdgeSelect** (Phase 3c): UI state selection (audio already playing)
  * - **onPointerUp** (Phase 3c): stop all audio
  *
- * All callbacks suppress audio and selection during `playback-running`
- * and `progression-loaded` states (UX-D6, INT-D6).
+ * Audio and selection suppressed during `playback-running` only (UX-D6).
+ * Exploration allowed during `progression-loaded` (POL-D28, revises INT-D6).
  */
 export function createInteractionWiring(
   options: InteractionWiringOptions,

@@ -5,6 +5,42 @@ Started: 2026-02-16
 
 ---
 
+## Entry 28 — Phase 4e-1: Relax Interaction Suppression in Progression-Loaded (Code)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Implemented POL-D28: interactive exploration (audio + visual highlighting) is now allowed when a progression is loaded but not playing. Suppression remains during active playback only (UX-D6).
+
+Previously, three independent guards blocked interaction in `progression-loaded` state:
+1. `isPlaybackSuppressed()` in `interaction-wiring.ts` — blocked audio
+2. `selectChord()` in `ui-state.ts` — rejected state transition
+3. `onPointerDown` wrapper in `main.ts` — blocked grid highlighting
+
+All three now check only `"playback-running"`.
+
+### Changes
+
+| File | Change |
+|------|--------|
+| `INTEGRATION/src/interaction-wiring.ts` | `isPlaybackSuppressed()`: removed `"progression-loaded"` — only `"playback-running"` suppresses audio |
+| `RENDERING_UI/src/ui-state.ts` | `selectChord()`: removed `"progression-loaded"` guard — permits `progression-loaded → chord-selected` transition |
+| `INTEGRATION/src/main.ts` | `onPointerDown` wrapper: removed `"progression-loaded"` from highlight suppression check |
+| `INTEGRATION/src/__tests__/interaction-wiring.test.ts` | "suppresses audio during progression-loaded" → "allows audio during progression-loaded" |
+| `RENDERING_UI/src/__tests__/ui-state.test.ts` | "is ignored in progression-loaded" → "transitions progression-loaded → chord-selected" |
+
+### Tests
+
+- RU: 367 passed
+- INT: 239 passed
+
+### Contract Changes
+- UX_SPEC.md §5: already updated in Entry 25 (planning)
+- INTEGRATION/DEVPLAN.md INT-D6: already revised in Entry 25
+
+---
+
 ## Entry 27 — Phase 4d-1: Synchronous AudioContext for iOS Safari (Code)
 
 **Date:** 2026-02-23
