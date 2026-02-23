@@ -1,4 +1,4 @@
-import type { TriId, EdgeId, WindowIndices } from "harmony-core";
+import type { TriId, EdgeId, NodeId, WindowIndices } from "harmony-core";
 import { getTrianglePcs, getEdgeUnionPcs } from "harmony-core";
 import type { CameraController } from "./camera-controller.js";
 import { createGestureController } from "./gesture-controller.js";
@@ -13,6 +13,8 @@ export interface InteractionCallbacks {
   onTriangleSelect?: (triId: TriId, pcs: number[]) => void;
   /** Tap on a shared edge → union chord selection (4 pitch classes). */
   onEdgeSelect?: (edgeId: EdgeId, triIds: [TriId, TriId], pcs: number[]) => void;
+  /** Tap on a lattice node → single pitch selection (Phase 4e-3). */
+  onNodeSelect?: (nodeId: NodeId, pc: number) => void;
   /** Pointer-down — immediate, before tap/drag classification (audio trigger per UX-D4). */
   onPointerDown?: (world: WorldPoint) => void;
   /** Pointer-up — release (audio stop per UX-D4). */
@@ -79,7 +81,9 @@ export function createInteractionController(
     const indices = getIndices();
     const hit = hitTest(world.x, world.y, radius, indices);
 
-    if (hit.type === "triangle") {
+    if (hit.type === "node") {
+      callbacks.onNodeSelect?.(hit.nodeId, hit.pc);
+    } else if (hit.type === "triangle") {
       const ref = indices.triIdToRef.get(hit.triId);
       if (ref) {
         const pcs = getTrianglePcs(ref);

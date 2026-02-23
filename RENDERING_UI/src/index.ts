@@ -43,11 +43,13 @@ export type { ResizeController, ResizeCallback } from "./resize-controller.js";
 export {
   hitTest,
   computeProximityRadius,
+  NODE_HIT_RADIUS,
 } from "./hit-test.js";
 export type {
   HitResult,
   HitTriangle,
   HitEdge,
+  HitNode,
   HitNone,
 } from "./hit-test.js";
 

@@ -31,7 +31,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phases 0–3, header redesign, Phase 4a, Phase 4d-1 (iOS audio), and Phase 4e-1 (interaction policy) complete. Next: Phase 3d (synthesis exploration), then Phase 4b–4c (mobile UAT), then Phase 4d-2/3 (iOS cosmetics, conditional), then Phase 4e-2–5 (node interaction), then Phase 5.
+**Phase:** Phases 0–3, header redesign, Phase 4a, Phase 4d-1 (iOS audio), and Phase 4e-1/2/3 (node interaction: policy + hit-test + dispatch) complete. 4e-4 (orange disc) deferred; 4e-5 (node size) optional. Next: Phase 3d (synthesis exploration), then Phase 4b–4c (mobile UAT), then Phase 5.
 **Blocked/Broken:** None.
 **Open decisions:** D14 (m7b5 triangles — deferred post-MVP).
 **Known limitations:** Mobile audio crackling on budget tablets (see Entry 21). iOS Safari cosmetic issues (labels, colors) unconfirmed on iOS 14.x — conditional on physical device verification. Giant Steps and Tristan chord placement deferred post-MVP.
@@ -489,91 +489,21 @@ After loading a progression, grid node labels turn white instead of dark grey (`
 
 Implemented. Three guards removed `"progression-loaded"` from suppression: `isPlaybackSuppressed()`, `selectChord()`, and `main.ts` onPointerDown highlight wrapper. Audio + visual highlighting both work in `progression-loaded`. See DEVLOG Entry 28.
 
-#### 4e-2: HitNode in hit-test (Build)
+#### 4e-2: HitNode in hit-test (Build) ✅
 
-Add `HitNode` to the `HitResult` discriminated union. Node proximity check runs before edge proximity, because nodes are smaller targets and need priority when the pointer is near a vertex.
+Implemented. `HitNode` type (`type, nodeId, pc, u, v`) added to `HitResult` union. Node proximity check (NODE_HIT_RADIUS = 0.20) runs before edge check. 8 new tests. See DEVLOG Entry 29.
 
-**Changes:**
+#### 4e-3: Interaction dispatch for nodes (Build) ✅
 
-| File | Change |
-|------|--------|
-| `RENDERING_UI/src/hit-test.ts` | Add `HitNode` type: `{ type: "node", nodeId: NodeId, pc: number }`. In `hitTest()`, after identifying containing triangle, compute distance to each of 3 vertices. If any vertex is within `nodeHitRadius`, return `HitNode` (nearest wins). Fall through to existing edge/triangle logic otherwise. |
-| `RENDERING_UI/src/hit-test.ts` | Export `NODE_HIT_RADIUS` constant (initially 0.20 world units; tunable in 4e-5) |
-
-**Tests:**
-- [ ] Pointer exactly on a node → `HitNode` with correct `nodeId` and `pc`
-- [ ] Pointer at node + 0.15 (inside radius) → `HitNode`
-- [ ] Pointer at node + 0.25 (outside radius) → `HitTriangle` or `HitEdge` (not node)
-- [ ] When equidistant from two nodes, nearest wins
-- [ ] Existing triangle and edge hit-tests unaffected for points far from nodes
-- [ ] Boundary node (edge of window) → `HitNode` still works
-
-#### 4e-3: Interaction dispatch for nodes (Build)
-
-Wire `HitNode` through the interaction and audio paths.
-
-**Changes:**
-
-| File | Change |
-|------|--------|
-| `RENDERING_UI/src/interaction-controller.ts` | Add `onNodeSelect?: (nodeId: NodeId, pc: number) => void` to `InteractionCallbacks`. In `onTap()`, handle `hit.type === "node"` → call `onNodeSelect`. |
-| `INTEGRATION/src/interaction-wiring.ts` | In `onPointerDown()`, add `hit.type === "node"` branch → `playPitchClasses(immediatePlayback, [hit.pc])`. In `onNodeSelect`, no additional work needed (audio already playing from pointer-down, same pattern as triangles). |
-
-**Audio:** No Audio Engine changes. `playPitchClasses(state, [pc])` already handles a single pitch class → one voice at 0.24 gain.
-
-**Tests:**
-- [ ] Pointer down on node → `playPitchClasses` called with single-element array `[pc]`
-- [ ] `onNodeSelect` callback fires with correct `nodeId` and `pc`
-- [ ] Pointer down on node during `"playback-running"` → suppressed
-- [ ] Pointer down on node during `"progression-loaded"` → audio plays (per POL-D28)
-- [ ] Pointer up after node tap → `stopAll()` called (existing behavior)
+Implemented. `onNodeSelect` callback in `InteractionCallbacks`. `hit.type === "node"` → `playPitchClasses([pc])` in `onPointerDown()`. Node grid highlighting via dot-only `activateGridHighlight()` with node lattice coords. See DEVLOG Entry 29.
 
 #### 4e-4: Node selection highlight — orange disc (Build)
 
-Reuse the active chord path marker visual (orange filled disc with note label) for node selection feedback.
+Deferred. Current grid-highlighter dot-only highlight (colored stroke on node circle) is functional. Orange disc overlay (POL-D29) is a visual enhancement — implement if the current highlight feels insufficient after user testing.
 
-**Changes:**
+#### 4e-5: Node size increase (Refine) — OPTIONAL
 
-| File | Change |
-|------|--------|
-| `INTEGRATION/src/main.ts` | On `onPointerDown` → `HitNode`: create/show an orange disc SVG group (`<g>` with `<circle>` + `<text>`) at the node's world position. Radius = `ACTIVE_MARKER_RADIUS` (0.32). Fill = `ACTIVE_MARKER_FILL` (#e76f51). Text = note name (e.g., "C", "F#", "Bb"). Hide on pointer-up or drag-start. |
-| `RENDERING_UI/src/path-renderer.ts` | Export `ACTIVE_MARKER_RADIUS` and `ACTIVE_MARKER_FILL` constants (currently module-private) so the integration module can reuse them. Alternatively, extract a shared `createMarkerDisc(layer, x, y, label, options?)` helper. |
-
-**Design spec:**
-- Same orange disc as progression playback active chord marker
-- Note name label inside (white, same font as path centroid labels)
-- Appears on pointer-down, disappears on pointer-up (matches chord highlight lifecycle)
-- Renders on `layer-path` (above grid, below UI) — same layer as progression markers
-
-**Tests:**
-- [ ] Node tap creates orange disc at correct world coordinates
-- [ ] Disc displays correct note name (enharmonic: use sharp-preferred spelling)
-- [ ] Disc hidden after pointer-up
-- [ ] Disc hidden when drag begins
-- [ ] Disc does not appear during `"playback-running"`
-- [ ] Disc coexists with progression path when in `"progression-loaded"` state
-
-#### 4e-5: Node size increase (Refine)
-
-Enlarge node circles for better touch targets. This is a tuning pass — initial values provided, final values from visual feedback.
-
-**Changes:**
-
-| File | Change |
-|------|--------|
-| `RENDERING_UI/src/renderer.ts` | `NODE_RADIUS`: 0.15 → 0.20 (starting value; tune visually) |
-| `RENDERING_UI/src/renderer.ts` | `LABEL_FONT_SIZE`: may need proportional adjustment |
-| `RENDERING_UI/src/shape-renderer.ts` | `VERTEX_MARKER_RADIUS`: 0.15 → match new `NODE_RADIUS` |
-| `RENDERING_UI/src/hit-test.ts` | `NODE_HIT_RADIUS`: tune relative to visual radius (≥ visual radius) |
-| `RENDERING_UI/src/grid-highlighter.ts` | `ACTIVE_ROOT_WIDTH` / `ACTIVE_NODE_WIDTH`: may need adjustment for visual balance with larger circles |
-
-**Constraints:**
-- Adjacent nodes are 1.0 world units apart → max visual radius ~0.40 before circles touch
-- Node circles must not obscure triangle fills or edge lines
-- Labels must remain readable inside larger circles
-- Mobile touch target ≥44×44px met at zoom levels where grid is usable
-
-**Tests:** Visual only (Refine regime). Verified by human inspection at desktop and mobile zoom levels.
+Deferred. NODE_HIT_RADIUS (0.20) already provides a comfortable touch target larger than the visual node radius (0.15). User testing confirmed current size feels fine. Revisit only if mobile testing reveals touch target issues.
 
 ### Phase 5: Final Polish & Review
 

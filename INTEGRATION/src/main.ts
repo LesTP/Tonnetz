@@ -510,6 +510,17 @@ const interactionCallbacks = {
           rootPc: mainRef ? pc(triVertices(mainRef)[mainRef.orientation === "U" ? 0 : 2].u, triVertices(mainRef)[mainRef.orientation === "U" ? 0 : 2].v) : null,
         },
       );
+    } else if (hit.type === "node") {
+      interactiveGridHandle = activateGridHighlight(
+        scaffold.layers["layer-grid"],
+        indices,
+        {
+          mainTriId: null,
+          dotPcs: [hit.pc],
+          centroid: { u: hit.u, v: hit.v },
+          rootPc: hit.pc,
+        },
+      );
     }
 
     // Delegate to base (audio + state gating)

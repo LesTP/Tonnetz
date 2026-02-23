@@ -142,6 +142,8 @@ const onPointerDown = (world: WorldPoint): void => {
     }
   } else if (hit.type === "edge") {
     pcs = getEdgeUnionPcs(hit.edgeId, indices);
+  } else if (hit.type === "node") {
+    pcs = [hit.pc];
   }
 
   if (pcs && pcs.length > 0) {

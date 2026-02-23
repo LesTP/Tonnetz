@@ -1,5 +1,5 @@
-import type { EdgeId, TriId, TriRef, WindowIndices } from "harmony-core";
-import { edgeId, triId, triVertices } from "harmony-core";
+import type { EdgeId, NodeId, TriId, TriRef, WindowIndices } from "harmony-core";
+import { edgeId, nodeId, pc, triId, triVertices } from "harmony-core";
 import { worldToLattice, latticeToWorld } from "./coords.js";
 import type { WorldPoint } from "./coords.js";
 
@@ -16,11 +16,19 @@ export interface HitEdge {
   readonly triIds: [TriId, TriId];
 }
 
+export interface HitNode {
+  readonly type: "node";
+  readonly nodeId: NodeId;
+  readonly pc: number;
+  readonly u: number;
+  readonly v: number;
+}
+
 export interface HitNone {
   readonly type: "none";
 }
 
-export type HitResult = HitTriangle | HitEdge | HitNone;
+export type HitResult = HitTriangle | HitEdge | HitNode | HitNone;
 
 // --- Proximity radius ---
 
@@ -42,6 +50,9 @@ export function computeProximityRadius(factor: number = 0.5): number {
 }
 
 // --- Constants ---
+
+/** Node hit-test radius in world units (tunable in Phase 4e-5). */
+export const NODE_HIT_RADIUS = 0.20;
 
 /**
  * Edge pairs for triangle hit-testing: indices into triVertices result.
@@ -148,6 +159,30 @@ export function hitTest(
     latticeToWorld(verts[2].u, verts[2].v),
   ];
 
+  // Node proximity check — runs before edge check (nodes get priority
+  // because vertices sit where edges meet, and nodes are smaller targets)
+  let nearestNodeDist = Infinity;
+  let nearestNodeIdx = -1;
+  for (let i = 0; i < 3; i++) {
+    const dx = worldX - wv[i].x;
+    const dy = worldY - wv[i].y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < nearestNodeDist) {
+      nearestNodeDist = dist;
+      nearestNodeIdx = i;
+    }
+  }
+  if (nearestNodeDist <= NODE_HIT_RADIUS && nearestNodeIdx >= 0) {
+    const v = verts[nearestNodeIdx];
+    return {
+      type: "node",
+      nodeId: nodeId(v.u, v.v),
+      pc: pc(v.u, v.v),
+      u: v.u,
+      v: v.v,
+    };
+  }
+
   let nearestDist = Infinity;
   let nearestEdgeId: EdgeId | null = null;
   let nearestEdgeTris: TriId[] | null = null;
@@ -185,6 +220,6 @@ export function hitTest(
     };
   }
 
-  // Triangle hit (including node-overlap fallback)
+  // Triangle hit
   return { type: "triangle", triId: id };
 }

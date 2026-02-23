@@ -5,6 +5,45 @@ Started: 2026-02-16
 
 ---
 
+## Entry 29 — Phase 4e-2/3: Node Hit-Test + Interaction Dispatch (Code)
+
+**Date:** 2026-02-23
+
+### Summary
+
+Implemented node tap → single note playback. Added `HitNode` to the hit-test system (4e-2) and wired it through interaction dispatch to audio + visual highlighting (4e-3). Tapping a lattice node now plays a single pitch and highlights the node circle. Node proximity check runs before edge check, giving nodes priority at vertices where edges meet. 4e-4 (orange disc) deferred — current dot-only highlight is functional. 4e-5 (node size increase) marked optional — NODE_HIT_RADIUS (0.20) already larger than visual radius (0.15), user testing confirmed feel is fine.
+
+### Changes
+
+**4e-2: HitNode in hit-test** (`RENDERING_UI/src/hit-test.ts`)
+- `HitNode` interface: `{ type: "node", nodeId, pc, u, v }`
+- `NODE_HIT_RADIUS = 0.20` exported constant
+- Node proximity check in `hitTest()`: after identifying containing triangle, compute distance to each of 3 vertices; nearest within radius → `HitNode`
+- Exported `HitNode` + `NODE_HIT_RADIUS` from RU barrel
+
+**4e-3: Interaction dispatch** (3 files)
+- `interaction-controller.ts`: `onNodeSelect` callback in `InteractionCallbacks`; `hit.type === "node"` in `onTap()`
+- `interaction-wiring.ts`: `hit.type === "node"` → `playPitchClasses([hit.pc])` in `onPointerDown()`
+- `main.ts`: `hit.type === "node"` → `activateGridHighlight()` with dot-only shape using node lattice coords as centroid
+
+### Tests
+
+- RU: 375 passed (+8 new node hit-test cases)
+- INT: 239 passed
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `RENDERING_UI/src/hit-test.ts` | +`HitNode`, +`NODE_HIT_RADIUS`, node proximity check |
+| `RENDERING_UI/src/index.ts` | +export `HitNode`, `NODE_HIT_RADIUS` |
+| `RENDERING_UI/src/interaction-controller.ts` | +`onNodeSelect` callback, node dispatch in `onTap()` |
+| `RENDERING_UI/src/__tests__/hit-test.test.ts` | +8 node hit-test cases |
+| `INTEGRATION/src/interaction-wiring.ts` | +`hit.type === "node"` → `playPitchClasses([pc])` |
+| `INTEGRATION/src/main.ts` | +node grid highlighting in onPointerDown wrapper |
+
+---
+
 ## Entry 28 — Phase 4e-1: Relax Interaction Suppression in Progression-Loaded (Code)
 
 **Date:** 2026-02-23

@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildWindowIndices, edgeId, triId } from "harmony-core";
+import { buildWindowIndices, edgeId, nodeId, pc, triId } from "harmony-core";
 import type { WindowIndices } from "harmony-core";
 import { latticeToWorld } from "../coords.js";
 import {
   hitTest,
   computeProximityRadius,
+  NODE_HIT_RADIUS,
 } from "../hit-test.js";
 
 const SQRT3_OVER_2 = Math.sqrt(3) / 2;
@@ -249,5 +250,84 @@ describe("hitTest — small radius prevents edge hits", () => {
     const c = upCentroid(0, 0);
     const result = hitTest(c.x, c.y, 0.1, indices);
     expect(result.type).toBe("triangle");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Node hit-testing (Phase 4e-2)
+// ═══════════════════════════════════════════════════════════════════
+
+describe("hitTest — node proximity (Phase 4e-2)", () => {
+  const indices = makeIndices();
+  const radius = 0.12; // standard proximity radius for edge detection
+
+  it("pointer exactly on a node → HitNode with correct nodeId and pc", () => {
+    const w = latticeToWorld(0, 0);
+    const result = hitTest(w.x, w.y, radius, indices);
+    expect(result.type).toBe("node");
+    if (result.type === "node") {
+      expect(result.nodeId).toBe(nodeId(0, 0));
+      expect(result.pc).toBe(pc(0, 0)); // C = 0
+    }
+  });
+
+  it("pointer slightly offset from node (inside NODE_HIT_RADIUS) → HitNode", () => {
+    const w = latticeToWorld(1, 0);
+    // Offset by 0.15 in x — inside NODE_HIT_RADIUS (0.20)
+    const result = hitTest(w.x + 0.15, w.y, radius, indices);
+    expect(result.type).toBe("node");
+    if (result.type === "node") {
+      expect(result.nodeId).toBe(nodeId(1, 0));
+      expect(result.pc).toBe(pc(1, 0)); // G = 7
+    }
+  });
+
+  it("pointer outside NODE_HIT_RADIUS → not HitNode", () => {
+    const w = latticeToWorld(0, 0);
+    // Offset by 0.25 — outside NODE_HIT_RADIUS (0.20)
+    const result = hitTest(w.x + 0.25, w.y, radius, indices);
+    expect(result.type).not.toBe("node");
+  });
+
+  it("equidistant from two nodes → nearest wins", () => {
+    // Node (0,0) and (1,0) are 1.0 world unit apart horizontally.
+    // Point at 0.15 from (0,0) is closer than 0.85 from (1,0).
+    const w0 = latticeToWorld(0, 0);
+    const result = hitTest(w0.x + 0.10, w0.y, radius, indices);
+    expect(result.type).toBe("node");
+    if (result.type === "node") {
+      expect(result.nodeId).toBe(nodeId(0, 0));
+    }
+  });
+
+  it("triangle centroid (far from all nodes) → HitTriangle, not HitNode", () => {
+    // Centroid of Up(0,0) is ~0.577 from each vertex — well outside NODE_HIT_RADIUS
+    const c = upCentroid(0, 0);
+    const result = hitTest(c.x, c.y, radius, indices);
+    expect(result.type).toBe("triangle");
+  });
+
+  it("node at different lattice position returns correct pc", () => {
+    const w = latticeToWorld(0, 1);
+    const result = hitTest(w.x, w.y, radius, indices);
+    expect(result.type).toBe("node");
+    if (result.type === "node") {
+      expect(result.nodeId).toBe(nodeId(0, 1));
+      expect(result.pc).toBe(pc(0, 1)); // E = 4
+    }
+  });
+
+  it("NODE_HIT_RADIUS is exported and positive", () => {
+    expect(NODE_HIT_RADIUS).toBeGreaterThan(0);
+    expect(NODE_HIT_RADIUS).toBeLessThan(0.5); // must not exceed half edge length
+  });
+
+  it("node hit takes priority over edge hit near a vertex", () => {
+    // A vertex is where edges meet. A point very close to a vertex could be
+    // within both NODE_HIT_RADIUS and edge proximity radius. Node should win.
+    const w = latticeToWorld(1, 0);
+    // Tiny offset toward edge midpoint — still within NODE_HIT_RADIUS
+    const result = hitTest(w.x + 0.05, w.y + 0.05, radius, indices);
+    expect(result.type).toBe("node");
   });
 });
