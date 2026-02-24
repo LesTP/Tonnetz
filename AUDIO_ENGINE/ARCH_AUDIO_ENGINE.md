@@ -26,6 +26,7 @@ AE-D13 Staccato/Legato playback mode (POL-D19) — Closed
 AE-D14 Hard-stop at chord boundary + 10ms fade-out (POL Phase 3a) — Closed
 AE-D15 VoiceHandle.cancelRelease() for voice carry-forward (POL Phase 3b/3c) — Closed
 AE-D16 Fixed per-voice gain 0.24 (no dynamic normalization) — Closed
+AE-D19 Root-in-bass voicing rule (progression playback only) — **Open**
 
 ---
 
@@ -125,6 +126,32 @@ Output order: `result[i]` always corresponds to `newPcs[i]` — preserves caller
 | C → E major (chromatic mediant) | 2 semitones | Efficient |
 | ii–V–I (Dm7 → G7 → Cmaj7) | ≤12 per step | Smooth |
 | C → Db (chromatic) | ≤2 per voice | Semitone motion |
+
+### AE-D19: Root-in-bass voicing rule (Open)
+
+**Status:** Open | **Priority:** Nice-to-have | **Date:** 2026-02-24
+
+For progression playback (Shape-based), ensure the chord root is always the lowest sounding note. Interactive playback (triangle/edge taps via `playPitchClasses`) is excluded — root position is not enforced for exploratory interaction.
+
+**Implementation:**
+
+| Step | Location | Change |
+|------|----------|--------|
+| 1 | `voicing.ts` | New `ensureRootInBass(voicing, rootPc)` — find root voice, transpose down octave if not lowest |
+| 2 | `immediate-playback.ts` | `playShape()` calls `ensureRootInBass()` after voicing |
+| 3 | `scheduler.ts` | `scheduleChordVoices()` calls `ensureRootInBass()` after voicing |
+
+**Scope:**
+- ✓ Scheduled progression playback (Shape objects have `root_pc`)
+- ✓ Interactive `playShape()` calls
+- ✗ `playPitchClasses()` — no root indicator in current API
+
+**Trade-offs:**
+- Pro: Traditional root-position voicings, clearer harmonic foundation
+- Con: Increased voice motion — root must jump to bass on every chord
+- Con: May conflict with smooth voice-leading (AE-D3) when root moves by large interval
+
+**Revisit if:** Users request root-position for interactive taps, or voice-leading sounds choppy with forced root motion.
 
 ---
 
@@ -370,6 +397,18 @@ interface AudioTransport {
   setPadMode(enabled: boolean): void;
 
   /**
+   * Sets the synthesis preset for scheduled playback.
+   * Takes effect on next play() — does not affect in-progress scheduled playback.
+   * @param preset - SynthPreset from presets.ts
+   */
+  setPreset(preset: SynthPreset): void;
+
+  /**
+   * Returns the current synthesis preset.
+   */
+  getPreset(): SynthPreset;
+
+  /**
    * Schedules a progression for playback.
    * Does not start playback — call play() after scheduling.
    * @param events - Array of ChordEvent objects
@@ -558,17 +597,17 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 | Test File | Tests | Covers |
 |-----------|-------|--------|
 | `smoke.test.ts` | 1 | Barrel export resolves with expected public API |
+| `presets.test.ts` | 98 | Preset validation, gain staging, registry, utility functions, PeriodicWave cache |
+| `effects.test.ts` | 29 | EffectsChain creation, reconfigure, damping, feedback, destroy, node budget |
+| `scheduler.test.ts` | 54 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration, onComplete callback (AE-D10) |
 | `audio-context.test.ts` | 39 | initAudio, transport state machine, play/stop/pause/cancel, event subscriptions, tempo, suspended context, natural completion (AE-D10), pause/resume chord index (AE-D11), voice-leading reset on stop (AE-D12) |
+| `immediate-playback.test.ts` | 37 | createImmediatePlayback, playPitchClasses, playShape, stopAll, voice-count normalization, duration, velocity, preset handling |
 | `voicing.test.ts` | 30 | nearestMidiNote, voiceInRegister, voiceLead, edge cases, musical progressions |
-| `synth.test.ts` | 18 | midiToFreq, createVoice signal chain, velocity scaling, release/stop idempotency |
-| `immediate-playback.test.ts` | 25 | createImmediatePlayback, playPitchClasses, playShape, stopAll, voice-count normalization, duration, velocity |
-| `scheduler.test.ts` | 44 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration, onComplete callback (AE-D10) |
+| `synth.test.ts` | 26 | midiToFreq, createVoice signal chain, velocity scaling, release/stop idempotency, cancelRelease |
 | `cross-module.test.ts` | 7 | HC Shape → playShape, HC getTrianglePcs → playPitchClasses, HC getEdgeUnionPcs → playPitchClasses, ChordEvent scheduling, onChordChange subscribers |
 | `conversion.test.ts` | 5 | shapesToChordEvents: empty, single, multiple, custom beatsPerChord, reference preservation |
 | `integration-e2e.test.ts` | 3 | ii–V–I pipeline (HC→AE→events), triangle tap → 3 voices, edge union → 4 voices |
-| `sustained-repeat.test.ts` | 12 | Sustained repeated chords: carry-forward in both modes, pitch-class equality gate |
-| `legato.test.ts` | 18 | Per-voice continuation: common tone sustain, departing release, arriving attack, padMode plumbing |
-| **Total** | **202** | |
+| **Total** | **329** | |
 
 ### Latency Analysis (Static)
 
@@ -704,6 +743,50 @@ Fix:
 Set mixGain.gain.value = 0.24 per voice. Max 4 voices: 4 × 0.24 = 0.96 < 1.0.
 Removed all dynamic masterGain normalization. Master gain stays at 1.0.
 Files: synth.ts, immediate-playback.ts, scheduler.ts
+```
+
+```
+AE-D17: DynamicsCompressorNode as safety limiter
+Date: 2026-02-24
+Status: Closed
+Priority: High
+Issue:
+Loop restart crackle — when a progression loops, old voices' release tails +
+delay echoes overlap with new voices' attack. Sum exceeds 1.0, causing clipping.
+Worst on presets with long release (Glass 1.6s, Warm/Breathing Pad 1.4s).
+Decision:
+Insert a DynamicsCompressorNode after effectsChain.output, before ctx.destination.
+Acts as a brickwall limiter to catch transient peaks from loop transitions,
+preset switching, or any other unforeseen gain spikes.
+Parameters: threshold -6dB, knee 6dB, ratio 12:1, attack 3ms, release 100ms.
+Node budget: +1 global node (max 37 < 40).
+Rationale:
+- Hard-stopping voices at loop restart would create an audible gap
+- Compressor catches peaks automatically without audible artifacts
+- Also provides safety net for future changes
+Files: effects.ts
+Revisit if: Compressor causes audible pumping/breathing on sustained chords.
+```
+
+```
+AE-D18: Increase voice.stop() fade-out from 10ms to 50ms
+Date: 2026-02-24
+Status: Closed (already implemented)
+Priority: Medium
+Issue:
+Staccato mode sounds too abrupt — 10ms fade-out is imperceptible as a decay,
+sounds like a hard cut rather than a musical note ending.
+Decision:
+Increase STOP_FADE_TIME from 0.01s to 0.05s (50ms).
+Note: Upon investigation, synth.ts already used fadeOut = 0.05 (50ms).
+This was implemented as part of the original preset work. No change needed.
+Rationale:
+- 50ms is audible as a short decay (not a click)
+- Still short enough to maintain rhythmic separation
+- At 180 BPM: beat = 333ms, 50ms = 15% of beat (acceptable)
+- At 120 BPM: beat = 500ms, 50ms = 10% of beat (comfortable)
+Files: synth.ts
+Revisit if: Fast-tempo progressions sound smeared.
 ```
 
 ---

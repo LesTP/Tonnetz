@@ -85,19 +85,33 @@ vi.mock("audio-engine", () => {
   const mockImmediatePlayback = {
     transport: mockTransport,
     masterGain: {},
+    voiceDestination: {},
+    effectsChain: null,
     voices: new Set(),
     prevVoicing: [],
+    padMode: false,
+    preset: { name: "classic", label: "Classic" },
+  };
+
+  const mockEffectsChain = {
+    input: {},
+    output: {},
+    reconfigure: vi.fn(),
+    destroy: vi.fn(),
   };
 
   return {
     initAudio: vi.fn(async () => mockTransport),
     initAudioSync: vi.fn(() => mockTransport),
     createImmediatePlayback: vi.fn(() => mockImmediatePlayback),
+    createEffectsChain: vi.fn(() => mockEffectsChain),
+    DEFAULT_PRESET: { name: "classic", label: "Classic" },
     playPitchClasses: vi.fn(),
     playShape: vi.fn(),
     stopAll: vi.fn(),
     __mockTransport: mockTransport,
     __mockImmediatePlayback: mockImmediatePlayback,
+    __mockEffectsChain: mockEffectsChain,
   };
 });
 

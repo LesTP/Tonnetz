@@ -90,12 +90,25 @@ export class MockGainNode extends MockAudioNode {
   }
 }
 
+// ── Mock PeriodicWave ────────────────────────────────────────────────
+
+export class MockPeriodicWave {
+  readonly real: Float32Array;
+  readonly imag: Float32Array;
+
+  constructor(real: Float32Array, imag: Float32Array) {
+    this.real = real;
+    this.imag = imag;
+  }
+}
+
 // ── Mock OscillatorNode ──────────────────────────────────────────────
 
 export class MockOscillatorNode extends MockAudioNode {
   readonly frequency: MockAudioParam;
   readonly detune: MockAudioParam;
   type: OscillatorType = "sine";
+  private _periodicWave: MockPeriodicWave | null = null;
 
   constructor(context: MockAudioContext) {
     super(context);
@@ -109,6 +122,48 @@ export class MockOscillatorNode extends MockAudioNode {
 
   stop(_when?: number): void {
     // no-op
+  }
+
+  setPeriodicWave(wave: MockPeriodicWave): void {
+    this._periodicWave = wave;
+  }
+
+  getPeriodicWave(): MockPeriodicWave | null {
+    return this._periodicWave;
+  }
+}
+
+// ── Mock DelayNode ───────────────────────────────────────────────────
+
+export class MockDelayNode extends MockAudioNode {
+  readonly delayTime: MockAudioParam;
+
+  constructor(context: MockAudioContext, maxDelayTime: number = 1.0) {
+    super(context);
+    this.delayTime = new MockAudioParam(0);
+    // Store maxDelayTime for potential validation (not used in mock)
+    void maxDelayTime;
+  }
+}
+
+// ── Mock DynamicsCompressorNode ─────────────────────────────────────
+
+export class MockDynamicsCompressorNode extends MockAudioNode {
+  readonly threshold: MockAudioParam;
+  readonly knee: MockAudioParam;
+  readonly ratio: MockAudioParam;
+  readonly attack: MockAudioParam;
+  readonly release: MockAudioParam;
+  readonly reduction: number = 0;
+
+  constructor(context: MockAudioContext) {
+    super(context);
+    // Default values per Web Audio spec
+    this.threshold = new MockAudioParam(-24);
+    this.knee = new MockAudioParam(30);
+    this.ratio = new MockAudioParam(12);
+    this.attack = new MockAudioParam(0.003);
+    this.release = new MockAudioParam(0.25);
   }
 }
 
@@ -180,6 +235,22 @@ export class MockAudioContext {
 
   createBiquadFilter(): MockBiquadFilterNode {
     return new MockBiquadFilterNode(this);
+  }
+
+  createPeriodicWave(
+    real: Float32Array,
+    imag: Float32Array,
+    _constraints?: PeriodicWaveConstraints,
+  ): MockPeriodicWave {
+    return new MockPeriodicWave(real, imag);
+  }
+
+  createDelay(maxDelayTime: number = 1.0): MockDelayNode {
+    return new MockDelayNode(this, maxDelayTime);
+  }
+
+  createDynamicsCompressor(): MockDynamicsCompressorNode {
+    return new MockDynamicsCompressorNode(this);
   }
 }
 

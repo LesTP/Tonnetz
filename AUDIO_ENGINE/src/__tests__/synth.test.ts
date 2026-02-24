@@ -119,8 +119,9 @@ describe("createVoice — signal chain", () => {
     expect(filters[0].Q.value).toBe(SYNTH_DEFAULTS.filterQ);
   });
 
-  it("creates gain nodes (mix + envelope = 2, plus possible master)", () => {
+  it("creates gain nodes (osc1 + osc2 + envelope + output = 4)", () => {
     const mock = new MockAudioContext();
+    const dest = mock.createGain(); // Created before tracking starts
     const gains: MockGainNode[] = [];
     const origCreate = mock.createGain.bind(mock);
     mock.createGain = () => {
@@ -128,14 +129,13 @@ describe("createVoice — signal chain", () => {
       gains.push(g);
       return g;
     };
-    const dest = mock.createGain();
     createVoice(
       mock as unknown as AudioContext,
       dest as unknown as AudioNode,
       60,
     );
-    // At least 2 gains: mix gain (0.5) and envelope gain
-    expect(gains.length).toBeGreaterThanOrEqual(2);
+    // 4 gains: osc1Gain, osc2Gain, envGain, outGain
+    expect(gains.length).toBe(4);
   });
 });
 
@@ -152,6 +152,7 @@ describe("createVoice — velocity", () => {
 
   it("max velocity (127) gives peak gain of 1.0", () => {
     const mock = new MockAudioContext();
+    const dest = mock.createGain(); // Created before tracking starts
     const gains: MockGainNode[] = [];
     const origCreate = mock.createGain.bind(mock);
     mock.createGain = () => {
@@ -159,22 +160,22 @@ describe("createVoice — velocity", () => {
       gains.push(g);
       return g;
     };
-    const dest = mock.createGain();
     createVoice(
       mock as unknown as AudioContext,
       dest as unknown as AudioNode,
       60,
       127,
     );
-    // Envelope gain (last created) should have ramped toward 1.0
+    // Envelope gain is at index 2 (osc1Gain[0], osc2Gain[1], envGain[2], outGain[3])
     // In our mock, linearRampToValueAtTime sets .value directly
-    const envGain = gains[gains.length - 1];
+    const envGain = gains[2];
     // After attack ramp, value = peakGain * sustainLevel
     expect(envGain.gain.value).toBeCloseTo(1.0 * SYNTH_DEFAULTS.sustainLevel, 5);
   });
 
   it("low velocity (32) produces lower peak gain", () => {
     const mock = new MockAudioContext();
+    const dest = mock.createGain(); // Created before tracking starts
     const gains: MockGainNode[] = [];
     const origCreate = mock.createGain.bind(mock);
     mock.createGain = () => {
@@ -182,14 +183,14 @@ describe("createVoice — velocity", () => {
       gains.push(g);
       return g;
     };
-    const dest = mock.createGain();
     createVoice(
       mock as unknown as AudioContext,
       dest as unknown as AudioNode,
       60,
       32,
     );
-    const envGain = gains[gains.length - 1];
+    // Envelope gain is at index 2 (osc1Gain[0], osc2Gain[1], envGain[2], outGain[3])
+    const envGain = gains[2];
     const expectedPeak = 32 / 127;
     expect(envGain.gain.value).toBeCloseTo(
       expectedPeak * SYNTH_DEFAULTS.sustainLevel,
@@ -253,6 +254,7 @@ describe("createVoice — cancelRelease", () => {
 
   it("cancelRelease() is no-op if not released", () => {
     const mock = new MockAudioContext();
+    const dest = mock.createGain(); // Created before tracking starts
     const gains: MockGainNode[] = [];
     const origCreate = mock.createGain.bind(mock);
     mock.createGain = () => {
@@ -260,14 +262,14 @@ describe("createVoice — cancelRelease", () => {
       gains.push(g);
       return g;
     };
-    const dest = mock.createGain();
     const voice = createVoice(
       mock as unknown as AudioContext,
       dest as unknown as AudioNode,
       60,
       100,
     );
-    const envGain = gains[gains.length - 1];
+    // Envelope gain is at index 2 (osc1Gain[0], osc2Gain[1], envGain[2], outGain[3])
+    const envGain = gains[2];
     const valueBefore = envGain.gain.value;
     voice.cancelRelease();
     expect(envGain.gain.value).toBe(valueBefore);
@@ -284,6 +286,7 @@ describe("createVoice — cancelRelease", () => {
 
   it("cancelRelease() restores sustain level after release()", () => {
     const mock = new MockAudioContext();
+    const dest = mock.createGain(); // Created before tracking starts
     const gains: MockGainNode[] = [];
     const origCreate = mock.createGain.bind(mock);
     mock.createGain = () => {
@@ -291,7 +294,6 @@ describe("createVoice — cancelRelease", () => {
       gains.push(g);
       return g;
     };
-    const dest = mock.createGain();
     const velocity = 100;
     const voice = createVoice(
       mock as unknown as AudioContext,
@@ -301,13 +303,15 @@ describe("createVoice — cancelRelease", () => {
     );
     voice.release();
     voice.cancelRelease();
-    const envGain = gains[gains.length - 1];
+    // Envelope gain is at index 2 (osc1Gain[0], osc2Gain[1], envGain[2], outGain[3])
+    const envGain = gains[2];
     const expectedSustain = (velocity / 127) * SYNTH_DEFAULTS.sustainLevel;
     expect(envGain.gain.value).toBeCloseTo(expectedSustain, 5);
   });
 
   it("release() fires again after cancelRelease()", () => {
     const mock = new MockAudioContext();
+    const dest = mock.createGain(); // Created before tracking starts
     const gains: MockGainNode[] = [];
     const origCreate = mock.createGain.bind(mock);
     mock.createGain = () => {
@@ -315,7 +319,6 @@ describe("createVoice — cancelRelease", () => {
       gains.push(g);
       return g;
     };
-    const dest = mock.createGain();
     const voice = createVoice(
       mock as unknown as AudioContext,
       dest as unknown as AudioNode,
@@ -326,7 +329,8 @@ describe("createVoice — cancelRelease", () => {
     voice.cancelRelease();
     // Second release should fire (envelope ramps to 0)
     voice.release();
-    const envGain = gains[gains.length - 1];
+    // Envelope gain is at index 2 (osc1Gain[0], osc2Gain[1], envGain[2], outGain[3])
+    const envGain = gains[2];
     expect(envGain.gain.value).toBeCloseTo(0, 5);
   });
 

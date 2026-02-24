@@ -2,7 +2,9 @@
 
 Module: Audio Engine (cross-cutting with Integration)
 Parent: MVP_POLISH/DEVPLAN.md §Phase 3d
+DEVLOG: AUDIO_ENGINE/DEVLOG_3D.md
 References: AUDIO_ENGINE/SOUND_SCULPTING.md, AUDIO_ENGINE/SOUND_SCULPTING_1.md
+Date: 2026-02-24
 
 ---
 
@@ -27,7 +29,8 @@ References: AUDIO_ENGINE/SOUND_SCULPTING.md, AUDIO_ENGINE/SOUND_SCULPTING_1.md
 
 ## Current Status
 
-**Phase:** Not started.
+**Phase:** Step 2 — A/B listening evaluation.
+**Focus:** User testing 6 presets, identifying keepers/problems.
 **Blocked/Broken:** None.
 
 ---
@@ -83,8 +86,13 @@ interface SynthPreset {
     readonly wet: number;
     readonly dry: number;
   };
+
+  // Output level trim (optional, default 1.0)
+  readonly outputGain?: number;
 }
 ```
+
+**`outputGain`** (optional): Post-mix level trim applied after oscillator sum, before effects chain. Allows level-matching presets without changing oscillator balance ratios. Default 1.0. Use during Step 2 listening if presets feel unbalanced.
 
 **"periodic"** osc type: `createVoice` builds a `PeriodicWave` from `periodicWavePartials` and sets it on the oscillator. The wave is built once per `AudioContext` and cached (not per voice).
 
@@ -106,8 +114,8 @@ Current sound, unchanged. Serves as comparison reference.
 |-----------|-------|
 | osc1Type | `"triangle"` |
 | osc2Type | `"sine"` |
-| osc1Gain | 0.24 |
-| osc2Gain | 0.24 |
+| osc1Gain | 0.12 |
+| osc2Gain | 0.12 |
 | detuneCents | 3 |
 | filterCutoff | 1500 |
 | filterQ | 1.0 |
@@ -348,25 +356,238 @@ All within the 40-node practical limit for mobile.
 
 ## Gain Staging
 
-Each preset's `osc1Gain` + `osc2Gain` is tuned so that 4 simultaneous voices don't clip:
+Each preset's `osc1Gain + osc2Gain` sum is tuned so that 4 simultaneous voices don't clip. The constraint is: `(osc1Gain + osc2Gain) × 4 < 1.0`.
 
-| Preset | Max per-voice peak | 4 voices peak |
-|--------|-------------------|---------------|
-| Classic | 0.24 × 2 × 0.787 = 0.38 | 1.51 → needs review |
-| Warm Pad | (0.10 + 0.07) × 0.787 = 0.13 | 0.53 ✓ |
-| Breathing Pad | same as Warm Pad | 0.53 ✓ |
-| Cathedral | (0.14 + 0.08) × 0.787 = 0.17 | 0.69 ✓ |
-| Electric Organ | 0.18 × 0.787 = 0.14 | 0.57 ✓ |
-| Glass | (0.12 + 0.12) × 0.787 = 0.19 | 0.76 ✓ |
+| Preset | Per-voice sum | 4 voices peak |
+|--------|---------------|---------------|
+| Classic | 0.12 + 0.12 = 0.24 | 0.96 ✓ |
+| Warm Pad | 0.10 + 0.07 = 0.17 | 0.68 ✓ |
+| Breathing Pad | (same as Warm Pad) | 0.68 ✓ |
+| Cathedral | 0.14 + 0.08 = 0.22 | 0.88 ✓ |
+| Electric Organ | 0.18 + 0.00 = 0.18 | 0.72 ✓ |
+| Glass | 0.12 + 0.12 = 0.24 | 0.96 ✓ |
 
-**Classic preset note:** The current design uses a shared `mixGain = 0.24` for both oscillators (not per-osc gains). This works because the old signal chain routes both oscs into one gain node. The preset system will use per-osc gains, so the Classic preset needs `osc1Gain = 0.12, osc2Gain = 0.12` (split evenly) to match the current behavior. Adjust if needed after listening.
+**Note:** The current synth.ts uses a shared `mixGain = 0.24` node for both oscillators. The preset system splits this into per-oscillator gains (0.12 + 0.12 for Classic) to allow presets with asymmetric oscillator levels.
+
+---
+
+## Level Balancing (Exploration Topic)
+
+The per-voice sums vary across presets (0.17 to 0.24), which may cause perceived loudness differences when switching presets. This is intentional headroom for:
+
+1. **Effects wet signal** — presets with delay add 14–22% wet on top of dry
+2. **Envelope sustain differences** — sustainLevel ranges from 0.65 (Glass) to 0.95 (Electric Organ)
+3. **Timbre-dependent perception** — sawtooth/organ harmonics sound louder than sine at equal amplitude
+
+**Possible approaches (evaluate during Step 2 listening):**
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **`outputGain` per preset** | Clean separation of timbre vs level; easy A/B tuning | Manual tuning per preset |
+| **DynamicsCompressorNode as limiter** | Automatic peak control; masks clipping | Adds 1 global node; doesn't address root gain balance; may color sound |
+| **Normalize to equal loudness (LUFS)** | Perceptually matched | Requires measurement; complex |
+
+**Prior discussion:** `DynamicsCompressorNode` was considered as a crackling mitigation for budget tablets but deferred (see `MVP_POLISH/DEVLOG.md` Entry 21). The `SOUND_SCULPTING_1.md` reference notes that gains are conservative because there's no compressor in the node budget.
+
+**Recommendation:** Start with `outputGain = 1.0` for all presets. During Step 2 listening, if presets feel unbalanced, adjust `outputGain` values. If clipping persists despite conservative gains (especially on mobile), reconsider adding a `DynamicsCompressorNode` as a safety limiter at the end of the effects chain.
 
 ---
 
 ## Test Strategy
 
 - Existing synth/scheduler/immediate-playback tests continue passing (backward compat via `PRESET_CLASSIC` default)
-- New `presets.test.ts`: validate all preset objects have required fields, gain staging within limits
-- New `effects.test.ts`: delay chain creation, reconfigure, bypass (no delay)
+- New `presets.test.ts`: validate all preset objects have required fields, gain staging within limits ✅
+- New `effects.test.ts`: delay chain creation, reconfigure, bypass (no delay) ✅
 - `createVoice` with each preset type: periodic wave, sub osc, filter bloom, LFO — verify nodes created without error
 - Integration: preset change mid-session doesn't crash; voices created after change use new preset
+
+---
+
+## Step 2: Listen & Refine (A/B Testing)
+
+**Work Regime:** Refine (human-evaluable). Correctness requires subjective judgment — no automated tests can verify "sounds good."
+
+**Status:** In progress. Initial evaluation complete. Two issues identified, fixes planned.
+
+### Initial Evaluation Results
+
+**Issues Found:**
+
+| # | Issue | Severity | Affected Presets | Planned Fix |
+|---|-------|----------|------------------|-------------|
+| 1 | Loop start crackle/pop | High | All (worst: Glass) | DynamicsCompressorNode (AE-D17) |
+| 2 | Staccato endings too abrupt | Medium | All | Increase stop fade 10ms → 50ms (AE-D18) |
+
+**Preset Verdicts (preliminary):**
+
+| Preset | Verdict | Notes |
+|--------|---------|-------|
+| Classic | Keep | Clean baseline |
+| Warm Pad | Keep | Pleasant warm wash |
+| Breathing Pad | Keep | Organic filter LFO motion |
+| Cathedral Organ | Keep | Chiff articulation effective |
+| Electric Organ | Keep | Subtle Leslie wobble |
+| Glass Harmonica | Keep | Ethereal, but worst loop crackle (long release) |
+
+**Preliminary conclusion:** All 6 presets are musically useful. No removals planned. Final verdict pending after fixes applied.
+
+### Issue 1: Loop Start Crackle/Pop
+
+**Symptom:** Audible crackle at the moment a looped progression restarts. Glass Harmonica is worst despite being the quietest preset.
+
+**Root cause analysis:**
+
+When loop restarts:
+1. Last chord's voices are in release phase (up to 1.6s for Glass)
+2. Delay effects continue echoing
+3. New scheduler starts immediately → new voices attack
+4. Sum of (old release tails) + (delay echo) + (new attack) > 1.0
+5. Clipping → crackle
+
+**Evidence:** Long-release presets (Glass 1.6s, Warm/Breathing 1.4s) exhibit worse crackling than short-release presets (Cathedral 80ms, Electric 30ms).
+
+**Decision: AE-D17 — DynamicsCompressorNode as safety limiter**
+
+```
+AE-D17: Add DynamicsCompressorNode at end of effects chain
+Date: 2026-02-24
+Status: Open → Closed (pending implementation)
+Priority: High
+Decision:
+Insert a DynamicsCompressorNode after effectsChain.output, before ctx.destination.
+Acts as a brickwall limiter to catch transient peaks from loop transitions,
+preset switching, or any other unforeseen gain spikes.
+Rationale:
+- Hard-stopping voices at loop restart would create audible gap
+- Compressor catches peaks automatically without audible artifacts
+- Also provides safety net for future changes
+- +1 global node (max 37 < 40 budget)
+Parameters: threshold -6dB, knee 6dB, ratio 12:1, attack 3ms, release 100ms
+Revisit if: Compressor causes audible pumping/breathing on sustained chords
+```
+
+### Issue 2: Staccato Endings Too Abrupt
+
+**Symptom:** In Staccato mode, chord endings sound like hard cuts rather than musical note endings.
+
+**Root cause:** Current `voice.stop()` uses 10ms fade-out (AE-D14). 10ms is imperceptible as a decay.
+
+**Decision: AE-D18 — Increase stop fade-out to 50ms**
+
+```
+AE-D18: Increase voice.stop() fade-out from 10ms to 50ms
+Date: 2026-02-24
+Status: Open → Closed (pending implementation)
+Priority: Medium
+Decision:
+Change STOP_FADE_TIME constant in synth.ts from 0.01 to 0.05 seconds.
+Rationale:
+- 50ms is audible as a short decay (not a click)
+- Still short enough to maintain rhythmic separation
+- At 180 BPM: beat = 333ms, 50ms = 15% of beat (acceptable)
+- At 120 BPM: beat = 500ms, 50ms = 10% of beat (comfortable)
+Revisit if: Fast-tempo progressions sound smeared
+```
+
+### Implementation Plan
+
+| Task | File(s) | Change |
+|------|---------|--------|
+| Add compressor | `effects.ts` | Create compressor node, insert after output, before destination |
+| Expose compressor | `effects.ts` | Add to EffectsChain interface (optional, for testing) |
+| Update mock | `web-audio-mock.ts` | Add `MockDynamicsCompressorNode`, `createDynamicsCompressor()` |
+| Increase fade | `synth.ts` | `STOP_FADE_TIME = 0.05` (was 0.01) |
+| Tests | `effects.test.ts` | Verify compressor node created and connected |
+
+### Goals
+
+1. **Identify keepers** — which presets are musically useful and worth keeping?
+2. **Identify problems** — clipping, artifacts, unbalanced levels, unpleasant timbres
+3. **Tune parameters** — adjust preset values based on listening feedback
+4. **Decide survivors** — at least 2 presets must survive; losers are removed in Step 3
+
+### Evaluation Criteria
+
+For each preset, evaluate on these dimensions:
+
+| Dimension | Good | Bad |
+|-----------|------|-----|
+| **Timbre** | Pleasant, appropriate for harmonic exploration | Harsh, fatiguing, or inappropriate |
+| **Attack** | Clear chord onset, appropriate for tempo range | Too abrupt (clicks) or too slow (mushy) |
+| **Release** | Clean decay, no artifacts | Clicks, pops, or abrupt cutoff |
+| **Level balance** | Similar perceived loudness to other presets | Noticeably louder/quieter than others |
+| **Delay/effects** | Adds depth without muddying | Overwhelming, distracting, or inaudible |
+| **LFO** | Subtle motion, enhances sound | Distracting wobble or imperceptible |
+| **Playback modes** | Works well in both Staccato and Legato | Broken in one mode |
+
+### Test Protocol
+
+1. **Interactive exploration** — click triangles, edges; hold chords; drag to pan
+2. **Progression playback** — load a library progression, play at various tempos (60–180 BPM)
+3. **Mode comparison** — test both Staccato and Legato modes
+4. **A/B comparison** — switch between presets while same progression plays
+
+### Feedback Template
+
+After listening to each preset, record observations using this format:
+
+```
+### [Preset Name]
+
+**Verdict:** Keep | Tune | Remove
+
+**Observations:**
+1. [First issue/observation — highest priority]
+2. [Second issue]
+3. ...
+
+**Parameter adjustments (if Tune):**
+- [parameter]: [current] → [proposed]
+
+**Comparison notes:**
+- vs Classic: [better/worse/different at X]
+- vs [other preset]: [notes]
+```
+
+### Iteration Protocol
+
+Per GOVERNANCE.md Refine Feedback Loop:
+
+1. **Show** — run app, select preset, play chords/progression
+2. **React** — human lists observations (order = priority)
+3. **Triage** — classify each:
+   - **Fix now** — parameter tweak, apply immediately
+   - **Fix later** — log for batch adjustment
+   - **Needs decision** — design question (e.g., "should Cathedral have reverb instead of delay?")
+4. **Adjust** — implement "fix now" items, update preset definition
+5. **Repeat** — until human declares acceptable or remaining items are deferred
+
+### Time Budget
+
+Step 2 is time-boxed to **one session**. If presets cannot be tuned to satisfaction within the session, defer remaining issues to Step 3 or a future phase.
+
+### Presets to Evaluate
+
+| # | Preset | Key Features | Expected Use Case |
+|---|--------|--------------|-------------------|
+| 1 | Classic | Baseline tri+sine | Reference comparison |
+| 2 | Warm Pad | Saw+tri, filter bloom, delay | Slow ambient exploration |
+| 3 | Breathing Pad | Warm Pad + filter LFO | Organic, evolving pads |
+| 4 | Cathedral Organ | Periodic wave, sub, dual delay, chiff | Dramatic, organ-like |
+| 5 | Electric Organ | Periodic drawbars, pitch LFO | B3/Leslie character |
+| 6 | Glass Harmonica | Sine+sine, wide detune, pitch vibrato | Ethereal, crystalline |
+
+---
+
+## Step 3: Lock & Clean
+
+**Work Regime:** Build. Mechanical cleanup based on Step 2 decisions.
+
+### Tasks
+
+1. Remove eliminated presets from `presets.ts` and `ALL_PRESETS`
+2. Update tests to reflect final preset count
+3. If only 1 preset survives, remove dropdown UI (hardcode preset)
+4. If 2+ survive, keep dropdown as permanent feature
+5. Update ARCH_AUDIO_ENGINE.md with final preset list
+6. Documentation pass: remove exploration artifacts from DEVPLAN

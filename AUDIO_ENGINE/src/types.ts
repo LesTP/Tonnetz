@@ -4,6 +4,7 @@
  */
 
 import type { Shape } from "harmony-core";
+import type { SynthPreset } from "./presets.js";
 
 // ── Transport State ──────────────────────────────────────────────────
 
@@ -109,6 +110,12 @@ export interface AudioTransport {
 
   /** Returns true if loop mode is active. */
   getLoop(): boolean;
+
+  /** Sets the synthesis preset for scheduled playback. Takes effect on next play(). */
+  setPreset(preset: SynthPreset): void;
+
+  /** Returns the current synthesis preset. */
+  getPreset(): SynthPreset;
 
   // === Event Subscriptions ===
 

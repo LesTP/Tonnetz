@@ -1,16 +1,25 @@
 /**
- * Per-voice synthesis signal chain (AE-D2).
+ * Per-voice synthesis signal chain (AE-D2, Phase 3d).
  *
- * Detuned dual-oscillator pad with low-pass filter.
+ * Supports multiple synthesis presets with configurable oscillators,
+ * filter, envelope, LFO modulation, and output gain.
+ *
  * Signal chain per voice:
- *   2× OscillatorNode (triangle +detune, sine −detune)
- *   → GainNode (mix)
- *   → BiquadFilterNode (lowpass)
+ *   2× OscillatorNode (configurable types, detune)
+ *   → 2× GainNode (per-osc gain)
+ *   → BiquadFilterNode (lowpass, optional bloom automation)
  *   → GainNode (envelope)
- *   → destination (passed by caller — typically a master gain)
+ *   → GainNode (output trim)
+ *   → destination (passed by caller — typically effectsChain.input)
+ *
+ * Optional LFO modulates filter frequency or oscillator pitch.
  */
 
+import type { SynthPreset, PresetOscType } from "./presets.js";
+import { PRESET_CLASSIC, getPeriodicWave } from "./presets.js";
+
 // ── Synthesis parameters (AE-D2, ARCH §2b) ──────────────────────────
+// Preserved for backward compatibility with existing tests.
 
 export const SYNTH_DEFAULTS = {
   osc1Type: "triangle" as OscillatorType,
@@ -69,16 +78,56 @@ export interface VoiceHandle {
   stop(): void;
 }
 
+// ── Oscillator setup helpers ─────────────────────────────────────────
+
+function setupOscillator(
+  ctx: AudioContext,
+  osc: OscillatorNode,
+  oscType: PresetOscType,
+  freq: number,
+  detuneCents: number,
+  preset: SynthPreset,
+  isOsc2: boolean,
+): void {
+  // Handle "sub" type: osc2 plays one octave below
+  if (oscType === "sub") {
+    osc.type = "sine";
+    osc.frequency.value = freq / 2;
+    osc.detune.value = isOsc2 ? -detuneCents : detuneCents;
+    return;
+  }
+
+  // Handle "periodic" type: use PeriodicWave from preset
+  if (oscType === "periodic") {
+    const wave = getPeriodicWave(ctx, preset);
+    if (wave) {
+      osc.setPeriodicWave(wave);
+    } else {
+      // Fallback to sine if no partials defined
+      osc.type = "sine";
+    }
+    osc.frequency.value = freq;
+    osc.detune.value = isOsc2 ? -detuneCents : detuneCents;
+    return;
+  }
+
+  // Standard oscillator type
+  osc.type = oscType;
+  osc.frequency.value = freq;
+  osc.detune.value = isOsc2 ? -detuneCents : detuneCents;
+}
+
 // ── Voice creation ───────────────────────────────────────────────────
 
 /**
  * Create and start a single synthesizer voice.
  *
  * @param ctx - AudioContext
- * @param destination - AudioNode to connect to (e.g., master GainNode)
+ * @param destination - AudioNode to connect to (e.g., effectsChain.input)
  * @param midi - MIDI note number (0–127)
  * @param velocity - Velocity 0–127, scales peak gain (default: 100)
  * @param when - AudioContext time to start (default: ctx.currentTime)
+ * @param preset - SynthPreset to use (default: PRESET_CLASSIC)
  * @returns VoiceHandle for release/stop control
  */
 export function createVoice(
@@ -87,6 +136,7 @@ export function createVoice(
   midi: number,
   velocity: number = 100,
   when?: number,
+  preset: SynthPreset = PRESET_CLASSIC,
 ): VoiceHandle {
   const offset = safeOffset(ctx);
   const now = when ?? ctx.currentTime;
@@ -96,46 +146,62 @@ export function createVoice(
   const freq = midiToFreq(midi);
   const peakGain = velocity / 127;
 
+  // Extract preset parameters
   const {
     osc1Type,
     osc2Type,
+    osc1Gain,
+    osc2Gain,
     detuneCents,
     filterCutoff,
     filterQ,
+    filterBloom,
     attackTime,
     decayTime,
     sustainLevel,
     releaseTime,
-  } = SYNTH_DEFAULTS;
+    lfo,
+    outputGain = 1.0,
+  } = preset;
 
-  // Oscillator 1: triangle, positive detune
+  // ── Oscillators ──────────────────────────────────────────────────
+
   const osc1 = ctx.createOscillator();
-  osc1.type = osc1Type;
-  osc1.frequency.value = freq;
-  osc1.detune.value = detuneCents;
+  setupOscillator(ctx, osc1, osc1Type, freq, detuneCents, preset, false);
 
-  // Oscillator 2: sine, negative detune
   const osc2 = ctx.createOscillator();
-  osc2.type = osc2Type;
-  osc2.frequency.value = freq;
-  osc2.detune.value = -detuneCents;
+  setupOscillator(ctx, osc2, osc2Type, freq, detuneCents, preset, true);
 
-  // Mix gain: fixed at 0.24 per voice so that 4 simultaneous voices
-  // never exceed 1.0 (4 × 0.24 × peakGain ≈ 0.76 at velocity 100).
-  // Eliminates the need for dynamic master gain normalization.
-  const mixGain = ctx.createGain();
-  mixGain.gain.value = 0.24;
+  // Per-oscillator gain nodes (allows asymmetric mixing)
+  const osc1GainNode = ctx.createGain();
+  osc1GainNode.gain.value = osc1Gain;
 
-  // Low-pass filter
+  const osc2GainNode = ctx.createGain();
+  osc2GainNode.gain.value = osc2Gain;
+
+  // ── Filter ───────────────────────────────────────────────────────
+
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.frequency.value = filterCutoff;
   filter.Q.value = filterQ;
 
-  // Envelope gain (ADSR)
-  // gain.value = 0 as immediate backstop; setValueAtTime anchors the
-  // automation timeline. Envelope holds at 0 from now → oscStart, then
-  // attack ramp begins when oscillators start producing signal.
+  // Filter bloom automation (optional)
+  if (filterBloom) {
+    filter.frequency.setValueAtTime(filterBloom.start, oscStart);
+    filter.frequency.linearRampToValueAtTime(
+      filterBloom.peak,
+      oscStart + attackTime,
+    );
+    filter.frequency.setTargetAtTime(
+      filterBloom.settle,
+      oscStart + attackTime,
+      filterBloom.timeConstant,
+    );
+  }
+
+  // ── Envelope ─────────────────────────────────────────────────────
+
   const envGain = ctx.createGain();
   envGain.gain.value = 0;
   envGain.gain.setValueAtTime(0, now);
@@ -148,16 +214,56 @@ export function createVoice(
     oscStart + attackTime + decayTime,
   );
 
-  // Connect: osc1,osc2 → mixGain → filter → envGain → destination
-  osc1.connect(mixGain);
-  osc2.connect(mixGain);
-  mixGain.connect(filter);
+  // ── Output gain (trim) ───────────────────────────────────────────
+
+  const outGain = ctx.createGain();
+  outGain.gain.value = outputGain;
+
+  // ── LFO (optional) ───────────────────────────────────────────────
+
+  let lfoOsc: OscillatorNode | null = null;
+  let lfoGain: GainNode | null = null;
+
+  if (lfo) {
+    lfoOsc = ctx.createOscillator();
+    lfoOsc.type = "sine";
+    lfoOsc.frequency.value = lfo.rate;
+
+    lfoGain = ctx.createGain();
+    lfoGain.gain.value = lfo.depth;
+
+    lfoOsc.connect(lfoGain);
+
+    if (lfo.target === "filter") {
+      // Modulate filter frequency
+      lfoGain.connect(filter.frequency);
+    } else {
+      // Modulate pitch (detune on both oscillators)
+      lfoGain.connect(osc1.detune);
+      lfoGain.connect(osc2.detune);
+    }
+
+    lfoOsc.start(oscStart);
+  }
+
+  // ── Connect signal chain ─────────────────────────────────────────
+
+  // osc1 → osc1Gain → filter
+  // osc2 → osc2Gain → filter
+  // filter → envGain → outGain → destination
+  osc1.connect(osc1GainNode);
+  osc2.connect(osc2GainNode);
+  osc1GainNode.connect(filter);
+  osc2GainNode.connect(filter);
   filter.connect(envGain);
-  envGain.connect(destination);
+  envGain.connect(outGain);
+  outGain.connect(destination);
 
   // Start oscillators at the safe future time
   osc1.start(oscStart);
   osc2.start(oscStart);
+
+  // ── Voice state ──────────────────────────────────────────────────
 
   let released = false;
   let stopped = false;
@@ -166,9 +272,25 @@ export function createVoice(
   function disconnectAll(): void {
     osc1.disconnect();
     osc2.disconnect();
-    mixGain.disconnect();
+    osc1GainNode.disconnect();
+    osc2GainNode.disconnect();
     filter.disconnect();
     envGain.disconnect();
+    outGain.disconnect();
+    if (lfoOsc) {
+      lfoOsc.disconnect();
+      lfoGain?.disconnect();
+    }
+  }
+
+  function stopLfo(): void {
+    if (lfoOsc) {
+      try {
+        lfoOsc.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
   }
 
   const handle: VoiceHandle = {
@@ -189,13 +311,22 @@ export function createVoice(
       // Don't call stop() — the envelope is already at zero and
       // stop()'s setValueAtTime/ramp would create a micro-spike.
       // Just stop oscillators and disconnect nodes silently.
-      const cleanupDelay = (t - ctx.currentTime) + releaseTime + 0.05;
+      const cleanupDelay = t - ctx.currentTime + releaseTime + 0.05;
       releaseCleanupId = setTimeout(() => {
         releaseCleanupId = null;
         if (stopped) return;
         stopped = true;
-        try { osc1.stop(); } catch { /* already stopped */ }
-        try { osc2.stop(); } catch { /* already stopped */ }
+        try {
+          osc1.stop();
+        } catch {
+          /* already stopped */
+        }
+        try {
+          osc2.stop();
+        } catch {
+          /* already stopped */
+        }
+        stopLfo();
         disconnectAll();
       }, cleanupDelay * 1000);
     },
@@ -235,10 +366,22 @@ export function createVoice(
         envGain.gain.linearRampToValueAtTime(0, t + fadeOut);
         osc1.stop(t + fadeOut + 0.01);
         osc2.stop(t + fadeOut + 0.01);
+        if (lfoOsc) {
+          lfoOsc.stop(t + fadeOut + 0.01);
+        }
       } catch {
         // Already stopped — force disconnect
-        try { osc1.stop(); } catch { /* noop */ }
-        try { osc2.stop(); } catch { /* noop */ }
+        try {
+          osc1.stop();
+        } catch {
+          /* noop */
+        }
+        try {
+          osc2.stop();
+        } catch {
+          /* noop */
+        }
+        stopLfo();
       }
       setTimeout(() => disconnectAll(), (fadeOut + 0.02) * 1000);
     },

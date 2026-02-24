@@ -1,15 +1,18 @@
 /**
  * Immediate (non-scheduled) chord playback.
  *
- * Manages a set of active voices and a master gain node.
+ * Manages a set of active voices and connects to an effects chain.
  * Provides the ARCH §6.2 public API: playShape(), playPitchClasses(), stopAll().
  *
- * Per-voice gain is fixed at 0.24 (mix gain in synth.ts) so that up to 4
- * simultaneous voices never clip. No dynamic normalization needed.
+ * Per-voice gain is determined by the preset (osc1Gain + osc2Gain < 0.24)
+ * so that up to 4 simultaneous voices never clip.
  */
 
 import type { Shape } from "harmony-core";
 import type { AudioTransport, PlayOptions } from "./types.js";
+import type { SynthPreset } from "./presets.js";
+import type { EffectsChain } from "./effects.js";
+import { PRESET_CLASSIC } from "./presets.js";
 import { createVoice, type VoiceHandle } from "./synth.js";
 import { voiceInRegister, voiceLead } from "./voicing.js";
 
@@ -34,31 +37,66 @@ function samePitchClasses(
 /** State for the immediate playback system. Created per-transport. */
 export interface ImmediatePlaybackState {
   readonly transport: AudioTransport;
+  /** Destination for voices — either effectsChain.input or masterGain */
+  readonly voiceDestination: AudioNode;
+  /** Master gain node — may be effectsChain.output or standalone */
   readonly masterGain: GainNode;
+  /** Effects chain (if provided) */
+  readonly effectsChain: EffectsChain | null;
   readonly voices: Set<VoiceHandle>;
   prevVoicing: number[];
   /** Pad mode: per-voice continuation on chord change (3c). */
   padMode: boolean;
+  /** Current synthesis preset. Mutable — changed by sidebar dropdown. */
+  preset: SynthPreset;
+}
+
+/** Options for createImmediatePlayback. */
+export interface CreateImmediatePlaybackOptions {
+  /** Effects chain to route voices through. If omitted, voices connect directly to destination. */
+  effectsChain?: EffectsChain;
+  /** Initial preset. Defaults to PRESET_CLASSIC. */
+  preset?: SynthPreset;
 }
 
 /**
  * Create an immediate playback state bound to a transport.
- * The master gain node is connected to the AudioContext destination.
+ * Voices connect to the effects chain input (if provided) or directly to destination.
  */
 export function createImmediatePlayback(
   transport: AudioTransport,
+  options?: CreateImmediatePlaybackOptions,
 ): ImmediatePlaybackState {
   const ctx = transport.getContext();
-  const masterGain = ctx.createGain();
-  masterGain.gain.value = 1;
-  masterGain.connect(ctx.destination);
+  const effectsChain = options?.effectsChain ?? null;
+  const preset = options?.preset ?? PRESET_CLASSIC;
+
+  let voiceDestination: AudioNode;
+  let masterGain: GainNode;
+
+  if (effectsChain) {
+    // Voices connect to effects chain input; effects chain handles routing to destination
+    voiceDestination = effectsChain.input;
+    masterGain = effectsChain.output;
+    // Apply initial preset to effects chain
+    effectsChain.reconfigure(preset);
+  } else {
+    // No effects chain — create a simple master gain connected to destination
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 1;
+    masterGain.connect(ctx.destination);
+    voiceDestination = masterGain;
+  }
 
   return {
     transport,
+    voiceDestination,
     masterGain,
+    effectsChain,
     voices: new Set(),
     prevVoicing: [],
     padMode: false,
+    preset,
   };
 }
 
@@ -117,8 +155,15 @@ export function playPitchClasses(
         newVoices.add(existing);
         prevByMidi.delete(midi);
       } else {
-        // Arriving tone — fresh attack
-        const voice = createVoice(ctx, state.masterGain, midi, velocity);
+        // Arriving tone — fresh attack with current preset
+        const voice = createVoice(
+          ctx,
+          state.voiceDestination,
+          midi,
+          velocity,
+          undefined,
+          state.preset,
+        );
         newVoices.add(voice);
       }
     }
@@ -142,13 +187,15 @@ export function playPitchClasses(
   }
   state.voices.clear();
 
-  // Create new voices
+  // Create new voices with current preset
   for (const midi of midiNotes) {
     const voice = createVoice(
       ctx,
-      state.masterGain,
+      state.voiceDestination,
       midi,
       velocity,
+      undefined,
+      state.preset,
     );
     state.voices.add(voice);
   }
@@ -192,4 +239,18 @@ export function stopAll(state: ImmediatePlaybackState): void {
   }
   state.voices.clear();
   state.prevVoicing = [];
+}
+
+/**
+ * Update the preset for immediate playback.
+ * Also reconfigures the effects chain if present.
+ */
+export function setPreset(
+  state: ImmediatePlaybackState,
+  preset: SynthPreset,
+): void {
+  state.preset = preset;
+  if (state.effectsChain) {
+    state.effectsChain.reconfigure(preset);
+  }
 }

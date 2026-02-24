@@ -9,6 +9,8 @@
  */
 
 import { injectCSS, HIDDEN_CLASS } from "rendering-ui";
+import type { SynthPreset } from "audio-engine";
+import { ALL_PRESETS, DEFAULT_PRESET } from "audio-engine";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -31,6 +33,8 @@ export interface SidebarOptions {
   onLoopToggle: (enabled: boolean) => void;
   /** Callback when playback mode toggle changes (piano = hard cut, pad = voice continuation). */
   onPlaybackModeChange?: (mode: "piano" | "pad") => void;
+  /** Callback when synthesis preset changes. */
+  onPresetChange?: (preset: SynthPreset) => void;
   /** Callback when user clicks Share. Returns share URL string, or null if nothing to share. */
   onShare?: () => string | null;
   /** Callback when "What This Is" info button is clicked. */
@@ -62,6 +66,10 @@ export interface Sidebar {
   setPlaybackMode(mode: "piano" | "pad"): void;
   /** Get the current playback mode. */
   getPlaybackMode(): "piano" | "pad";
+  /** Set the current synthesis preset. */
+  setPreset(preset: SynthPreset): void;
+  /** Get the current synthesis preset. */
+  getPreset(): SynthPreset;
   /** Programmatically switch to a tab. */
   switchToTab(tab: "play" | "library"): void;
   /** Get the library list container (for Phase 2 population). */
@@ -109,6 +117,9 @@ const C = {
   pathToggle: "tonnetz-sidebar-path-toggle",
   pathToggleBtn: "tonnetz-sidebar-path-toggle-btn",
   pathToggleBtnActive: "tonnetz-sidebar-path-toggle-btn--active",
+  presetSection: "tonnetz-sidebar-preset",
+  presetLabel: "tonnetz-sidebar-preset-label",
+  presetSelect: "tonnetz-sidebar-preset-select",
   loadBtn: "tonnetz-sidebar-load-btn",
   clearBtn: "tonnetz-sidebar-clear-btn",
   libraryList: "tonnetz-sidebar-library-list",
@@ -493,6 +504,37 @@ const STYLES = `
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+/* Preset dropdown */
+.${C.presetSection} {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.${C.presetLabel} {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  white-space: nowrap;
+}
+.${C.presetSelect} {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1.5px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.${C.presetSelect}:hover {
+  border-color: #aaa;
+}
+.${C.presetSelect}:focus {
+  border-color: #2a9d8f;
+}
+
 /* Library list (Phase 2 placeholder) */
 .${C.libraryList} {
   flex: 1;
@@ -717,6 +759,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onPathModeChange,
     onLoopToggle,
     onPlaybackModeChange,
+    onPresetChange,
     onShare,
     onHowToUse,
     onAbout,
@@ -729,6 +772,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   let playbackRunning = false;
   let loopEnabled = false;
   let activeTab: "play" | "library" = "play";
+  let currentPreset: SynthPreset = DEFAULT_PRESET;
 
   // ── Build DOM ──────────────────────────────────────────────────────
 
@@ -855,12 +899,27 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   modeToggle.appendChild(pianoBtn);
   modeToggle.appendChild(padBtn);
 
+  // Synthesis preset dropdown
+  const presetSection = el("div", C.presetSection, { "data-testid": "preset-section" });
+  const presetLabel = el("label", C.presetLabel);
+  presetLabel.textContent = "Sound";
+  const presetSelect = el("select", C.presetSelect, { "data-testid": "preset-select" }) as HTMLSelectElement;
+  for (const preset of ALL_PRESETS) {
+    const option = document.createElement("option");
+    option.value = preset.name;
+    option.textContent = preset.label;
+    presetSelect.appendChild(option);
+  }
+  presetSection.appendChild(presetLabel);
+  presetSection.appendChild(presetSelect);
+
   // Assemble play panel
   playPanel.appendChild(inputGroup);
   playPanel.appendChild(transportRow);
   playPanel.appendChild(tempoSection);
   playPanel.appendChild(pathToggle);
   playPanel.appendChild(modeToggle);
+  playPanel.appendChild(presetSection);
 
   // ── Library Tab Panel ──────────────────────────────────────────────
 
@@ -1171,6 +1230,15 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     if (onPlaybackModeChange) onPlaybackModeChange(mode);
   }
 
+  function handlePresetChange(): void {
+    const selectedName = presetSelect.value;
+    const preset = ALL_PRESETS.find((p) => p.name === selectedName);
+    if (preset && preset !== currentPreset) {
+      currentPreset = preset;
+      if (onPresetChange) onPresetChange(preset);
+    }
+  }
+
   function handleTempoInput(): void {
     const bpm = clampTempo(Number(tempoSlider.value));
     tempoLabel.textContent = `${bpm} BPM`;
@@ -1227,6 +1295,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   tonalBtn.addEventListener("click", () => handlePathToggle("tonal"));
   pianoBtn.addEventListener("click", () => handleModeToggle("piano"));
   padBtn.addEventListener("click", () => handleModeToggle("pad"));
+  presetSelect.addEventListener("change", handlePresetChange);
   howBtn.addEventListener("click", handleHowToUse);
   aboutBtn.addEventListener("click", handleAbout);
   tempoSlider.addEventListener("input", handleTempoInput);
@@ -1295,6 +1364,15 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       return playbackMode;
     },
 
+    setPreset(preset: SynthPreset): void {
+      currentPreset = preset;
+      presetSelect.value = preset.name;
+    },
+
+    getPreset(): SynthPreset {
+      return currentPreset;
+    },
+
     switchToTab(tab: "play" | "library"): void {
       switchTab(tab);
     },
@@ -1317,6 +1395,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       stopBtn.removeEventListener("click", handleStop);
       clearBtn.removeEventListener("click", handleClear);
       loopBtn.removeEventListener("click", handleLoopToggle);
+      presetSelect.removeEventListener("change", handlePresetChange);
       howBtn.removeEventListener("click", handleHowToUse);
       aboutBtn.removeEventListener("click", handleAbout);
       tempoSlider.removeEventListener("input", handleTempoInput);

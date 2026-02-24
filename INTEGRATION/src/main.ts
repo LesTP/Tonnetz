@@ -41,8 +41,8 @@ import type {
   ProximityCursor,
 } from "rendering-ui";
 
-import { stopAll } from "audio-engine";
-import type { ChordEvent } from "audio-engine";
+import { stopAll, setPreset } from "audio-engine";
+import type { ChordEvent, SynthPreset } from "audio-engine";
 
 import {
   createAppAudioState,
@@ -327,6 +327,22 @@ function handleLoopToggle(enabled: boolean): void {
   }
 }
 
+function handlePresetChange(preset: SynthPreset): void {
+  log.info("audio", `Preset changed to: ${preset.name}`);
+  // Update immediate playback state
+  if (audioState.immediatePlayback) {
+    setPreset(audioState.immediatePlayback, preset);
+  }
+  // Update transport for scheduled playback
+  if (audioState.transport) {
+    audioState.transport.setPreset(preset);
+  }
+  // Reconfigure effects chain
+  if (audioState.effectsChain) {
+    audioState.effectsChain.reconfigure(preset);
+  }
+}
+
 function handlePathModeChange(mode: "root" | "tonal"): void {
   log.info("display", `Path mode: ${mode}`);
   if (!currentPathHandle || currentShapes.length === 0) return;
@@ -366,6 +382,7 @@ const sidebar: Sidebar = createSidebar({
       audioState.immediatePlayback.padMode = enabled;
     }
   },
+  onPresetChange: handlePresetChange,
   onShare: (): string | null => {
     if (currentChordSymbols.length === 0) return null;
     const tempo = audioState.transport?.getTempo() ?? 150;

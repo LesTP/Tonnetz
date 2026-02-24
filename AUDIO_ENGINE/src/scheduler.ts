@@ -16,6 +16,8 @@
 
 import type { ChordEvent, ChordChangeEvent } from "./types.js";
 import type { VoiceHandle } from "./synth.js";
+import type { SynthPreset } from "./presets.js";
+import { PRESET_CLASSIC } from "./presets.js";
 import { createVoice, SYNTH_DEFAULTS } from "./synth.js";
 import { voiceInRegister, voiceLead } from "./voicing.js";
 
@@ -105,6 +107,8 @@ export interface SchedulerState {
   readonly padMode: boolean;
   /** Loop mode: hard-stop at last chord endTime instead of waiting for release tail. */
   readonly loop: boolean;
+  /** Synthesis preset for voice creation. */
+  readonly preset: SynthPreset;
 }
 
 // ── Scheduler creation ───────────────────────────────────────────────
@@ -123,6 +127,8 @@ export interface CreateSchedulerOptions {
   padMode?: boolean;
   /** Loop mode: cut cleanly at last chord endTime (no release tail). Default: false. */
   loop?: boolean;
+  /** Synthesis preset for voice creation. Default: PRESET_CLASSIC. */
+  preset?: SynthPreset;
 }
 
 /**
@@ -178,6 +184,7 @@ export function createScheduler(opts: CreateSchedulerOptions): SchedulerState {
     stopped: false,
     padMode: opts.padMode ?? false,
     loop: opts.loop ?? false,
+    preset: opts.preset ?? PRESET_CLASSIC,
   };
 }
 
@@ -238,13 +245,14 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
         slot.voices.push(existing);
         prevByMidi.delete(midi);
       } else {
-        // Arriving tone — fresh attack
+        // Arriving tone — fresh attack with preset
         const voice = createVoice(
           state.ctx,
           state.masterGain,
           midi,
           100,
           slot.startTime,
+          state.preset,
         );
         voice.release(slot.endTime);
         slot.voices.push(voice);
@@ -276,6 +284,7 @@ function scheduleChordVoices(state: SchedulerState, idx: number): void {
       midi,
       100,
       slot.startTime,
+      state.preset,
     );
     voice.release(slot.endTime);
     slot.voices.push(voice);

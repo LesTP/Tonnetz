@@ -15,10 +15,12 @@
 import type { WindowIndices, EdgeId, TriId } from "harmony-core";
 import { getTrianglePcs, getEdgeUnionPcs } from "harmony-core";
 
-import type { AudioTransport, ImmediatePlaybackState } from "audio-engine";
+import type { AudioTransport, ImmediatePlaybackState, EffectsChain } from "audio-engine";
 import {
   initAudioSync,
   createImmediatePlayback,
+  createEffectsChain,
+  DEFAULT_PRESET,
   playPitchClasses,
   stopAll,
 } from "audio-engine";
@@ -37,6 +39,7 @@ import { hitTest, computeProximityRadius } from "rendering-ui";
 export interface AppAudioState {
   transport: AudioTransport | null;
   immediatePlayback: ImmediatePlaybackState | null;
+  effectsChain: EffectsChain | null;
 }
 
 /** Create a fresh uninitialized audio state holder. */
@@ -44,6 +47,7 @@ export function createAppAudioState(): AppAudioState {
   return {
     transport: null,
     immediatePlayback: null,
+    effectsChain: null,
   };
 }
 
@@ -61,20 +65,30 @@ export function createAppAudioState(): AppAudioState {
  */
 export function ensureAudio(
   state: AppAudioState,
-): { transport: AudioTransport; immediatePlayback: ImmediatePlaybackState } {
-  if (state.transport && state.immediatePlayback) {
+): { transport: AudioTransport; immediatePlayback: ImmediatePlaybackState; effectsChain: EffectsChain } {
+  if (state.transport && state.immediatePlayback && state.effectsChain) {
     return {
       transport: state.transport,
       immediatePlayback: state.immediatePlayback,
+      effectsChain: state.effectsChain,
     };
   }
 
   const transport = initAudioSync();
-  const immediatePlayback = createImmediatePlayback(transport);
+  const ctx = transport.getContext();
+
+  // Create effects chain first, then immediate playback connected to it
+  const chain = createEffectsChain(ctx, DEFAULT_PRESET);
+  const immediatePlayback = createImmediatePlayback(transport, {
+    effectsChain: chain,
+    preset: DEFAULT_PRESET,
+  });
+
   state.transport = transport;
   state.immediatePlayback = immediatePlayback;
+  state.effectsChain = chain;
 
-  return { transport, immediatePlayback };
+  return { transport, immediatePlayback, effectsChain: chain };
 }
 
 // ── Phase 3b/3c: Interaction Callbacks Factory ──────────────────────

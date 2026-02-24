@@ -26,6 +26,8 @@ import {
   pauseScheduler,
   type SchedulerState,
 } from "./scheduler.js";
+import type { SynthPreset } from "./presets.js";
+import { PRESET_CLASSIC } from "./presets.js";
 
 const DEFAULT_TEMPO = 150;
 
@@ -43,6 +45,7 @@ function buildTransport(ctx: AudioContext, initialTempo?: number): AudioTranspor
   let prevVoicing: number[] = [];
   let padMode = false;
   let loop = false;
+  let preset: SynthPreset = PRESET_CLASSIC;
 
   const stateListeners = new Set<(e: PlaybackStateChange) => void>();
   const chordListeners = new Set<(e: ChordChangeEvent) => void>();
@@ -128,6 +131,7 @@ function buildTransport(ctx: AudioContext, initialTempo?: number): AudioTranspor
         prevVoicing,
         padMode,
         loop,
+        preset,
         onChordChange: emitChordChange,
         onComplete() {
           playing = false;
@@ -190,6 +194,14 @@ function buildTransport(ctx: AudioContext, initialTempo?: number): AudioTranspor
 
     getLoop(): boolean {
       return loop;
+    },
+
+    setPreset(p: SynthPreset): void {
+      preset = p;
+    },
+
+    getPreset(): SynthPreset {
+      return preset;
     },
 
     onStateChange(callback: (event: PlaybackStateChange) => void): () => void {

@@ -34,8 +34,44 @@ export {
   playPitchClasses,
   playShape,
   stopAll,
+  setPreset,
 } from "./immediate-playback.js";
-export type { ImmediatePlaybackState } from "./immediate-playback.js";
+export type {
+  ImmediatePlaybackState,
+  CreateImmediatePlaybackOptions,
+} from "./immediate-playback.js";
+
+// Synthesis presets (Phase 3d)
+export type {
+  SynthPreset,
+  PresetOscType,
+  FilterBloom,
+  LfoConfig,
+  DelayConfig,
+} from "./presets.js";
+export {
+  PRESET_CLASSIC,
+  PRESET_WARM_PAD,
+  PRESET_BREATHING_PAD,
+  PRESET_CATHEDRAL,
+  PRESET_ELECTRIC_ORGAN,
+  PRESET_GLASS,
+  ALL_PRESETS,
+  DEFAULT_PRESET,
+  getPresetByName,
+  getPeriodicWave,
+  usesPeriodicWave,
+  hasDelay,
+  hasLfo,
+  hasFilterBloom,
+  validateGainStaging,
+  CATHEDRAL_PARTIALS,
+  ELECTRIC_ORGAN_PARTIALS,
+} from "./presets.js";
+
+// Effects chain (Phase 3d)
+export type { EffectsChain } from "./effects.js";
+export { createEffectsChain } from "./effects.js";
 
 // Scheduled playback utilities (ARCH §5b)
 export {

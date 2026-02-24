@@ -1,8 +1,8 @@
 # DEVPLAN — MVP Polish Track
 
 Module: MVP Polish (cross-cutting)
-Version: 0.4
-Date: 2026-02-21
+Version: 0.5
+Date: 2026-02-24
 References: SPEC.md, UX_SPEC.md, ARCH_AUDIO_ENGINE.md, ARCH_RENDERING_UI.md
 
 ---
@@ -31,79 +31,54 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Phase:** Phases 0–3, header redesign, Phase 4a, Phase 4d-1 (iOS audio), and Phase 4e-1/2/3 (node interaction: policy + hit-test + dispatch) complete. 4e-4 (orange disc) deferred; 4e-5 (node size) optional. Next: Phase 3d (synthesis exploration), then Phase 4b–4c (mobile UAT), then Phase 5.
-**Blocked/Broken:** None.
-**Open decisions:** D14 (m7b5 triangles — deferred post-MVP).
-**Known limitations:** Mobile audio crackling on budget tablets (see Entry 21). iOS Safari cosmetic issues (labels, colors) unconfirmed on iOS 14.x — conditional on physical device verification. Giant Steps and Tristan chord placement deferred post-MVP.
+**Next:** 4d-2, 4d-3 (iOS Safari label fixes)
+
+**Completed:**
+- 0 (pre-polish bug fixes)
+- 1 (UI layout redesign)
+- 2 (progression library)
+- 3a/3b/3c (audio quality)
+- Header redesign (POL-D18)
+- Placement heuristics
+- Chord input improvements
+- 4a (mobile touch + responsive)
+- 4d-1 (iOS audio)
+- 4e-1/2/3 (node interaction)
+
+**Deferred:**
+- 4e-4 (orange disc highlight) — implement if current highlight feels insufficient
+- 4e-5 (node size increase) — optional, current touch targets adequate
+
+**Upcoming:** 3d (synthesis) → 4b/4c (mobile UAT) → 5 (final polish)
+
+**Blocked/Broken:** None
+
+**Open decisions:** D14 (m7b5 triangles — deferred post-MVP)
+
+**Known limitations:**
+- Mobile audio crackling on budget tablets (see Entry 21)
+- Giant Steps / Tristan chord placement (post-MVP)
 
 ---
 
-## Completed Phases
+## Completed Phases (summaries — see DEVLOG for detail)
 
-### Phase 0: Pre-Polish Bug Fixes ✅
+| Phase | Summary | DEVLOG |
+|-------|---------|--------|
+| 0 | Pre-polish bug fixes: interactive press = triad only (D6), chord grammar expansion (D7) | Entries 2–3 |
+| 1 | UI layout: two-tab sidebar, transport controls, tempo slider, info modals | Entries 4–12 |
+| 2 | Progression library: 26 entries, 3 views, accordion cards (D12) | Entry 16 |
+| 3a/b/c | Audio quality: envelope cleanup, sustained repeats, legato mode | Entries 15, 17 |
+| Header | Title redesign (D18), info buttons at bottom, Clear absorbs Reset View (D21) | Entry 19 |
+| Placement | Centroid focus + cluster gravity blend, distance-gated root reuse | Entries 16, 18 |
+| Chord input | 9th aliases, silent strip of unrecognized symbols | Entry 19 |
+| 4a | Mobile touch: pinch-zoom, breakpoint 1024px, floating transport, share button | Entry 20 |
+| 4d-1 | iOS Safari audio: synchronous AudioContext creation | Entry 27 |
+| 4e-1/2/3 | Node interaction: policy revision (D28), hit-test, dispatch | Entries 28–29 |
 
-- **0a:** Interactive press = triad only, playback = full Shape (resolved as non-bug, POL-D6)
-- **0b:** Chord grammar expansion — input cleaning (slash bass, ø, Δ, -, sus) + HC dim7/m7b5 (POL-D7)
-
-### Phase 1: UI Layout Redesign ✅
-
-Replaced three-zone layout with two-tab sidebar (Play | Library) in `INTEGRATION/src/sidebar.ts`. Transport controls ▶ ■ 🔁 ✕, tempo slider 20–960 BPM, info overlay modals. Title "Tone Nets". Active chord labels on path markers.
-
-Key decisions: POL-D1 (sidebar), D9 (two tabs), D11 (transport), D15 (root vertex centroid), D16 (Root Motion / Tonal Centroid toggle), D17 (4 beats/chord, no collapsing).
-
-### Phase 2: Progression Library ✅
-
-26 curated progressions in `INTEGRATION/src/library/`. Three browsing views (All, By Genre, By Harmonic Feature). Expandable accordion cards (POL-D12). Library load → auto-switch to Play tab.
-
-### Phase 3: Audio Quality ✅
-
-**3a — Envelope Cleanup:** Hard-stop previous voices before new attack with 10ms fade-out. Fixed crackling at chord transitions.
-
-**Shared Infrastructure — VoiceHandle.cancelRelease():** Resets released flag, clears pending cleanup timer, restores sustain level. `release()` no longer calls `osc.stop()`. Enables voice carry-forward for 3b/3c.
-
-**3b — Sustained Repeated Chords:** Pitch-class equality gate at chord boundaries. Identical consecutive chords carry voices forward. Both modes.
-
-**3c — Per-Voice Continuation (Legato Mode):** Voice-diff at chord boundaries: common tones sustain, departing tones release (500ms tail), arriving tones fresh attack. Staccato/Legato toggle in sidebar.
-
-**Crackling fixes:** Per-voice `mixGain = 0.24`; `release()` uses known sustain level; graceful end-of-progression cleanup.
-
-**Tests:** AE 202 (was 172).
-
-### Header Redesign (POL-D18) ✅
-
-- Title enlarged (30px) with subtitle (17px), centered, full-width, visually separated from tabs
-- Info buttons moved from header to sidebar bottom: "How / to use" (pink) + "What / this is" (blue)
-- Clear button absorbs Reset View (D21): resets camera + clears textarea + dismisses progression
-- Library tab icon: ● (circle, replaces 📚 emoji)
-- Loop button: geometric SVG cycle icon (replaces ⟳ Unicode)
-- Staccato/Legato labels (replaces Piano/Pad)
-
-### Placement Heuristics (HC) ✅
-
-**Entry 16:** World-coordinate `dist2()` in placement.ts. Distance-gated root reuse (`REUSE_THRESHOLD = 1.5`).
-
-**Entry 18:** Triangle centroid focus (not root vertex). Blended focus: `CHAIN_BLEND = 0.61` × previous tri centroid + 0.39 × running cluster center. World-coordinate `dist2()` in progression.ts.
-
-**Tests:** HC 178.
-
-### Chord Input Improvements ✅
-
-9th chord aliases (`X9`, `X+9` → `Xadd9`). Unrecognized chord symbols silently stripped (progression plays whatever parsed). Pipeline always returns `ok: true`.
-
-### Phase 4a: Mobile Touch + Responsive Layout ✅
-
-- **Pinch-to-zoom:** Two-finger gesture tracking in gesture-controller.ts; computes scale factor from inter-pointer distance change; wires to `cameraController.zoom()` via new `onPinchZoom` callback. Audio stops on pinch start (same as drag).
-- **Grid size:** `MIN_TRI_SIZE_PX` lowered from 40 to 25 — roughly doubles the lattice on tablets.
-- **Context menu prevention:** `contextmenu` event + `-webkit-touch-callout: none` on SVG — suppresses Android tablet long-press "Download/Share" dialog.
-- **Breakpoint raised:** 768px → 1024px — sidebar is always hamburger-overlay on phones and tablets (both orientations).
-- **Floating transport strip:** Play/Stop, Loop, Share, Clear buttons below hamburger on mobile. Visible when progression loaded + sidebar closed. Auto-syncs with sidebar button states.
-- **Auto-hide on Play:** Sidebar closes automatically on mobile when Play is tapped.
-- **Scrollable sidebar:** Content (title, tabs, panels) scrolls; info footer buttons stay pinned at bottom.
-- **Default tempo:** 150 BPM on page load and Clear (was 120).
-- **Share button:** Link SVG icon in transport row + floating strip. Generates full URL from `window.location` + `encodeShareUrl(chords, tempo, grid)`. Copies to clipboard with textarea+execCommand fallback for non-HTTPS. Brief ✓ feedback on button.
-
-**Files:** `RU/src/gesture-controller.ts`, `camera-controller.ts`, `interaction-controller.ts`, `resize-controller.ts`, `renderer.ts`; `INT/src/sidebar.ts`, `main.ts`, `index.ts`, `progression-pipeline.ts`; `AE/src/audio-context.ts`; `PD/src/types.ts`.
-**Tests:** RU 367, INT 239.
+**Forward references retained:**
+- Supported chord table: see §Supported Chord Reference below
+- Mobile proximity radius 0.12 world units (D5) — adequate on tested devices
 
 ### Supported Chord Reference
 
@@ -136,6 +111,8 @@ Key decisions: POL-D1 (sidebar), D9 (two tabs), D11 (transport), D15 (root verte
 
 **Regime:** Refine. Step 1 (infrastructure + presets) is Build. Step 2 (listening) is the Refine feedback loop. Step 3 (cleanup) is Build.
 
+**Detailed plan:** `AUDIO_ENGINE/DEVPLAN_3D.md`
+**Progress log:** `AUDIO_ENGINE/DEVLOG_3D.md`
 **Reference:** `AUDIO_ENGINE/SOUND_SCULPTING.md` (pad synthesis), `AUDIO_ENGINE/SOUND_SCULPTING_1.md` (organ emulation + PeriodicWave).
 
 **Constraints:**
@@ -210,23 +187,27 @@ Remove discarded presets. If one winner → remove dropdown, lock into `SYNTH_DE
 
 Implemented. Synchronous `initAudioSync()` + synchronous `ensureAudio()`. iOS Safari audio confirmed working on emulators (iPhone 11/12/13, iOS 14.6). Pending physical device verification. See DEVLOG Entry 27.
 
-#### 4d-2: SVG label positioning — `dominant-baseline` → `dy` (Issue 1) — CONDITIONAL
+#### 4d-2: SVG label positioning — `dominant-baseline` → `dy` (Issue 1)
 
-**Status:** Not reproduced in iOS 14.6 emulator. Execute only if confirmed on physical iOS 18.6.2+ device after 4d-1.
+**Status:** Confirmed on physical devices (iPhone 12 mini iOS 18.6.2, second iPhone). Labels vertically mispositioned within node circles.
 
-Safari/WebKit may ignore or misinterpret `dominant-baseline: "central"` on SVG `<text>` elements, causing vertical misalignment of note name labels relative to node circles. Observed on iOS 18.6.2 physical device only. The `dy` fix is low-risk and could be applied preemptively as a cross-browser hardening measure, but is not a confirmed regression on iOS 14.x.
+**Root cause:** Safari/WebKit doesn't reliably support `dominant-baseline: "central"` on SVG `<text>` elements. Chrome/Firefox use it to vertically center text; Safari ignores or misinterprets it, causing labels to sit at the baseline instead of centered.
 
-**Changes:**
+**Affected locations (5 total):**
 
-| File | Lines | Change |
-|------|-------|--------|
-| `RENDERING_UI/src/renderer.ts` | 208 | Single note label: remove `dominant-baseline`, add `dy="0.35em"` |
-| `RENDERING_UI/src/renderer.ts` | 223 | Enharmonic sharp label (top): remove `dominant-baseline`, add `dy="-0.1em"` (shifted up from center) |
-| `RENDERING_UI/src/renderer.ts` | 239 | Enharmonic flat label (bottom): remove `dominant-baseline`, add `dy="0.85em"` (shifted down from center) |
-| `RENDERING_UI/src/path-renderer.ts` | 230 | Centroid note label: remove `dominant-baseline`, add `dy="0.35em"` |
-| `RENDERING_UI/src/path-renderer.ts` | 265 | Active chord label: remove `dominant-baseline`, add `dy="0.35em"` |
+| File | Line | Label Type | Current | Fix |
+|------|------|------------|---------|-----|
+| `renderer.ts` | 209 | Enharmonic top (sharp) | `dominant-baseline: "central"` | `dy="-0.1em"` |
+| `renderer.ts` | 224 | Enharmonic bottom (flat) | `dominant-baseline: "central"` | `dy="0.85em"` |
+| `renderer.ts` | 240 | Single note label | `dominant-baseline: "central"` | `dy="0.35em"` |
+| `path-renderer.ts` | 231 | Centroid note label | `dominant-baseline: "central"` | `dy="0.35em"` |
+| `path-renderer.ts` | 266 | Active chord label | `dominant-baseline: "central"` | `dy="0.35em"` |
 
-**Enharmonic label note:** The sharp (top) and flat (bottom) labels are positioned via `y` offsets from the node center. The `dy` values above are starting points — the split labels need visual tuning so both names are readable within the circle. Single-name labels use the standard `0.35em` centering constant.
+**`dy` values explained:**
+- `0.35em` = shift down 35% of font height, centering cap-height vertically
+- Enharmonic top: negative `dy` shifts up from the already-offset `y` position
+- Enharmonic bottom: larger positive `dy` shifts down from the already-offset `y` position
+- Values are starting points — may need visual tuning on device
 
 **Tests:**
 - [ ] All 5 `dominant-baseline` usages replaced with `dy`
@@ -234,34 +215,40 @@ Safari/WebKit may ignore or misinterpret `dominant-baseline: "central"` on SVG `
 - [ ] Device: iOS Safari — labels centered in node circles
 - [ ] Regression: Chrome desktop — labels still centered (no visible shift)
 
-#### 4d-3: Grid label color bleed after progression load (Issue 2) — CONDITIONAL
+#### 4d-3: Grid label occlusion by path centroid labels (Issue 2)
 
-**Status:** Not reproduced in iOS 14.6 emulator. Execute only if confirmed on physical iOS 18.6.2+ device after 4d-1.
+**Status:** Confirmed on physical devices. Labels turn white only when a progression is loaded, and only for nodes included in the progression.
 
-After loading a progression, grid node labels turn white instead of dark grey (`#555`). Observed on iOS 18.6.2 physical device only. Two likely causes:
+**Root cause:** `path-renderer.ts` renders white (`#fff`) centroid note labels at root vertex positions. When a centroid label occupies the same `(x, y)` as a grid label, Safari's SVG compositor renders the white path label on top, occluding the dark `#555` grid label. Chrome handles z-order differently, keeping grid labels visible.
 
-**(A) Fill inheritance from grid-highlighter:** `activateGridHighlight()` in `grid-highlighter.ts` mutates `fill` on circle elements. If `<text>` labels are children of the same `<g>` group and inherit `fill`, the highlight color (or the `deactivate()` restore value) may bleed into text. Alternatively, `deactivate()` may not restore text `fill` at all if text elements are not in its mutation list.
+**Diagnosis confirmed:**
+- ✓ Happens only when progression loaded (not on interactive taps alone)
+- ✓ Affects only nodes in the progression path (root vertices with centroid labels)
 
-**(B) Path renderer z-order:** `path-renderer.ts` renders white note-name labels on centroid markers (`layer-path`). If Safari composites `layer-path` text on top of `layer-grid` text differently than Chrome, the white centroid label could occlude the dark grid label at the same node position.
+**Fix approach — Option A (suppress redundant labels):**
+Centroid labels already show the note name at root vertices. The grid label underneath is redundant information. Suppress grid label rendering when a centroid label will occupy the same position.
 
-**Diagnosis steps (before fixing):**
-1. In `grid-highlighter.ts`, log which elements `deactivate()` restores — check if `<text>` elements are included
-2. Add `fill="#555"` explicitly on grid `<text>` elements in `renderer.ts` (breaks inheritance chain regardless of parent mutations)
-3. Check if `layer-path` centroid labels overlap `layer-grid` labels at the same `(x, y)` — if so, either offset or suppress the grid label when a centroid label is present
+Implementation: In `path-renderer.ts`, after placing centroid labels, collect the set of node positions with labels. Pass this to a new `hideGridLabels(nodeIds)` function that sets `visibility="hidden"` on the corresponding grid `<text>` elements. On `PathHandle.clear()`, restore visibility.
 
-**Changes (preliminary — may expand after diagnosis):**
+**Fix approach — Option B (offset centroid labels):**
+Offset centroid labels slightly (e.g., `dy` adjustment or small `x/y` shift) so they don't exactly overlap grid labels. Both labels remain visible.
+
+**Recommended:** Option A — cleaner visually, no double-labeling at the same position.
+
+**Changes (Option A):**
 
 | File | Change |
 |------|--------|
-| `RENDERING_UI/src/renderer.ts` | Set `fill="#555"` explicitly on all grid `<text>` elements (currently may be inherited from parent or CSS) |
-| `RENDERING_UI/src/grid-highlighter.ts` | Audit `deactivate()` restore list — if text elements are children of mutated groups, either exclude them from mutation or add them to the restore list with their original fill |
-| `RENDERING_UI/src/path-renderer.ts` | If centroid labels overlap grid labels: add `pointer-events="none"` and verify z-order, or suppress grid label rendering at centroid positions |
+| `path-renderer.ts` | Collect `Set<NodeId>` of nodes with centroid labels during path rendering |
+| `path-renderer.ts` | New helper `hideGridLabels(gridLayer, nodeIds)` — sets `visibility="hidden"` on grid `<text data-id="label-{nodeId}">` elements |
+| `path-renderer.ts` | `PathHandle.clear()` calls `restoreGridLabels()` to reset visibility |
+| `renderer.ts` | Ensure all grid labels have queryable `data-id` attribute (already present: `data-id="label-{nid}"`) |
 
 **Tests:**
-- [ ] Grid `<text>` elements have explicit `fill` attribute (not inherited)
-- [ ] `deactivate()` restores all grid elements including text (if mutated)
-- [ ] Device: iOS Safari — load progression → labels remain dark grey
-- [ ] Regression: Chrome desktop — label colors unchanged at rest and during playback
+- [ ] Grid labels hidden at centroid positions when path rendered
+- [ ] Grid labels restored on `PathHandle.clear()`
+- [ ] Device: iOS Safari — no white labels after loading progression
+- [ ] Regression: Chrome desktop — grid labels still visible at non-centroid nodes
 
 ### Phase 4e: Node Interaction — Single-Note Playback (Build + Refine)
 
@@ -301,8 +288,9 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| iOS Safari: no audio, no playback | Tentatively closed | Fixed by 4d-1 (sync AudioContext). Verified on iOS 14.6 emulators. Pending physical device confirmation (iPhone 12 mini, iOS 18.6.2). See Entry 27. |
-| iOS Safari: labels, colors | Unconfirmed on iOS 14.x | `dominant-baseline` label positioning + highlight fill bleeding — observed on iOS 18.6.2 physical device only, NOT reproduced in iOS 14.6 emulator. May be iOS 18.x-specific or emulator limitation. Conditional: 4d-2, 4d-3. |
+| iOS Safari: label positioning | **Confirmed** | `dominant-baseline: "central"` ignored by Safari. Labels mispositioned in node circles. Fix: replace with `dy` attribute. See 4d-2. |
+| iOS Safari: label occlusion | **Confirmed** | White centroid labels (`#fff`) occlude dark grid labels (`#555`) at progression nodes. Safari z-order differs from Chrome. Fix: hide grid labels at centroid positions. See 4d-3. |
+| Android: long-press haptic feedback | **Won't fix (web)** | OS-level vibration, cannot suppress from web app. `touch-action: manipulation` tested — broke drag, haptic still fired. See Entry 30. |
 | Mobile audio crackling (budget tablets) | Deferred to Phase 3d/4c | Stale `ctx.currentTime` on large-buffer devices. `safeOffset` fix helped Pixel 6, not Galaxy Tab A7 Lite. Need device diagnostic data + brute-force offset test. See Entry 21 |
 
 ## Post-MVP
@@ -312,11 +300,13 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | Giant Steps symmetric jumps | Requires two-pass global optimizer. Local greedy algorithm cannot resolve symmetric tritone jumps. |
 | Tristan chord Am placement | Local algorithm picks geometrically nearest Am; no `CHAIN_BLEND` value fixes it. Needs global optimizer. |
 | m7b5 non-root triangle placement | POL-D14 (deferred) |
+| **Root-in-bass voicing (AE-D19)** | Ensure chord root is lowest note in progression playback. ~2-3h effort. See ARCH_AUDIO_ENGINE.md §3. |
 
 ## Resolved Issues
 
 | Issue | Resolution |
 |-------|------------|
+| iOS Safari: no audio | Sync AudioContext creation (Entry 27, 4d-1). Confirmed working on iOS 14.6 emulators + physical devices. |
 | Chain-focus drift | Centroid focus + cluster gravity blend (Entry 18) |
 | End-of-progression crackling | Sustain-level release scheduling + graceful completion (Entry 17) |
 | Multi-voice attack crackling | Per-voice mixGain 0.24, removed dynamic normalization (Entry 17) |
@@ -370,3 +360,4 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | # | Date | Decision | Status |
 |---|------|----------|--------|
 | D14 | 02-17 | m7b5 non-root triangle placement | Deferred post-MVP |
+| D30 | 02-24 | Root-in-bass voicing rule (AE-D19) | Open — see §Post-MVP |
