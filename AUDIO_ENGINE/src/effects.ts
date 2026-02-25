@@ -1,22 +1,18 @@
 /**
  * Global effects chain for synthesis presets.
  *
- * Provides dry/wet routing with configurable delay feedback loops,
- * plus a brickwall limiter (DynamicsCompressorNode) to catch transient peaks.
+ * Provides dry/wet routing with configurable delay feedback loops.
  * Voices connect to the chain's input; the chain's output connects to
- * the AudioContext destination via the limiter.
+ * the AudioContext destination.
  *
  * Signal flow:
- *   voices → input (dry) ─┬─→ dryGain ───────────────────┬→ output → limiter → destination
+ *   voices → input (dry) ─┬─→ dryGain ───────────────────┬→ output → destination
  *                         └─→ delay1 → damp1 → fb1 ──────┤
  *                              └─→ delay2 → damp2 → fb2 ─┤
  *                                                        └→ wetGain
  *
  * The chain supports up to 2 parallel delay lines with independent
  * damping (LP filter) and feedback. Presets with no delay use wet=0/dry=1.
- *
- * The limiter (AE-D17) catches transient peaks from loop transitions,
- * preset switching, or voice collision at chord boundaries.
  */
 
 import type { SynthPreset, DelayConfig } from "./presets.js";
@@ -26,10 +22,8 @@ import type { SynthPreset, DelayConfig } from "./presets.js";
 export interface EffectsChain {
   /** Input node — voices connect here. */
   readonly input: GainNode;
-  /** Output node — feeds into limiter. */
+  /** Output node — connected to ctx.destination. */
   readonly output: GainNode;
-  /** Limiter node — catches transient peaks (AE-D17). */
-  readonly limiter: DynamicsCompressorNode;
   /**
    * Reconfigure the effects chain for a new preset.
    * Adjusts delay times, feedback, damping, and wet/dry mix.
@@ -52,7 +46,6 @@ interface EffectsChainState {
   ctx: AudioContext;
   input: GainNode;
   output: GainNode;
-  limiter: DynamicsCompressorNode;
   dryGain: GainNode;
   wetGain: GainNode;
   delay1: DelayLine | null;
@@ -67,23 +60,6 @@ const MIN_DELAY_TIME = 0.003;
 
 /** Default damping filter Q. */
 const DEFAULT_DAMPING_Q = 0.7;
-
-// ── Limiter Parameters (AE-D17) ─────────────────────────────────────
-
-/** Limiter threshold in dB — compression starts here. */
-const LIMITER_THRESHOLD_DB = -6;
-
-/** Limiter knee in dB — soft knee for transparent limiting. */
-const LIMITER_KNEE_DB = 6;
-
-/** Limiter ratio — high ratio acts as brickwall. */
-const LIMITER_RATIO = 12;
-
-/** Limiter attack time in seconds — fast to catch transients. */
-const LIMITER_ATTACK = 0.003;
-
-/** Limiter release time in seconds — smooth recovery. */
-const LIMITER_RELEASE = 0.1;
 
 // ── Helper Functions ─────────────────────────────────────────────────
 
@@ -149,17 +125,9 @@ export function createEffectsChain(
   const input = ctx.createGain();
   input.gain.value = 1.0;
 
-  // Output node — feeds into limiter
+  // Output node — connects to destination
   const output = ctx.createGain();
   output.gain.value = 1.0;
-
-  // Limiter — catches transient peaks (AE-D17)
-  const limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = LIMITER_THRESHOLD_DB;
-  limiter.knee.value = LIMITER_KNEE_DB;
-  limiter.ratio.value = LIMITER_RATIO;
-  limiter.attack.value = LIMITER_ATTACK;
-  limiter.release.value = LIMITER_RELEASE;
 
   // Dry path
   const dryGain = ctx.createGain();
@@ -180,7 +148,6 @@ export function createEffectsChain(
     ctx,
     input,
     output,
-    limiter,
     dryGain,
     wetGain,
     delay1: null,
@@ -188,14 +155,12 @@ export function createEffectsChain(
     destroyed: false,
   };
 
-  // Connect output → limiter → destination
-  output.connect(limiter);
-  limiter.connect(ctx.destination);
+  // Connect output to destination
+  output.connect(ctx.destination);
 
   const chain: EffectsChain = {
     input,
     output,
-    limiter,
 
     reconfigure(preset: SynthPreset): void {
       if (state.destroyed) return;
@@ -290,7 +255,6 @@ export function createEffectsChain(
       state.dryGain.disconnect();
       state.wetGain.disconnect();
       state.output.disconnect();
-      state.limiter.disconnect();
 
       if (state.delay1) {
         disconnectDelayLine(state.delay1);

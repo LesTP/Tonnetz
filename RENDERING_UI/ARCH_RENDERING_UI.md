@@ -270,13 +270,14 @@ Actual exported API surface from `src/index.ts`:
 | `ResizeCallback` | Type | `resize-controller.ts` | Resize event payload type |
 | `hitTest(worldX, worldY, radius, indices)` | Function | `hit-test.ts` | Proximity-circle hit classification |
 | `computeProximityRadius(factor?)` | Function | `hit-test.ts` | Radius in world units |
-| `HitResult`, `HitTriangle`, `HitEdge`, `HitNone` | Types | `hit-test.ts` | Discriminated union result types |
+| `HitResult`, `HitTriangle`, `HitEdge`, `HitNode`, `HitNone` | Types | `hit-test.ts` | Discriminated union result types (HitNode added Phase 4e-2) |
+| `NODE_HIT_RADIUS` | Const | `hit-test.ts` | Node proximity radius (0.20 world units) |
 | `createGestureController(options)` | Function | `gesture-controller.ts` | Tap/drag/pinch disambiguation (UX-D3, RU-D18) |
 | `GestureController` | Type | `gesture-controller.ts` | `{ destroy }` |
 | `GestureControllerOptions`, `GestureCallbacks` | Types | `gesture-controller.ts` | Options and callback types (includes `onPinchZoom`) |
 | `createInteractionController(options)` | Function | `interaction-controller.ts` | Orchestration: gesture→hit-test→selection events |
 | `InteractionController` | Type | `interaction-controller.ts` | `{ destroy }` |
-| `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types |
+| `InteractionControllerOptions`, `InteractionCallbacks` | Types | `interaction-controller.ts` | Options and callback types (includes `onNodeSelect` for single-pitch node taps, Phase 4e-3) |
 
 ### Resolved — Phase 4b+ (originally deferred, now wired in Integration)
 

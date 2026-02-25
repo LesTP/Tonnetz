@@ -1,7 +1,7 @@
 # UX_SPEC.md
 
-Version: Draft 0.7
-Date: 2026-02-22
+Version: Draft 0.8
+Date: 2026-02-25
 
 ---
 
@@ -261,7 +261,8 @@ UX introduces the following interface expectations:
 | Progression path clearing | `clearProgression(handle)` | ✅ Implemented |
 | Active chord highlight | `PathHandle.setActiveChord(index)` | ✅ Implemented |
 | Proximity-circle hit testing | `hitTest(worldX, worldY, radius, indices)` | ✅ Implemented |
-| Triangle/edge hit classification | `HitResult` (discriminated union: HitTriangle \| HitEdge \| HitNone) | ✅ Implemented |
+| Triangle/edge/node hit classification | `HitResult` (discriminated union: HitTriangle \| HitEdge \| HitNode \| HitNone) | ✅ Implemented |
+| Node proximity hit testing | `HitNode` type (`type, nodeId, pc, u, v`) + `NODE_HIT_RADIUS` (0.20) | ✅ Implemented |
 | UI state machine | `createUIStateController()` | ✅ Implemented |
 | Clear button integration | `UIStateController.clearProgression()` + `ControlPanel` | ✅ Implemented |
 
@@ -271,8 +272,9 @@ UX introduces the following interface expectations:
 
 | Requirement | API | Status |
 |-------------|-----|--------|
-| Immediate playback mode | `createImmediatePlayback(transport)`, `playShape(state, shape)`, `playPitchClasses(state, pcs)`, `stopAll(state)` | ✅ Implemented |
-| Scheduled playback mode | `AudioTransport` interface (play/stop/pause/setTempo/scheduleProgression) | ✅ Implemented |
+| Immediate playback mode | `createImmediatePlayback(transport, options?)`, `playShape(state, shape)`, `playPitchClasses(state, pcs)`, `stopAll(state)` | ✅ Implemented |
+| Audio initialization | `initAudio(options?)` (async), `initAudioSync(options?)` (sync, for iOS Safari) | ✅ Implemented |
+| Scheduled playback mode | `AudioTransport` interface (play/stop/pause/setTempo/scheduleProgression/setPreset/setLoop) | ✅ Implemented |
 | Chord change events | `AudioTransport.onChordChange()` | ✅ Implemented |
 | 4-note edge-proximity playback | Integration module wiring (`InteractionCallbacks` → `playPitchClasses`) | ✅ Implemented |
 

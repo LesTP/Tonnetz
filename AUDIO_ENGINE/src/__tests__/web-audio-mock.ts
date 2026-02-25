@@ -146,27 +146,6 @@ export class MockDelayNode extends MockAudioNode {
   }
 }
 
-// ── Mock DynamicsCompressorNode ─────────────────────────────────────
-
-export class MockDynamicsCompressorNode extends MockAudioNode {
-  readonly threshold: MockAudioParam;
-  readonly knee: MockAudioParam;
-  readonly ratio: MockAudioParam;
-  readonly attack: MockAudioParam;
-  readonly release: MockAudioParam;
-  readonly reduction: number = 0;
-
-  constructor(context: MockAudioContext) {
-    super(context);
-    // Default values per Web Audio spec
-    this.threshold = new MockAudioParam(-24);
-    this.knee = new MockAudioParam(30);
-    this.ratio = new MockAudioParam(12);
-    this.attack = new MockAudioParam(0.003);
-    this.release = new MockAudioParam(0.25);
-  }
-}
-
 // ── Mock BiquadFilterNode ────────────────────────────────────────────
 
 export class MockBiquadFilterNode extends MockAudioNode {
@@ -247,10 +226,6 @@ export class MockAudioContext {
 
   createDelay(maxDelayTime: number = 1.0): MockDelayNode {
     return new MockDelayNode(this, maxDelayTime);
-  }
-
-  createDynamicsCompressor(): MockDynamicsCompressorNode {
-    return new MockDynamicsCompressorNode(this);
   }
 }
 

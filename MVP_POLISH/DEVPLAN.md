@@ -1,8 +1,8 @@
 # DEVPLAN — MVP Polish Track
 
 Module: MVP Polish (cross-cutting)
-Version: 0.5
-Date: 2026-02-24
+Version: 0.6
+Date: 2026-02-25
 References: SPEC.md, UX_SPEC.md, ARCH_AUDIO_ENGINE.md, ARCH_RENDERING_UI.md
 
 ---
@@ -31,7 +31,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Next:** 4d-2, 4d-3 (iOS Safari label fixes)
+**Next:** 3d Step 2 listening (in progress), then 4d-2, 4d-3 (iOS Safari label fixes)
 
 **Completed:**
 - 0 (pre-polish bug fixes)
@@ -44,12 +44,13 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 - 4a (mobile touch + responsive)
 - 4d-1 (iOS audio)
 - 4e-1/2/3 (node interaction)
+- 3d Step 1 (preset infrastructure + 6 presets + effects chain + integration wiring + tests)
 
 **Deferred:**
 - 4e-4 (orange disc highlight) — implement if current highlight feels insufficient
 - 4e-5 (node size increase) — optional, current touch targets adequate
 
-**Upcoming:** 3d (synthesis) → 4b/4c (mobile UAT) → 5 (final polish)
+**Upcoming:** 3d Step 2/3 (synthesis evaluation + lock) → 4d-2/4d-3 (iOS Safari labels) → 4b/4c (mobile UAT) → 5 (final polish)
 
 **Blocked/Broken:** None
 
@@ -75,6 +76,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 | 4a | Mobile touch: pinch-zoom, breakpoint 1024px, floating transport, share button | Entry 20 |
 | 4d-1 | iOS Safari audio: synchronous AudioContext creation | Entry 27 |
 | 4e-1/2/3 | Node interaction: policy revision (D28), hit-test, dispatch | Entries 28–29 |
+| 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 338 AE tests | DEVLOG_3D Entries 1–6 |
 
 **Forward references retained:**
 - Supported chord table: see §Supported Chord Reference below
@@ -361,3 +363,4 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 |---|------|----------|--------|
 | D14 | 02-17 | m7b5 non-root triangle placement | Deferred post-MVP |
 | D30 | 02-24 | Root-in-bass voicing rule (AE-D19) | Open — see §Post-MVP |
+| 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 338 AE tests | DEVLOG_3D Entries 1–6 |

@@ -18,7 +18,6 @@ import {
   MockGainNode,
   MockDelayNode,
   MockBiquadFilterNode,
-  MockDynamicsCompressorNode,
 } from "./web-audio-mock.js";
 
 const ctx = () => new MockAudioContext() as unknown as AudioContext;
@@ -33,12 +32,6 @@ describe("createEffectsChain — basic creation", () => {
     expect(chain.output).toBeDefined();
   });
 
-  it("creates an effects chain with limiter node", () => {
-    const mock = ctx();
-    const chain = createEffectsChain(mock);
-    expect(chain.limiter).toBeDefined();
-  });
-
   it("input is a GainNode", () => {
     const mock = new MockAudioContext();
     const chain = createEffectsChain(mock as unknown as AudioContext);
@@ -49,12 +42,6 @@ describe("createEffectsChain — basic creation", () => {
     const mock = new MockAudioContext();
     const chain = createEffectsChain(mock as unknown as AudioContext);
     expect(chain.output).toBeInstanceOf(MockGainNode);
-  });
-
-  it("limiter is a DynamicsCompressorNode", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    expect(chain.limiter).toBeInstanceOf(MockDynamicsCompressorNode);
   });
 
   it("exposes reconfigure method", () => {
@@ -487,64 +474,5 @@ describe("createEffectsChain — presets without delay", () => {
     // We can't directly inspect internal state, but the reconfigure shouldn't throw
     // and subsequent operations should work
     expect(() => chain.reconfigure(PRESET_WARM_PAD)).not.toThrow();
-  });
-});
-
-// ── Limiter (AE-D17) ─────────────────────────────────────────────────
-
-describe("createEffectsChain — limiter", () => {
-  it("creates a DynamicsCompressorNode", () => {
-    const mock = new MockAudioContext();
-    const compressors: MockDynamicsCompressorNode[] = [];
-    const origCreate = mock.createDynamicsCompressor.bind(mock);
-    mock.createDynamicsCompressor = () => {
-      const c = origCreate();
-      compressors.push(c);
-      return c;
-    };
-
-    createEffectsChain(mock as unknown as AudioContext);
-    expect(compressors).toHaveLength(1);
-  });
-
-  it("configures limiter with correct threshold (-6dB)", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    expect((chain.limiter as unknown as MockDynamicsCompressorNode).threshold.value).toBe(-6);
-  });
-
-  it("configures limiter with correct knee (6dB)", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    expect((chain.limiter as unknown as MockDynamicsCompressorNode).knee.value).toBe(6);
-  });
-
-  it("configures limiter with correct ratio (12:1)", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    expect((chain.limiter as unknown as MockDynamicsCompressorNode).ratio.value).toBe(12);
-  });
-
-  it("configures limiter with fast attack (3ms)", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    expect((chain.limiter as unknown as MockDynamicsCompressorNode).attack.value).toBe(0.003);
-  });
-
-  it("configures limiter with 100ms release", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    expect((chain.limiter as unknown as MockDynamicsCompressorNode).release.value).toBe(0.1);
-  });
-
-  it("limiter is in signal path (output → limiter → destination)", () => {
-    const mock = new MockAudioContext();
-    const chain = createEffectsChain(mock as unknown as AudioContext);
-    // Verify the limiter exists and is connected (indirectly via creation)
-    expect(chain.limiter).toBeDefined();
-    expect(chain.output).toBeDefined();
-    // The connection is verified by the fact that the chain works and
-    // all nodes are created — actual connection testing would require
-    // more complex mocking
   });
 });

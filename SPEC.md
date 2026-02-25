@@ -1,7 +1,7 @@
 # SPEC.md — Tonnetz Interactive Harmonic Explorer
 
-Version: Draft 0.6
-Date: 2026-02-22
+Version: Draft 0.7
+Date: 2026-02-25
 
 ---
 
@@ -240,7 +240,7 @@ Rendering/UI handles SVG rendering, interaction, and layout. Other modules consu
 | `LatticePoint` | Lattice coordinate `{ u, v }` |
 | `CameraState` | Camera state `{ centerX, centerY, zoom }` |
 | `ViewBox` | SVG viewBox `{ minX, minY, width, height }` |
-| `HitResult` | Discriminated union: `HitTriangle \| HitEdge \| HitNone` |
+| `HitResult` | Discriminated union: `HitTriangle \| HitEdge \| HitNode \| HitNone` |
 | `ShapeHandle` | Handle for clearing rendered shapes |
 | `PathHandle` | Handle for progression path (`clear`, `setActiveChord`, `getChordCount`) |
 | `HighlightHandle` | Handle for clearing highlights |
@@ -259,8 +259,9 @@ Audio Engine handles chord voicing, Web Audio synthesis, and playback scheduling
 
 | Function | Description |
 |----------|-------------|
-| `initAudio(options?)` | Create AudioContext (with autoplay resume) → returns `AudioTransport` |
-| `createImmediatePlayback(transport)` | Create immediate playback state (master gain + voice tracking) |
+| `initAudio(options?)` | Create AudioContext (async, with autoplay resume) → returns `AudioTransport` |
+| `initAudioSync(options?)` | Create AudioContext (synchronous, for iOS Safari gesture chain) → returns `AudioTransport` |
+| `createImmediatePlayback(transport, options?)` | Create immediate playback state (effects chain + voice tracking) |
 
 ## Immediate Playback (ARCH §6.2)
 
@@ -293,20 +294,20 @@ Audio Engine handles chord voicing, Web Audio synthesis, and playback scheduling
 | `secondsToBeats(seconds, bpm)` | Convert seconds to beats at tempo |
 | `shapesToChordEvents(shapes, beatsPerChord?)` | Convert `Shape[]` → `ChordEvent[]` (sequential, equal duration) |
 
-## AudioTransport (16 methods — ARCH §6.1)
+## AudioTransport (18 methods — ARCH §6.1)
 
 | Group | Methods |
 |-------|--------|
 | Time queries | `getTime()`, `getContext()` |
-| State queries | `getState()`, `isPlaying()`, `getTempo()`, `getCurrentChordIndex()`, `getPadMode()` |
-| Playback control | `setTempo(bpm)`, `setPadMode(enabled)`, `scheduleProgression(events)`, `play()`, `stop()`, `pause()`, `cancelSchedule()` |
+| State queries | `getState()`, `isPlaying()`, `getTempo()`, `getCurrentChordIndex()`, `getPadMode()`, `getPreset()`, `getLoop()` |
+| Playback control | `setTempo(bpm)`, `setPadMode(enabled)`, `setPreset(preset)`, `setLoop(enabled)`, `scheduleProgression(events)`, `play()`, `stop()`, `pause()`, `cancelSchedule()` |
 | Event subscriptions | `onStateChange(cb)`, `onChordChange(cb)` |
 
 ## Key Types
 
 | Type | Description |
 |------|-------------|
-| `AudioTransport` | 16-method cross-module transport contract |
+| `AudioTransport` | 18-method cross-module transport contract |
 | `TransportState` | Snapshot: `{ playing, tempo, currentChordIndex, totalChords }` |
 | `ChordEvent` | Scheduled chord: `{ shape, startBeat, durationBeats }` |
 | `PlaybackStateChange` | Event payload: `{ playing, timestamp }` |
@@ -415,7 +416,7 @@ Audio Engine is stateless with respect to UI state (see ARCH_AUDIO_ENGINE.md §4
 
 * **Idle / Chord Selected:** immediate playback permitted via `playPitchClasses()`
 * **Playback Running:** interactive playback suppressed (UX-D6); only `AudioTransport` controls active
-* **Progression Loaded:** ready for scheduled playback; interactive playback suppressed (INT-D6) — user clears progression first to return to exploration
+* **Progression Loaded:** interactive playback permitted (POL-D28) — audio + visual highlighting coexist with progression path; ready for scheduled playback via play button
 
 ## Duration Model
 
@@ -440,25 +441,25 @@ All items must be verified before starting integration module development.
 ### Rendering/UI
 
 - [x] SVG scaffold, grid rendering, camera controller operational
-- [x] `hitTest()` returns discriminated `HitResult` (HitTriangle | HitEdge | HitNone)
-- [x] `createInteractionController()` emits `onTriangleSelect`, `onEdgeSelect`, `onPointerUp` with pitch classes
+- [x] `hitTest()` returns discriminated `HitResult` (HitTriangle | HitEdge | HitNode | HitNone)
+- [x] `createInteractionController()` emits `onTriangleSelect`, `onEdgeSelect`, `onNodeSelect`, `onPointerUp` with pitch classes
 - [x] `renderShape()` / `renderProgressionPath()` render HC Shape objects
 - [x] `PathHandle.setActiveChord(index)` ready for transport subscription
 - [x] `createUIStateController()` implements all state transitions (idle → chord-selected → progression-loaded → playback-running)
 - [x] `createControlPanel()` exposes play/stop/clear callbacks (legacy API; see [Superseded APIs appendix](#appendix-superseded-apis))
 - [x] `createLayoutManager()` provides three-zone layout (legacy API; see [Superseded APIs appendix](#appendix-superseded-apis))
-- [x] All tests passing (367 tests including 19 AE contract tests)
+- [x] All tests passing (375 tests including 19 AE contract tests)
 - [x] No runtime dependencies on audio or storage
 
 ### Audio Engine
 
-- [x] `initAudio()` → `AudioTransport` with all 16 interface methods
+- [x] `initAudio()` / `initAudioSync()` → `AudioTransport` with all 18 interface methods
 - [x] `createImmediatePlayback()` / `playPitchClasses()` / `playShape()` / `stopAll()` operational
 - [x] `AudioTransport.scheduleProgression()` / `play()` / `stop()` / `pause()` operational
 - [x] `AudioTransport.onChordChange()` / `onStateChange()` fire correctly
 - [x] `shapesToChordEvents()` converts `Shape[]` → `ChordEvent[]`
 - [x] Voice-leading (`voiceLead`) threads across sequential chords
-- [x] All tests passing (202 tests)
+- [x] All tests passing (338 tests)
 - [x] No runtime dependencies on UI or storage
 
 ### Persistence/Data
@@ -691,7 +692,7 @@ Deliver playable harmonic instrument with progression visualization.
 * limited chord grammar (no augmented extended chords; no 9/11/13 tensions); input cleaning accepts common aliases (ø, Δ, dash-as-minor, slash bass, sus, 9th shorthands) but strips unsupported extensions
 * diminished and augmented triads rendered as dot clusters, not triangles
 * ~~no shared progression library~~ (shipped: 26 curated progressions, MVP Polish Phase 2)
-* simple synthesis model (dual-oscillator pad; Staccato/Legato toggle available)
+* simple synthesis model (6 baked presets: Classic, Warm Pad, Breathing Pad, Cathedral Organ, Electric Organ, Glass Harmonica; Staccato/Legato toggle available)
 * minimal voice-leading optimization
 * placement heuristics use local greedy algorithm with cluster gravity — symmetric progressions (Giant Steps) and certain voicing-dependent placements (Tristan chord Am) require a future global optimizer
 

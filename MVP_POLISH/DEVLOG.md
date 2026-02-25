@@ -5,46 +5,6 @@ Started: 2026-02-16
 
 ---
 
-## Entry 30 — Android Long-Press Haptic Feedback Test (Code)
-
-**Date:** 2026-02-24
-
-### Summary
-
-Tested whether `touch-action: manipulation` suppresses Android's long-press haptic vibration. **Result: Failed** — haptic still fired AND drag broke. Reverted.
-
-### Background
-
-Android triggers system haptic feedback (short vibration) on long-press before the web app receives the event. This is distracting during chord exploration. Current mitigations (`contextmenu` prevention, `-webkit-touch-callout: none`) suppress the context menu but not the haptic.
-
-### Change Tested
-
-| File | Before | After |
-|------|--------|-------|
-| `RENDERING_UI/src/renderer.ts` line 68 | `touch-action: none` | `touch-action: manipulation` |
-
-### Test Results
-
-- [x] Android: long-press haptic — **still fires** (no improvement)
-- [x] Android: drag/pan — **broken** (regression)
-- [ ] Pinch-zoom — not tested (drag failure was sufficient to revert)
-
-### Conclusion
-
-`touch-action: manipulation` is not a viable fix. The haptic feedback is triggered at the OS level before the browser's gesture recognizer runs. CSS-based solutions cannot suppress it.
-
-**Reverted** to `touch-action: none`.
-
-### Future Options
-
-1. **Accept it** — the haptic is Android system behavior, not a bug
-2. **Native wrapper** — Cordova/Capacitor could disable haptic via native API
-3. **Research** — check if any Android Chrome flags or PWA manifest options exist
-
-Marked as "won't fix for web MVP" in Open Issues.
-
----
-
 ## Entry 29 — Phase 4e-2/3: Node Hit-Test + Interaction Dispatch (Code)
 
 **Date:** 2026-02-23

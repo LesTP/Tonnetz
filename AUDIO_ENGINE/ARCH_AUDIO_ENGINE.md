@@ -1,7 +1,7 @@
 # ARCH_AUDIO_ENGINE.md
 
-Version: Draft 0.6
-Date: 2026-02-22
+Version: Draft 0.7
+Date: 2026-02-25
 
 ---
 
@@ -26,39 +26,63 @@ AE-D13 Staccato/Legato playback mode (POL-D19) — Closed
 AE-D14 Hard-stop at chord boundary + 10ms fade-out (POL Phase 3a) — Closed
 AE-D15 VoiceHandle.cancelRelease() for voice carry-forward (POL Phase 3b/3c) — Closed
 AE-D16 Fixed per-voice gain 0.24 (no dynamic normalization) — Closed
+AE-D17 DynamicsCompressorNode as safety limiter — Closed
+AE-D18 Stop fade-out 50ms (already implemented) — Closed
 AE-D19 Root-in-bass voicing rule (progression playback only) — **Open**
 
 ---
 
 ## 2b. Synthesis Model (AE-D2)
 
-Detuned dual-oscillator pad with low-pass filter. Per-voice signal chain:
+Preset-driven synthesis with configurable oscillators, filter, envelope, LFO, and global effects chain. Per-voice signal chain:
 
 ```
-OscillatorNode (triangle, +2 cents)  ──┐
-                                       ├──► GainNode (mix) ──► BiquadFilterNode (LP) ──► GainNode (ADSR) ──► master GainNode
-OscillatorNode (sine, −2 cents)     ──┘
+osc1 → osc1Gain ─┬→ BiquadFilterNode (LP) → GainNode (ADSR) → outputGain → effectsChain.input
+osc2 → osc2Gain ─┘
+     [lfoOsc → lfoGain → filter.frequency OR osc.detune]
 ```
 
-### Default Parameters
+Global effects chain:
+
+```
+voices → input ─┬→ dryGain ──────────────────────┬→ output → limiter → ctx.destination
+                └→ delay1 → damp1 → fb1 (loop) ──┤
+                     └→ delay2 → damp2 → fb2 ────┘→ wetGain
+```
+
+### Preset System (Phase 3d)
+
+6 baked `SynthPreset` objects selected via sidebar dropdown. Presets define all voice parameters (oscillator types, gains, filter, envelope, LFO, delay). `createVoice()` reads from the active preset. PeriodicWave objects are built once per AudioContext and cached.
+
+| Preset | Oscillators | Filter | Envelope | LFO | Delay |
+|--------|-------------|--------|----------|-----|-------|
+| Classic (default) | tri+sine, ±3¢ | LP 1500Hz | A120ms R500ms | — | — |
+| Warm Pad | saw+tri, ±5¢ | LP 900Hz + bloom | A350ms R1.4s | — | 55ms |
+| Breathing Pad | saw+tri, ±5¢ | LP 900Hz + bloom | A350ms R1.4s | filter 0.09Hz | 55ms |
+| Cathedral Organ | periodic+sub | LP 4200Hz + chiff | A12ms R80ms | — | dual 61ms/89ms |
+| Electric Organ | periodic drawbars | LP 3200Hz | A6ms R30ms | pitch 0.8Hz | — |
+| Glass Harmonica | sine+sine, ±8¢ | LP 3600Hz | A280ms R1.6s | pitch 0.25Hz | 38ms |
+
+See `AUDIO_ENGINE/DEVPLAN_3D.md` for full preset definitions and `SynthPreset` type.
+
+### Classic Preset Parameters (baseline, backward-compatible)
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
 | Oscillator 1 type | `"triangle"` | Warm odd-harmonic content |
 | Oscillator 2 type | `"sine"` | Adds fundamental body |
-| Detune | ±2–4 cents | Chorusing; exact value tuned during implementation |
-| Mix ratio | 0.5 / 0.5 | Equal blend; adjustable |
+| Detune | ±3 cents | Chorusing |
+| osc1Gain / osc2Gain | 0.12 / 0.12 | Per-voice sum 0.24 (AE-D16) |
 | LP filter cutoff | 1500 Hz | Softens upper harmonics (revised from 2000, POL Phase 3a) |
-| LP filter Q | ~1.0 | Gentle rolloff, no resonant peak |
-| Attack | 120 ms | Softer fade-in; chord transitions less percussive (revised from 50ms, POL Phase 3a) |
-| Decay | ~200 ms | Settles to sustain level |
-| Sustain | ~0.7 | Sustained pad level |
-| Release | ~500 ms | Musical release tail |
-| Per-voice mixGain | 0.24 | Fixed gain per voice (AE-D16) |
+| LP filter Q | 1.0 | Gentle rolloff, no resonant peak |
+| Attack | 120 ms | Softer fade-in (revised from 50ms, POL Phase 3a) |
+| Decay | 200 ms | Settles to sustain level |
+| Sustain | 0.7 | Sustained pad level |
+| Release | 500 ms | Musical release tail |
 
 ### Gain Normalization (AE-D16)
 
-Per-voice `mixGain` is fixed at 0.24. With a maximum of 4 simultaneous voices, the sum is `4 × 0.24 = 0.96`, always under 1.0. Master gain stays at 1.0 permanently.
+Per-voice gain constraint: `(osc1Gain + osc2Gain) × 4 < 1.0`. Each preset's oscillator gains are tuned to stay within this budget. A `DynamicsCompressorNode` (AE-D17) acts as a safety limiter at the end of the effects chain to catch transient peaks from loop transitions or preset switching.
 
 The previous dynamic normalization (`1/√n`) caused transient clipping because the master gain was set *after* voice creation — voices briefly attacked into an un-normalized gain of 1.0. Fixed per-voice gain eliminates this race.
 
@@ -68,11 +92,20 @@ The previous dynamic normalization (`1/√n`) caused transient clipping because 
 
 - **`cancelRelease()`** — resets the `released` flag, clears the pending cleanup timer (`releaseCleanupId`), cancels the envelope ramp, and restores the sustain level (`peakGain × sustainLevel`). This enables voice carry-forward for sustained repeated chords (Phase 3b) and per-voice continuation in Legato mode (Phase 3c).
 - **`release()`** no longer calls `osc.stop()` — oscillators stay alive; cleanup is deferred via `setTimeout → handle.stop()`. This allows `cancelRelease()` to reclaim a voice mid-release.
-- **`stop()`** uses a 10ms envelope fade-out (`linearRampToValueAtTime(0, t + 0.01)`) before stopping oscillators, preventing DC clicks from instant disconnects (AE-D14).
+- **`stop()`** uses a 50ms envelope fade-out (`linearRampToValueAtTime(0, t + 0.05)`) before stopping oscillators, preventing DC clicks from instant disconnects (AE-D14, AE-D18). Also disconnects LFO nodes if present.
 
 ### Node Budget
 
-5 Web Audio nodes per voice × 4 voices = 20 nodes for a seventh chord. Well within browser limits.
+| Preset | Nodes/voice | × 4 voices | Global | Total |
+|--------|------------|------------|--------|-------|
+| Classic | 5 | 20 | 0 | 20 |
+| Warm Pad | 6 | 24 | 4 | 28 |
+| Breathing Pad | 8 | 32 | 4 | 36 |
+| Cathedral | 6 | 24 | 8 | 32 |
+| Electric Organ | 7 | 28 | 0 | 28 |
+| Glass | 7 | 28 | 4 | 32 |
+
+All within 40-node practical limit for mobile. +1 global node for DynamicsCompressorNode limiter (AE-D17).
 
 ---
 
@@ -485,17 +518,26 @@ interface ImmediatePlaybackState {
 }
 
 /**
- * Initialize the audio system. Must be called after user gesture
- * (browser autoplay policy).
+ * Initialize the audio system (async). Awaits AudioContext.resume().
+ * Suitable for non-gesture contexts (tests, deferred init).
  */
 function initAudio(options?: InitAudioOptions): Promise<AudioTransport>;
 
 /**
- * Create immediate playback state. Call once after initAudio().
- * Connects a master gain node to the AudioContext destination.
- * @param transport - AudioTransport returned by initAudio()
+ * Initialize the audio system (synchronous). Calls AudioContext.resume()
+ * fire-and-forget without awaiting. Required for iOS Safari, which demands
+ * AudioContext creation + resume within the synchronous gesture handler
+ * call stack. See MVP_POLISH/DEVLOG Entry 27.
  */
-function createImmediatePlayback(transport: AudioTransport): ImmediatePlaybackState;
+function initAudioSync(options?: InitAudioOptions): AudioTransport;
+
+/**
+ * Create immediate playback state. Call once after initAudio/initAudioSync().
+ * Connects voices to the provided effects chain.
+ * @param transport - AudioTransport returned by initAudio/initAudioSync()
+ * @param options - { effectsChain, preset } (optional; defaults to dry chain + PRESET_CLASSIC)
+ */
+function createImmediatePlayback(transport: AudioTransport, options?: CreateImmediatePlaybackOptions): ImmediatePlaybackState;
 
 /**
  * Play a Shape immediately (interactive mode).
@@ -598,7 +640,7 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 |-----------|-------|--------|
 | `smoke.test.ts` | 1 | Barrel export resolves with expected public API |
 | `presets.test.ts` | 98 | Preset validation, gain staging, registry, utility functions, PeriodicWave cache |
-| `effects.test.ts` | 29 | EffectsChain creation, reconfigure, damping, feedback, destroy, node budget |
+| `effects.test.ts` | 38 | EffectsChain creation, reconfigure, damping, feedback, destroy, node budget, limiter |
 | `scheduler.test.ts` | 54 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration, onComplete callback (AE-D10) |
 | `audio-context.test.ts` | 39 | initAudio, transport state machine, play/stop/pause/cancel, event subscriptions, tempo, suspended context, natural completion (AE-D10), pause/resume chord index (AE-D11), voice-leading reset on stop (AE-D12) |
 | `immediate-playback.test.ts` | 37 | createImmediatePlayback, playPitchClasses, playShape, stopAll, voice-count normalization, duration, velocity, preset handling |
@@ -607,7 +649,7 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 | `cross-module.test.ts` | 7 | HC Shape → playShape, HC getTrianglePcs → playPitchClasses, HC getEdgeUnionPcs → playPitchClasses, ChordEvent scheduling, onChordChange subscribers |
 | `conversion.test.ts` | 5 | shapesToChordEvents: empty, single, multiple, custom beatsPerChord, reference preservation |
 | `integration-e2e.test.ts` | 3 | ii–V–I pipeline (HC→AE→events), triangle tap → 3 voices, edge union → 4 voices |
-| **Total** | **329** | |
+| **Total** | **338** | |
 
 ### Latency Analysis (Static)
 
@@ -794,5 +836,6 @@ Revisit if: Fast-tempo progressions sound smeared.
 ## 8c. Future Extensions
 
 * sampled instruments
-* richer synthesis (Phase 3d: waveform, reverb, filter exploration)
+* user-adjustable synthesis parameters (beyond baked presets)
 * MIDI export
+* root-in-bass voicing rule (AE-D19)
