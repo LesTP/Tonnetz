@@ -5,6 +5,35 @@ Started: 2026-02-16
 
 ---
 
+## Entry 32 — Preset Order Change (Code)
+
+**Date:** 2026-02-25
+
+### Summary
+
+Reordered synthesis presets in the Sound selector dropdown. Cathedral Organ is now the default preset, followed by Electric Organ, Soft Pad, and Warm Pad. User preference — organ sounds better suited as default for harmonic exploration.
+
+### Changes
+
+**`AUDIO_ENGINE/src/presets.ts`**
+- `ALL_PRESETS` reordered: Cathedral Organ → Electric Organ → Soft Pad → Warm Pad
+- `DEFAULT_PRESET` changed from `PRESET_SOFT_PAD` to `PRESET_CATHEDRAL`
+
+**`AUDIO_ENGINE/src/__tests__/presets.test.ts`**
+- Updated `DEFAULT_PRESET` tests to expect `PRESET_CATHEDRAL` with name `"cathedral"`
+
+**`INTEGRATION/src/__tests__/interaction-wiring.test.ts`**
+- Updated mock preset: `"soft-pad"` → `"cathedral"`
+
+**`INTEGRATION/src/__tests__/integration-flow.test.ts`**
+- Updated mock preset: `"soft-pad"` → `"cathedral"`
+
+### Tests
+
+- AE 305 passing, INT 239 passing
+
+---
+
 ## Entry 31 — Phase 4d-2/3 + 3d Closure + Sidebar Fixes (Code)
 
 **Date:** 2026-02-25

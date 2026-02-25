@@ -131,12 +131,12 @@ describe("ALL_PRESETS", () => {
 // ── DEFAULT_PRESET ───────────────────────────────────────────────────
 
 describe("DEFAULT_PRESET", () => {
-  it("is PRESET_SOFT_PAD", () => {
-    expect(DEFAULT_PRESET).toBe(PRESET_SOFT_PAD);
+  it("is PRESET_CATHEDRAL", () => {
+    expect(DEFAULT_PRESET).toBe(PRESET_CATHEDRAL);
   });
 
-  it("has name 'soft-pad'", () => {
-    expect(DEFAULT_PRESET.name).toBe("soft-pad");
+  it("has name 'cathedral'", () => {
+    expect(DEFAULT_PRESET.name).toBe("cathedral");
   });
 
   it("PRESET_CLASSIC alias points to PRESET_SOFT_PAD", () => {

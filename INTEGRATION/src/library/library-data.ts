@@ -321,9 +321,20 @@ export const LIBRARY: readonly LibraryEntry[] = [
     genre: "Pop / Rock",
     harmonicFeature: ["Chromatic voice-leading"],
     comment:
-      "The chromatic descending bass F-E-Eb-D creates the melancholy. Em7-A7-Dm borrows A7 from D minor \u2014 a secondary dominant (V/vi).",
+      "The chromatic descending bass F-E-Eb-D-C-Bb creates the melancholy. Em7-A7-Dm borrows A7 from D minor \u2014 a secondary dominant (V/vi). The C comes from Dm/C (slash stripped).",
     tempo: 96,
-    chords: ["F", "Em7", "A7", "Dm", "Dm", "Bb", "C7", "F"],
+    chords: ["F", "F", "Em7", "A7", "Dm", "Dm", "Bbmaj7", "C7", "F", "Em", "Dm7", "G7", "Bb", "F"],
+  },
+  {
+    id: "no-woman-no-cry",
+    title: "No Woman No Cry",
+    composer: "Bob Marley",
+    genre: "Pop / Rock",
+    harmonicFeature: ["I-V-vi-IV pop progression"],
+    comment:
+      "I-vi-IV-I with a IV-I-V turnaround. The vi-IV (Am-F) motion gives reggae its characteristic warmth.",
+    tempo: 165,
+    chords: ["C", "C", "Am", "F", "C", "F", "C", "G"],
   },
 ];
 

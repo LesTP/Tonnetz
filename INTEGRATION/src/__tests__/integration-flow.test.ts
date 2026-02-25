@@ -90,7 +90,7 @@ vi.mock("audio-engine", () => {
     voices: new Set(),
     prevVoicing: [],
     padMode: false,
-    preset: { name: "soft-pad", label: "Soft Pad" },
+    preset: { name: "cathedral", label: "Cathedral Organ" },
   };
 
   const mockEffectsChain = {
@@ -105,7 +105,7 @@ vi.mock("audio-engine", () => {
     initAudioSync: vi.fn(() => mockTransport),
     createImmediatePlayback: vi.fn(() => mockImmediatePlayback),
     createEffectsChain: vi.fn(() => mockEffectsChain),
-    DEFAULT_PRESET: { name: "soft-pad", label: "Soft Pad" },
+    DEFAULT_PRESET: { name: "cathedral", label: "Cathedral Organ" },
     playPitchClasses: vi.fn(),
     playShape: vi.fn(),
     stopAll: vi.fn(),

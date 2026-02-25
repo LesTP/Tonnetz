@@ -272,14 +272,14 @@ export const PRESET_GLASS: SynthPreset = {
 
 /** All available presets in display order. */
 export const ALL_PRESETS: readonly SynthPreset[] = [
-  PRESET_SOFT_PAD,
-  PRESET_WARM_PAD,
   PRESET_CATHEDRAL,
   PRESET_ELECTRIC_ORGAN,
+  PRESET_SOFT_PAD,
+  PRESET_WARM_PAD,
 ];
 
 /** Default preset for new sessions. */
-export const DEFAULT_PRESET: SynthPreset = PRESET_SOFT_PAD;
+export const DEFAULT_PRESET: SynthPreset = PRESET_CATHEDRAL;
 
 /**
  * @deprecated Use PRESET_SOFT_PAD. Alias retained for backward compatibility.

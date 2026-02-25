@@ -1,6 +1,6 @@
 # Progression Library — Content Reference
 
-29 curated progressions for the Tonnetz Interactive Harmonic Explorer.
+30 curated progressions for the Tonnetz Interactive Harmonic Explorer.
 This document is the authoritative content source for Phase 2a implementation.
 
 **Chord symbol convention:** All symbols must parse through HC `parseChordSymbol()` after Phase 0b grammar expansion (dim7, m7b5) and input cleaning (slash stripping). Slash chords in the `chords[]` array are listed WITHOUT the bass note — input cleaning handles this at load time. Roman numeral analysis is display-only metadata (shown in the card comment).
@@ -17,7 +17,7 @@ This document is the authoritative content source for Phase 2a implementation.
 | Traditional / Folk | 6, 7, 8, 9 |
 | Blues | 10 |
 | Jazz | 11, 12, 15, 16, 17, 18, 19 |
-| Pop / Rock | 13, 14, 20, 21, 22, 23, 24 |
+| Pop / Rock | 13, 14, 20, 21, 22, 23, 24, 30 |
 | Post-Punk | 28 |
 | Reference / Educational | 29 |
 
@@ -31,7 +31,7 @@ This document is the authoritative content source for Phase 2a implementation.
 | Modal / Dorian | 7, 9, 15 |
 | Chromatic voice-leading | 13, 25, 26, 27 |
 | Chromatic mediant / Coltrane changes | 17 |
-| I-V-vi-IV pop progression | 14, 20 |
+| I-V-vi-IV pop progression | 14, 20, 30 |
 | Rhythm changes | 12 |
 | Mixolydian / modal mixture | 8, 21 |
 | Minor key i-iv-V | 5, 28 |
@@ -294,13 +294,13 @@ Bb Bb Gm7 Gm7 | Cm7 Cm7 F7 F7 | Bb Bb Gm7 Gm7 | Cm7 Cm7 F7 F7 | Bb Bb Bb7 Bb7 | 
 **Tempo:** 96 BPM
 **Grid:** `"1/4"`
 
-**Comment:** The chromatic descending line F-E-Eb-D in the bass creates the melancholy. Em7-A7-Dm borrows A7 from D minor — a secondary dominant (V/vi) that pulls into the relative minor. One of the most covered songs ever written.
+**Comment:** The chromatic descending bass line (F-E-Eb-D-C-Bb) creates the melancholy. Em7-A7-Dm borrows A7 from D minor — a secondary dominant (V/vi) that pulls into the relative minor. The C in the bass comes from Dm/C (slash stripped). One of the most covered songs ever written.
 
-**Roman:** I | vii7 | III7 | vi | vi | IV | V7 | I
+**Roman:** I | vii7 | III7 | vi | vi | IVmaj7 | V7 | I | vii | vi7 | II7 | IV | I
 
 **Chords:**
 ```
-F F F F | Em7 Em7 Em7 Em7 | A7 A7 A7 A7 | Dm Dm Dm Dm | Dm Dm Dm Dm | Bb Bb Bb Bb | C7 C7 C7 C7 | F F F F
+F F F F | F F Em7 Em7 | A7 A7 A7 A7 | Dm Dm Dm Dm | Dm Dm Bbmaj7 Bbmaj7 | C7 C7 C7 C7 | F F F F | Em Em Em Em | Dm7 Dm7 Dm7 Dm7 | G7 G7 G7 G7 | Bb Bb Bb Bb | F F F F
 ```
 
 ---
@@ -623,6 +623,26 @@ Am Am Am Am | Dm Dm Dm Dm | E E E E | Am Am Am Am
 **Chords:**
 ```
 Dm7 Dm7 Dm7 Dm7 | G7 G7 G7 G7 | Cmaj7 Cmaj7 Cmaj7 Cmaj7 | Am7 Am7 Am7 Am7 | Fm7b5 Fm7b5 Fm7b5 Fm7b5 | Bb7 Bb7 Bb7 Bb7 | Ebmaj7 Ebmaj7 Ebmaj7 Ebmaj7 | Abdim7 Abdim7 Abdim7 Abdim7 | Dbaug Dbaug Dbaug Dbaug | Gb6 Gb6 Gb6 Gb6 | Bm Bm Bm Bm | E7 E7 E7 E7
+```
+
+---
+
+### 30. No Woman No Cry
+
+**Composer:** Bob Marley (1974)
+**Key:** C major
+**Genre:** Pop / Rock
+**Harmonic feature:** I-V-vi-IV pop progression
+**Tempo:** 165 BPM
+**Grid:** `"1/4"`
+
+**Comment:** I-vi-IV-I with a IV-I-V turnaround. The vi-IV (Am-F) motion gives reggae its characteristic warmth.
+
+**Roman:** I | I | vi | IV | I | IV | I | V
+
+**Chords:**
+```
+C C C C | C C C C | Am Am Am Am | F F F F | C C C C | F F F F | C C C C | G G G G
 ```
 
 ---
