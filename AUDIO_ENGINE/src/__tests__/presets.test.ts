@@ -9,12 +9,11 @@ import { describe, it, expect } from "vitest";
 import {
   ALL_PRESETS,
   DEFAULT_PRESET,
+  PRESET_SOFT_PAD,
   PRESET_CLASSIC,
   PRESET_WARM_PAD,
-  PRESET_BREATHING_PAD,
   PRESET_CATHEDRAL,
   PRESET_ELECTRIC_ORGAN,
-  PRESET_GLASS,
   getPeriodicWave,
   getPresetByName,
   validateGainStaging,
@@ -94,10 +93,10 @@ describe("Preset definitions — gain staging", () => {
     expect(fourVoicesPeak).toBeLessThan(1.0);
   });
 
-  it("Classic preset matches documented values (0.12 + 0.12 = 0.24)", () => {
-    expect(PRESET_CLASSIC.osc1Gain).toBe(0.12);
-    expect(PRESET_CLASSIC.osc2Gain).toBe(0.12);
-    const sum = PRESET_CLASSIC.osc1Gain + PRESET_CLASSIC.osc2Gain;
+  it("Soft Pad preset matches documented values (0.12 + 0.12 = 0.24)", () => {
+    expect(PRESET_SOFT_PAD.osc1Gain).toBe(0.12);
+    expect(PRESET_SOFT_PAD.osc2Gain).toBe(0.12);
+    const sum = PRESET_SOFT_PAD.osc1Gain + PRESET_SOFT_PAD.osc2Gain;
     expect(sum).toBeCloseTo(0.24, 5);
   });
 });
@@ -105,8 +104,8 @@ describe("Preset definitions — gain staging", () => {
 // ── ALL_PRESETS Registry ─────────────────────────────────────────────
 
 describe("ALL_PRESETS", () => {
-  it("contains exactly 6 presets", () => {
-    expect(ALL_PRESETS).toHaveLength(6);
+  it("contains exactly 4 presets", () => {
+    expect(ALL_PRESETS).toHaveLength(4);
   });
 
   it("has no duplicate names", () => {
@@ -122,24 +121,26 @@ describe("ALL_PRESETS", () => {
   });
 
   it("includes all named preset exports", () => {
-    expect(ALL_PRESETS).toContain(PRESET_CLASSIC);
+    expect(ALL_PRESETS).toContain(PRESET_SOFT_PAD);
     expect(ALL_PRESETS).toContain(PRESET_WARM_PAD);
-    expect(ALL_PRESETS).toContain(PRESET_BREATHING_PAD);
     expect(ALL_PRESETS).toContain(PRESET_CATHEDRAL);
     expect(ALL_PRESETS).toContain(PRESET_ELECTRIC_ORGAN);
-    expect(ALL_PRESETS).toContain(PRESET_GLASS);
   });
 });
 
 // ── DEFAULT_PRESET ───────────────────────────────────────────────────
 
 describe("DEFAULT_PRESET", () => {
-  it("is PRESET_CLASSIC", () => {
-    expect(DEFAULT_PRESET).toBe(PRESET_CLASSIC);
+  it("is PRESET_SOFT_PAD", () => {
+    expect(DEFAULT_PRESET).toBe(PRESET_SOFT_PAD);
   });
 
-  it("has name 'classic'", () => {
-    expect(DEFAULT_PRESET.name).toBe("classic");
+  it("has name 'soft-pad'", () => {
+    expect(DEFAULT_PRESET.name).toBe("soft-pad");
+  });
+
+  it("PRESET_CLASSIC alias points to PRESET_SOFT_PAD", () => {
+    expect(PRESET_CLASSIC).toBe(PRESET_SOFT_PAD);
   });
 });
 
@@ -147,12 +148,10 @@ describe("DEFAULT_PRESET", () => {
 
 describe("getPresetByName", () => {
   it("returns preset for valid name", () => {
-    expect(getPresetByName("classic")).toBe(PRESET_CLASSIC);
+    expect(getPresetByName("soft-pad")).toBe(PRESET_SOFT_PAD);
     expect(getPresetByName("warm-pad")).toBe(PRESET_WARM_PAD);
-    expect(getPresetByName("breathing-pad")).toBe(PRESET_BREATHING_PAD);
     expect(getPresetByName("cathedral")).toBe(PRESET_CATHEDRAL);
     expect(getPresetByName("electric-organ")).toBe(PRESET_ELECTRIC_ORGAN);
-    expect(getPresetByName("glass")).toBe(PRESET_GLASS);
   });
 
   it("returns undefined for unknown name", () => {
@@ -172,12 +171,12 @@ describe("usesPeriodicWave", () => {
     expect(usesPeriodicWave(PRESET_ELECTRIC_ORGAN)).toBe(true);
   });
 
-  it("returns false for Classic (no periodic)", () => {
-    expect(usesPeriodicWave(PRESET_CLASSIC)).toBe(false);
+  it("returns false for Soft Pad (no periodic)", () => {
+    expect(usesPeriodicWave(PRESET_SOFT_PAD)).toBe(false);
   });
 
   it("returns false for Glass (sine+sine)", () => {
-    expect(usesPeriodicWave(PRESET_GLASS)).toBe(false);
+    expect(usesPeriodicWave({ osc1Type: "sine", osc2Type: "sine" } as any)).toBe(false);
   });
 });
 
@@ -190,8 +189,8 @@ describe("hasDelay", () => {
     expect(hasDelay(PRESET_CATHEDRAL)).toBe(true);
   });
 
-  it("returns false for Classic (dry)", () => {
-    expect(hasDelay(PRESET_CLASSIC)).toBe(false);
+  it("returns false for Soft Pad (dry)", () => {
+    expect(hasDelay(PRESET_SOFT_PAD)).toBe(false);
   });
 
   it("returns false for Electric Organ (dry)", () => {
@@ -200,20 +199,12 @@ describe("hasDelay", () => {
 });
 
 describe("hasLfo", () => {
-  it("returns true for Breathing Pad (filter LFO)", () => {
-    expect(hasLfo(PRESET_BREATHING_PAD)).toBe(true);
-  });
-
   it("returns true for Electric Organ (pitch LFO)", () => {
     expect(hasLfo(PRESET_ELECTRIC_ORGAN)).toBe(true);
   });
 
-  it("returns true for Glass (pitch LFO)", () => {
-    expect(hasLfo(PRESET_GLASS)).toBe(true);
-  });
-
-  it("returns false for Classic (no LFO)", () => {
-    expect(hasLfo(PRESET_CLASSIC)).toBe(false);
+  it("returns false for Soft Pad (no LFO)", () => {
+    expect(hasLfo(PRESET_SOFT_PAD)).toBe(false);
   });
 
   it("returns false for Warm Pad (no LFO)", () => {
@@ -248,7 +239,6 @@ describe("getPeriodicWave", () => {
     const mock = ctx();
     expect(getPeriodicWave(mock, PRESET_CLASSIC)).toBeNull();
     expect(getPeriodicWave(mock, PRESET_WARM_PAD)).toBeNull();
-    expect(getPeriodicWave(mock, PRESET_GLASS)).toBeNull();
   });
 
   it("returns PeriodicWave for Cathedral preset", () => {
@@ -335,43 +325,6 @@ describe("Preset-specific validation", () => {
     });
   });
 
-  describe("Breathing Pad", () => {
-    it("has filter LFO", () => {
-      expect(PRESET_BREATHING_PAD.lfo).toBeDefined();
-      expect(PRESET_BREATHING_PAD.lfo!.target).toBe("filter");
-    });
-
-    it("has slow LFO rate (< 0.2 Hz)", () => {
-      expect(PRESET_BREATHING_PAD.lfo!.rate).toBeLessThan(0.2);
-    });
-
-    it("shares base characteristics with Warm Pad", () => {
-      expect(PRESET_BREATHING_PAD.osc1Type).toBe(PRESET_WARM_PAD.osc1Type);
-      expect(PRESET_BREATHING_PAD.osc2Type).toBe(PRESET_WARM_PAD.osc2Type);
-      expect(PRESET_BREATHING_PAD.filterCutoff).toBe(PRESET_WARM_PAD.filterCutoff);
-    });
-  });
-
-  describe("Glass Harmonica", () => {
-    it("uses sine+sine oscillators", () => {
-      expect(PRESET_GLASS.osc1Type).toBe("sine");
-      expect(PRESET_GLASS.osc2Type).toBe("sine");
-    });
-
-    it("has wider detune than Classic", () => {
-      expect(PRESET_GLASS.detuneCents).toBeGreaterThan(PRESET_CLASSIC.detuneCents);
-    });
-
-    it("has pitch vibrato LFO", () => {
-      expect(PRESET_GLASS.lfo).toBeDefined();
-      expect(PRESET_GLASS.lfo!.target).toBe("pitch");
-    });
-
-    it("has long release (> 1 second)", () => {
-      expect(PRESET_GLASS.releaseTime).toBeGreaterThan(1.0);
-    });
-  });
-
   describe("Warm Pad", () => {
     it("uses sawtooth+triangle oscillators", () => {
       expect(PRESET_WARM_PAD.osc1Type).toBe("sawtooth");
@@ -382,7 +335,7 @@ describe("Preset-specific validation", () => {
       expect(PRESET_WARM_PAD.filterBloom).toBeDefined();
     });
 
-    it("has no LFO (static, unlike Breathing Pad)", () => {
+    it("has no LFO (static)", () => {
       expect(PRESET_WARM_PAD.lfo).toBeUndefined();
     });
   });

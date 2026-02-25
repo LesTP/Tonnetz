@@ -29,9 +29,9 @@ Date: 2026-02-24
 
 ## Current Status
 
-**Phase:** Step 2 — A/B listening evaluation.
-**Focus:** User testing 6 presets, identifying keepers/problems.
-**Blocked/Broken:** None.
+**Phase:** Complete (closed).
+**Outcome:** 4 presets ship. Breathing Pad + Glass Harmonica removed, Classic renamed to Soft Pad. Dropdown UI retained.
+**Revisitable:** Yes - parameter tuning or preset additions may happen during normal use.
 
 ---
 

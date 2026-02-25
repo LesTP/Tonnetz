@@ -73,7 +73,7 @@ describe("Phase 6a: API surface", () => {
   it("exports constants", () => {
     expect(CURRENT_SCHEMA_VERSION).toBe(1);
     expect(DEFAULT_GRID).toBe("1/4");
-    expect(DEFAULT_SETTINGS).toEqual({ tempo_bpm: 120 });
+    expect(DEFAULT_SETTINGS).toEqual({ tempo_bpm: 150 });
   });
 
   it("exports StorageError class", () => {
@@ -89,7 +89,7 @@ describe("Phase 6a: API surface", () => {
     const _payload: SharePayload = {
       schema_version: 1,
       grid: "1/4",
-      tempo_bpm: 120,
+      tempo_bpm: 150,
       chords: ["C"],
     };
     const _settings: SettingsRecord = { tempo_bpm: 100 };
@@ -170,7 +170,7 @@ describe("Phase 6b: end-to-end integration", () => {
       // 1. Load defaults
       const defaults = loadSettings(b);
       expect(defaults).toEqual(DEFAULT_SETTINGS);
-      expect(defaults.tempo_bpm).toBe(120);
+      expect(defaults.tempo_bpm).toBe(150);
 
       // 2. Save partial
       const updated = saveSettings(b, { tempo_bpm: 90 });
@@ -193,7 +193,7 @@ describe("Phase 6b: end-to-end integration", () => {
       const b = createMemoryStorageBackend();
       saveProgression(b, {
         title: "Good",
-        tempo_bpm: 120,
+        tempo_bpm: 150,
         grid: "1/4" as GridValue,
         chords: ["C"],
       });
@@ -264,7 +264,7 @@ describe("Phase 6b: end-to-end integration", () => {
       // Functional parity is guaranteed by the shared interface.
       const saved = saveProgression(mem, {
         title: "Parity Test",
-        tempo_bpm: 120,
+        tempo_bpm: 150,
         grid: "1/4" as GridValue,
         chords: ["Am", "F", "C", "G"],
       });
@@ -287,7 +287,7 @@ describe("Phase 6b: end-to-end integration", () => {
       it(`round-trips grid "${grid}"`, () => {
         const encoded = encodeShareUrl({
           chords: ["C", "Am", "F", "G"],
-          tempo_bpm: 120,
+          tempo_bpm: 150,
           grid,
         });
         const decoded = decodeShareUrl(encoded);
@@ -316,7 +316,7 @@ describe("Phase 6b: end-to-end integration", () => {
 
       const original = saveProgression(b, {
         title: "Draft",
-        tempo_bpm: 120,
+        tempo_bpm: 150,
         grid: "1/4" as GridValue,
         chords: ["C"],
       });

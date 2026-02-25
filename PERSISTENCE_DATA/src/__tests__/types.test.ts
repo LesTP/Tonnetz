@@ -27,8 +27,8 @@ describe("DEFAULT_GRID", () => {
 });
 
 describe("DEFAULT_SETTINGS", () => {
-  it("has tempo_bpm = 120", () => {
-    expect(DEFAULT_SETTINGS.tempo_bpm).toBe(120);
+  it("has tempo_bpm = 150", () => {
+    expect(DEFAULT_SETTINGS.tempo_bpm).toBe(150);
   });
 });
 
@@ -45,8 +45,8 @@ describe("ProgressionRecord", () => {
       id: "test-id",
       schema_version: CURRENT_SCHEMA_VERSION,
       title: "ii-V-I",
-      tempo_bpm: 120,
-      grid: "1/4",
+      tempo_bpm: 150,
+      grid: DEFAULT_GRID,
       chords: ["Dm7", "G7", "Cmaj7"],
       notes: "",
       created_at: "2026-02-15T00:00:00Z",
@@ -56,7 +56,7 @@ describe("ProgressionRecord", () => {
     expect(record.id).toBe("test-id");
     expect(record.schema_version).toBe(1);
     expect(record.title).toBe("ii-V-I");
-    expect(record.tempo_bpm).toBe(120);
+    expect(record.tempo_bpm).toBe(150);
     expect(record.grid).toBe("1/4");
     expect(record.chords).toEqual(["Dm7", "G7", "Cmaj7"]);
     expect(record.notes).toBe("");
@@ -69,8 +69,7 @@ describe("ProgressionRecord", () => {
       id: "test",
       schema_version: 1,
       title: "",
-      tempo_bpm: 120,
-      grid: "1/4",
+      tempo_bpm: 150,
       chords: ["XYZ", "!!!invalid", ""],
       notes: "",
       created_at: "",
@@ -106,8 +105,7 @@ describe("SharePayload", () => {
       id: "id",
       schema_version: 1,
       title: "Test",
-      tempo_bpm: 120,
-      grid: "1/4",
+      tempo_bpm: 150,
       chords: ["C"],
       notes: "",
       created_at: "",

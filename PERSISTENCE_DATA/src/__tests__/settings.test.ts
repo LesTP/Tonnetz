@@ -12,7 +12,7 @@ describe("loadSettings", () => {
     const b = createMemoryStorageBackend();
     const settings = loadSettings(b);
     expect(settings).toEqual(DEFAULT_SETTINGS);
-    expect(settings.tempo_bpm).toBe(120);
+    expect(settings.tempo_bpm).toBe(150);
   });
 
   it("corrupted settings JSON returns defaults (not throw)", () => {
@@ -45,8 +45,8 @@ describe("saveSettings", () => {
   it("multiple partial saves accumulate correctly", () => {
     const b = createMemoryStorageBackend();
 
-    // Start from defaults (tempo_bpm: 120)
-    expect(loadSettings(b).tempo_bpm).toBe(120);
+    // Start from defaults (tempo_bpm: 150)
+    expect(loadSettings(b).tempo_bpm).toBe(150);
 
     // Update tempo
     saveSettings(b, { tempo_bpm: 90 });
@@ -86,7 +86,7 @@ describe("Phase 4 completion", () => {
   it("defaults are well-defined and documented", () => {
     expect(DEFAULT_SETTINGS).toBeDefined();
     expect(typeof DEFAULT_SETTINGS.tempo_bpm).toBe("number");
-    expect(DEFAULT_SETTINGS.tempo_bpm).toBe(120);
+    expect(DEFAULT_SETTINGS.tempo_bpm).toBe(150);
 
     // Verify loadSettings returns a fresh copy (not reference to DEFAULT_SETTINGS)
     const b = createMemoryStorageBackend();

@@ -459,7 +459,7 @@ All items must be verified before starting integration module development.
 - [x] `AudioTransport.onChordChange()` / `onStateChange()` fire correctly
 - [x] `shapesToChordEvents()` converts `Shape[]` → `ChordEvent[]`
 - [x] Voice-leading (`voiceLead`) threads across sequential chords
-- [x] All tests passing (338 tests)
+- [x] All tests passing (305 tests)
 - [x] No runtime dependencies on UI or storage
 
 ### Persistence/Data
@@ -692,7 +692,7 @@ Deliver playable harmonic instrument with progression visualization.
 * limited chord grammar (no augmented extended chords; no 9/11/13 tensions); input cleaning accepts common aliases (ø, Δ, dash-as-minor, slash bass, sus, 9th shorthands) but strips unsupported extensions
 * diminished and augmented triads rendered as dot clusters, not triangles
 * ~~no shared progression library~~ (shipped: 26 curated progressions, MVP Polish Phase 2)
-* simple synthesis model (6 baked presets: Classic, Warm Pad, Breathing Pad, Cathedral Organ, Electric Organ, Glass Harmonica; Staccato/Legato toggle available)
+* simple synthesis model (4 baked presets: Soft Pad, Warm Pad, Cathedral Organ, Electric Organ; Staccato/Legato toggle available)
 * minimal voice-leading optimization
 * placement heuristics use local greedy algorithm with cluster gravity — symmetric progressions (Giant Steps) and certain voicing-dependent placements (Tristan chord Am) require a future global optimizer
 

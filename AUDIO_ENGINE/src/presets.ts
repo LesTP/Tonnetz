@@ -81,12 +81,12 @@ export interface SynthPreset {
 // ── Preset Definitions ───────────────────────────────────────────────
 
 /**
- * Classic preset — baseline sound matching current synth.ts behavior.
- * Detuned triangle+sine dual oscillator with LP filter.
+ * Soft Pad preset — baseline sound. Detuned triangle+sine dual oscillator
+ * with LP filter. Clean and unprocessed (no effects, no LFO).
  */
-export const PRESET_CLASSIC: SynthPreset = {
-  name: "classic",
-  label: "Classic",
+export const PRESET_SOFT_PAD: SynthPreset = {
+  name: "soft-pad",
+  label: "Soft Pad",
 
   osc1Type: "triangle",
   osc2Type: "sine",
@@ -130,49 +130,6 @@ export const PRESET_WARM_PAD: SynthPreset = {
   decayTime: 0.6,
   sustainLevel: 0.78,
   releaseTime: 1.4,
-
-  delay: {
-    time1: 0.055,
-    feedback1: 0.33,
-    damping1: 2400,
-    wet: 0.16,
-    dry: 0.84,
-  },
-};
-
-/**
- * Breathing Pad — Warm Pad + slow LFO on filter cutoff.
- * Organic breathing motion.
- */
-export const PRESET_BREATHING_PAD: SynthPreset = {
-  name: "breathing-pad",
-  label: "Breathing Pad",
-
-  osc1Type: "sawtooth",
-  osc2Type: "triangle",
-  osc1Gain: 0.10,
-  osc2Gain: 0.07,
-  detuneCents: 5,
-
-  filterCutoff: 900,
-  filterQ: 0.85,
-  filterBloom: {
-    start: 550,
-    peak: 1250,
-    settle: 900,
-    timeConstant: 0.35,
-  },
-
-  attackTime: 0.35,
-  decayTime: 0.6,
-  sustainLevel: 0.78,
-  releaseTime: 1.4,
-
-  lfo: {
-    rate: 0.09,
-    depth: 120,
-    target: "filter",
-  },
 
   delay: {
     time1: 0.055,
@@ -273,6 +230,8 @@ export const PRESET_ELECTRIC_ORGAN: SynthPreset = {
 /**
  * Glass Harmonica — sine+sine with wide detune.
  * Pure, hollow, shimmering with subtle pitch vibrato and light delay.
+ * @deprecated Removed from preset lineup (crackling on long release tails).
+ * Retained for reference / potential future re-add.
  */
 export const PRESET_GLASS: SynthPreset = {
   name: "glass",
@@ -305,22 +264,27 @@ export const PRESET_GLASS: SynthPreset = {
     wet: 0.14,
     dry: 0.86,
   },
+
+  outputGain: 1.35,
 };
 
 // ── Preset Registry ──────────────────────────────────────────────────
 
 /** All available presets in display order. */
 export const ALL_PRESETS: readonly SynthPreset[] = [
-  PRESET_CLASSIC,
+  PRESET_SOFT_PAD,
   PRESET_WARM_PAD,
-  PRESET_BREATHING_PAD,
   PRESET_CATHEDRAL,
   PRESET_ELECTRIC_ORGAN,
-  PRESET_GLASS,
 ];
 
 /** Default preset for new sessions. */
-export const DEFAULT_PRESET: SynthPreset = PRESET_CLASSIC;
+export const DEFAULT_PRESET: SynthPreset = PRESET_SOFT_PAD;
+
+/**
+ * @deprecated Use PRESET_SOFT_PAD. Alias retained for backward compatibility.
+ */
+export const PRESET_CLASSIC: SynthPreset = PRESET_SOFT_PAD;
 
 /** Look up a preset by name. Returns undefined if not found. */
 export function getPresetByName(name: string): SynthPreset | undefined {

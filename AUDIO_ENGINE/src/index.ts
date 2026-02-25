@@ -50,12 +50,11 @@ export type {
   DelayConfig,
 } from "./presets.js";
 export {
+  PRESET_SOFT_PAD,
   PRESET_CLASSIC,
   PRESET_WARM_PAD,
-  PRESET_BREATHING_PAD,
   PRESET_CATHEDRAL,
   PRESET_ELECTRIC_ORGAN,
-  PRESET_GLASS,
   ALL_PRESETS,
   DEFAULT_PRESET,
   getPresetByName,

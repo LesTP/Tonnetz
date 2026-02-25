@@ -228,7 +228,7 @@ export function renderProgressionPath(
           "font-weight": "600",
           fill: "#fff",
           "text-anchor": "middle",
-          "dominant-baseline": "central",
+          dy: "0.35em",
           "pointer-events": "none",
           "data-path-element": "centroid-label",
           "data-chord-index": i,
@@ -263,7 +263,7 @@ export function renderProgressionPath(
     "font-weight": "700",
     fill: "#fff",
     "text-anchor": "middle",
-    "dominant-baseline": "central",
+    dy: "0.35em",
     "pointer-events": "none",
   });
   activeLabel.textContent = "";

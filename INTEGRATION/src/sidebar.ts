@@ -170,9 +170,8 @@ const STYLES = `
 .${C.sidebar} {
   display: flex;
   flex-direction: column;
-  width: 300px;
+  width: 320px;
   flex-shrink: 0;
-  background: #fafafa;
   border-right: 1px solid #d0d0d0;
   overflow: hidden;
   z-index: 100;
@@ -183,7 +182,8 @@ const STYLES = `
     top: 0;
     left: 0;
     bottom: 0;
-    width: 300px;
+    width: 320px;
+    background: #fafafa;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: none;
@@ -1056,6 +1056,11 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       <li><strong>■</strong> Stop — stop playback</li>
       <li><strong>🔁</strong> Loop — toggle auto-repeat</li>
       <li><strong>Clear</strong> — dismiss progression and return to exploration</li>
+    </ul>
+
+    <h2>Troubleshooting</h2>
+    <ul>
+      <li><strong>No sound on iPhone/iPad?</strong> Check that the silent mode switch on the side of the device is off (showing no orange).</li>
     </ul>
   `;
 

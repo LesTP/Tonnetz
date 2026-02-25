@@ -52,20 +52,20 @@ voices → input ─┬→ dryGain ───────────────
 
 ### Preset System (Phase 3d)
 
-6 baked `SynthPreset` objects selected via sidebar dropdown. Presets define all voice parameters (oscillator types, gains, filter, envelope, LFO, delay). `createVoice()` reads from the active preset. PeriodicWave objects are built once per AudioContext and cached.
+4 baked `SynthPreset` objects selected via sidebar dropdown. Presets define all voice parameters (oscillator types, gains, filter, envelope, LFO, delay). `createVoice()` reads from the active preset. PeriodicWave objects are built once per AudioContext and cached.
 
 | Preset | Oscillators | Filter | Envelope | LFO | Delay |
 |--------|-------------|--------|----------|-----|-------|
-| Classic (default) | tri+sine, ±3¢ | LP 1500Hz | A120ms R500ms | — | — |
+| Soft Pad (default) | tri+sine, ±3¢ | LP 1500Hz | A120ms R500ms | — | — |
 | Warm Pad | saw+tri, ±5¢ | LP 900Hz + bloom | A350ms R1.4s | — | 55ms |
-| Breathing Pad | saw+tri, ±5¢ | LP 900Hz + bloom | A350ms R1.4s | filter 0.09Hz | 55ms |
 | Cathedral Organ | periodic+sub | LP 4200Hz + chiff | A12ms R80ms | — | dual 61ms/89ms |
 | Electric Organ | periodic drawbars | LP 3200Hz | A6ms R30ms | pitch 0.8Hz | — |
-| Glass Harmonica | sine+sine, ±8¢ | LP 3600Hz | A280ms R1.6s | pitch 0.25Hz | 38ms |
 
 See `AUDIO_ENGINE/DEVPLAN_3D.md` for full preset definitions and `SynthPreset` type.
 
 ### Classic Preset Parameters (baseline, backward-compatible)
+
+Now named **Soft Pad** (`PRESET_SOFT_PAD`). `PRESET_CLASSIC` retained as deprecated alias.
 
 | Parameter | Value | Notes |
 |-----------|-------|-------|
@@ -98,12 +98,10 @@ The previous dynamic normalization (`1/√n`) caused transient clipping because 
 
 | Preset | Nodes/voice | × 4 voices | Global | Total |
 |--------|------------|------------|--------|-------|
-| Classic | 5 | 20 | 0 | 20 |
+| Soft Pad | 5 | 20 | 0 | 20 |
 | Warm Pad | 6 | 24 | 4 | 28 |
-| Breathing Pad | 8 | 32 | 4 | 36 |
 | Cathedral | 6 | 24 | 8 | 32 |
 | Electric Organ | 7 | 28 | 0 | 28 |
-| Glass | 7 | 28 | 4 | 32 |
 
 All within 40-node practical limit for mobile. +1 global node for DynamicsCompressorNode limiter (AE-D17).
 
@@ -639,7 +637,7 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 | Test File | Tests | Covers |
 |-----------|-------|--------|
 | `smoke.test.ts` | 1 | Barrel export resolves with expected public API |
-| `presets.test.ts` | 98 | Preset validation, gain staging, registry, utility functions, PeriodicWave cache |
+| `presets.test.ts` | 74 | Preset validation, gain staging, registry, utility functions, PeriodicWave cache |
 | `effects.test.ts` | 38 | EffectsChain creation, reconfigure, damping, feedback, destroy, node budget, limiter |
 | `scheduler.test.ts` | 54 | beatsToSeconds, secondsToBeats, createScheduler, startScheduler, stopScheduler, pauseScheduler, getCurrentBeat, transport integration, onComplete callback (AE-D10) |
 | `audio-context.test.ts` | 39 | initAudio, transport state machine, play/stop/pause/cancel, event subscriptions, tempo, suspended context, natural completion (AE-D10), pause/resume chord index (AE-D11), voice-leading reset on stop (AE-D12) |
@@ -649,7 +647,7 @@ Rationale: Events avoid missed transitions; polling provides smooth animation. B
 | `cross-module.test.ts` | 7 | HC Shape → playShape, HC getTrianglePcs → playPitchClasses, HC getEdgeUnionPcs → playPitchClasses, ChordEvent scheduling, onChordChange subscribers |
 | `conversion.test.ts` | 5 | shapesToChordEvents: empty, single, multiple, custom beatsPerChord, reference preservation |
 | `integration-e2e.test.ts` | 3 | ii–V–I pipeline (HC→AE→events), triangle tap → 3 voices, edge union → 4 voices |
-| **Total** | **338** | |
+| **Total** | **305** | |
 
 ### Latency Analysis (Static)
 

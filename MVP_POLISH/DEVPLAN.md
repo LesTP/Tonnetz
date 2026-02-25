@@ -31,7 +31,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Next:** 3d Step 2 listening (in progress), then 4d-2, 4d-3 (iOS Safari label fixes)
+**Next:** 4b/4c (mobile UAT + performance) → 5 (final polish)
 
 **Completed:**
 - 0 (pre-polish bug fixes)
@@ -44,13 +44,16 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 - 4a (mobile touch + responsive)
 - 4d-1 (iOS audio)
 - 4e-1/2/3 (node interaction)
-- 3d Step 1 (preset infrastructure + 6 presets + effects chain + integration wiring + tests)
+- 3d (synthesis presets: 4 presets ship, dropdown UI, limiter)
+- 4d-2 (iOS Safari SVG label positioning)
+- 4d-3 (grid label occlusion — resolved by 4d-2)
+- Sidebar: width 320px, mobile background fix, iOS mute switch UX copy
 
 **Deferred:**
 - 4e-4 (orange disc highlight) — implement if current highlight feels insufficient
 - 4e-5 (node size increase) — optional, current touch targets adequate
 
-**Upcoming:** 3d Step 2/3 (synthesis evaluation + lock) → 4d-2/4d-3 (iOS Safari labels) → 4b/4c (mobile UAT) → 5 (final polish)
+**Upcoming:** 4b/4c (mobile UAT + performance) → 5 (final polish)
 
 **Blocked/Broken:** None
 
@@ -77,6 +80,10 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 | 4d-1 | iOS Safari audio: synchronous AudioContext creation | Entry 27 |
 | 4e-1/2/3 | Node interaction: policy revision (D28), hit-test, dispatch | Entries 28–29 |
 | 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 338 AE tests | DEVLOG_3D Entries 1–6 |
+| 3d | Synthesis closed: 4 presets ship (Soft Pad, Warm Pad, Cathedral, Electric Organ). Breathing Pad + Glass Harmonica removed, Classic→Soft Pad. | DEVLOG_3D Entries 7–8 |
+| 4d-2 | iOS Safari SVG labels: `dominant-baseline` → `dy` (5 locations) | Entry 31 |
+| 4d-3 | Grid label occlusion: resolved by 4d-2 fix | Entry 31 |
+| Sidebar | Width 300→320px, mobile background fix, iOS mute switch UX copy | Entry 31 |
 
 **Forward references retained:**
 - Supported chord table: see §Supported Chord Reference below
@@ -290,10 +297,8 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 
 | Issue | Status | Notes |
 |-------|--------|-------|
-| iOS Safari: label positioning | **Confirmed** | `dominant-baseline: "central"` ignored by Safari. Labels mispositioned in node circles. Fix: replace with `dy` attribute. See 4d-2. |
-| iOS Safari: label occlusion | **Confirmed** | White centroid labels (`#fff`) occlude dark grid labels (`#555`) at progression nodes. Safari z-order differs from Chrome. Fix: hide grid labels at centroid positions. See 4d-3. |
 | Android: long-press haptic feedback | **Won't fix (web)** | OS-level vibration, cannot suppress from web app. `touch-action: manipulation` tested — broke drag, haptic still fired. See Entry 30. |
-| Mobile audio crackling (budget tablets) | Deferred to Phase 3d/4c | Stale `ctx.currentTime` on large-buffer devices. `safeOffset` fix helped Pixel 6, not Galaxy Tab A7 Lite. Need device diagnostic data + brute-force offset test. See Entry 21 |
+| Mobile audio crackling (budget tablets) | Deferred to Phase 4c | Stale `ctx.currentTime` on large-buffer devices. `safeOffset` fix helped Pixel 6, not Galaxy Tab A7 Lite. Need device diagnostic data + brute-force offset test. See Entry 21 |
 
 ## Post-MVP
 
@@ -303,12 +308,16 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | Tristan chord Am placement | Local algorithm picks geometrically nearest Am; no `CHAIN_BLEND` value fixes it. Needs global optimizer. |
 | m7b5 non-root triangle placement | POL-D14 (deferred) |
 | **Root-in-bass voicing (AE-D19)** | Ensure chord root is lowest note in progression playback. ~2-3h effort. See ARCH_AUDIO_ENGINE.md §3. |
+| **Synthesis preset tuning** | 5 presets ship. Revisitable if future listening reveals parameter issues during normal use. |
 
 ## Resolved Issues
 
 | Issue | Resolution |
 |-------|------------|
+| iOS Safari: label positioning | `dominant-baseline: "central"` → `dy: "0.35em"` at 5 locations (Entry 31, 4d-2) |
+| iOS Safari: label occlusion | Resolved by 4d-2 fix — baseline correction eliminated the overlap (Entry 31, 4d-3) |
 | iOS Safari: no audio | Sync AudioContext creation (Entry 27, 4d-1). Confirmed working on iOS 14.6 emulators + physical devices. |
+| Loop start crackling | DynamicsCompressorNode limiter (AE-D17, DEVLOG_3D Entry 6) |
 | Chain-focus drift | Centroid focus + cluster gravity blend (Entry 18) |
 | End-of-progression crackling | Sustain-level release scheduling + graceful completion (Entry 17) |
 | Multi-voice attack crackling | Per-voice mixGain 0.24, removed dynamic normalization (Entry 17) |

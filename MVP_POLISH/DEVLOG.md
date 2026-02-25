@@ -5,6 +5,67 @@ Started: 2026-02-16
 
 ---
 
+## Entry 31 — Phase 4d-2/3 + 3d Closure + Sidebar Fixes (Code)
+
+**Date:** 2026-02-25
+
+### Summary
+
+Session covering four items: (1) iOS Safari SVG label fix, (2) synthesis preset finalization, (3) sidebar width and mobile transparency fix, (4) iOS mute switch UX copy.
+
+### Phase 4d-2: SVG label positioning ✅
+
+Replaced `dominant-baseline: "central"` with `dy: "0.35em"` at all 5 SVG `<text>` locations (3 in `renderer.ts`, 2 in `path-renderer.ts`). Safari/WebKit doesn't support `dominant-baseline: "central"` — labels were mispositioned in node circles on iOS. Initial DEVPLAN values for enharmonic labels (`-0.1em` / `0.85em`) were wrong; the `y` coordinate already handles vertical offset, so all 5 locations use the same `dy: "0.35em"` centering correction.
+
+Confirmed working on iOS emulators and physical iPhone 12 mini (iOS 18.6.2).
+
+### Phase 4d-3: Grid label occlusion ✅
+
+Resolved as a side effect of 4d-2. The white centroid labels occluding dark grid labels was caused by Safari's baseline positioning — with the `dy` fix, labels render at correct positions and the overlap issue disappeared. No separate code change needed.
+
+### Phase 3d closure: 5 presets ship ✅
+
+Step 2 (A/B listening) completed. Results:
+- **Breathing Pad removed** — too similar to Warm Pad
+- **Classic renamed → Soft Pad** — name was misleading (it's a soft synth pad, not piano)
+- **Glass Harmonica boosted** — added `outputGain: 1.35` (was too quiet)
+- All other presets kept as-is
+
+Step 3 (lock & clean) completed. `PRESET_BREATHING_PAD` removed, `PRESET_GLASS` removed (crackling on long release tails even on desktop), `PRESET_SOFT_PAD` replaces `PRESET_CLASSIC` (alias retained for backward compat). `ALL_PRESETS` now 4 entries. Dropdown UI retained.
+
+See `AUDIO_ENGINE/DEVLOG_3D.md` Entries 7–8 for detail.
+
+### Sidebar fixes
+
+- **Width:** 300px → 320px (desktop + mobile). Clear button was wrapping to second row on Firefox desktop at default zoom.
+- **Mobile background:** Added `background: #fafafa` to mobile fixed-position sidebar CSS. Without it, the overlay was transparent (lattice grid visible through sidebar).
+- **iOS mute switch:** Added Troubleshooting section to "How to Use" modal with mute switch guidance.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `RU/src/renderer.ts` | 3× `dominant-baseline: "central"` → `dy: "0.35em"` |
+| `RU/src/path-renderer.ts` | 2× `dominant-baseline: "central"` → `dy: "0.35em"` |
+| `AE/src/presets.ts` | −Breathing Pad, Classic→Soft Pad, Glass +outputGain |
+| `AE/src/index.ts` | +`PRESET_SOFT_PAD`, −`PRESET_BREATHING_PAD` |
+| `AE/src/__tests__/presets.test.ts` | 98→88 tests (updated for 5 presets) |
+| `INT/src/sidebar.ts` | Width 300→320px, mobile `background: #fafafa`, mute switch copy |
+| `INT/src/__tests__/integration-flow.test.ts` | Mock: classic→soft-pad |
+| `INT/src/__tests__/interaction-wiring.test.ts` | Mock: classic→soft-pad |
+
+### Tests
+
+- HC 178, RU 375, AE 305, INT 239 — all passing
+- PD 102/108 — 6 pre-existing failures (DEFAULT_SETTINGS.tempo_bpm mismatch, unrelated)
+
+### Contract Changes
+- ARCH_AUDIO_ENGINE.md §2b: 6→4 presets, Classic→Soft Pad, −Breathing Pad, −Glass
+- SPEC.md: AE test count 338→305, preset description updated
+- UX_SPEC.md §4: sidebar width 300→320px
+
+---
+
 ## Entry 29 — Phase 4e-2/3: Node Hit-Test + Interaction Dispatch (Code)
 
 **Date:** 2026-02-23
