@@ -120,10 +120,10 @@ export const PRESET_WARM_PAD: SynthPreset = {
   filterCutoff: 900,
   filterQ: 0.85,
   filterBloom: {
-    start: 550,
-    peak: 1250,
+    start: 700,
+    peak: 1050,
     settle: 900,
-    timeConstant: 0.35,
+    timeConstant: 0.7,
   },
 
   attackTime: 0.35,

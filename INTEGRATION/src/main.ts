@@ -149,7 +149,7 @@ const pathHandleProxy: PathHandle = {
  */
 function loadProgressionFromChords(chords: string[]): boolean {
   const focus: CentroidCoord = {
-    u: Math.floor(resizeCtrl.getBounds().uMax * 0.25),
+    u: Math.floor(resizeCtrl.getBounds().uMax * 0.40),
     v: 0,
   };
   const indices = resizeCtrl.getIndices();

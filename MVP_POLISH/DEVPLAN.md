@@ -53,8 +53,6 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 - 4e-4 (orange disc highlight) — implement if current highlight feels insufficient
 - 4e-5 (node size increase) — optional, current touch targets adequate
 
-**Upcoming:** 4b/4c (mobile UAT + performance) → 5 (final polish)
-
 **Blocked/Broken:** None
 
 **Open decisions:** D14 (m7b5 triangles — deferred post-MVP)
@@ -79,7 +77,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 | 4a | Mobile touch: pinch-zoom, breakpoint 1024px, floating transport, share button | Entry 20 |
 | 4d-1 | iOS Safari audio: synchronous AudioContext creation | Entry 27 |
 | 4e-1/2/3 | Node interaction: policy revision (D28), hit-test, dispatch | Entries 28–29 |
-| 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 338 AE tests | DEVLOG_3D Entries 1–6 |
+| 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 332 AE tests | DEVLOG_3D Entries 1–6 |
 | 3d | Synthesis closed: 4 presets ship (Soft Pad, Warm Pad, Cathedral, Electric Organ). Breathing Pad + Glass Harmonica removed, Classic→Soft Pad. | DEVLOG_3D Entries 7–8 |
 | 4d-2 | iOS Safari SVG labels: `dominant-baseline` → `dy` (5 locations) | Entry 31 |
 | 4d-3 | Grid label occlusion: resolved by 4d-2 fix | Entry 31 |
@@ -114,178 +112,25 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Upcoming Work
 
-### Phase 3d: Synthesis Exploration (Refine)
+### Phase 3d: Synthesis Exploration ✅
 
-**Objective:** Build a preset-toggle system with 6 baked sound presets. User A/B tests all presets, picks favorites to keep. Losers are discarded in a cleanup step.
+Completed. 4 presets ship. See `AUDIO_ENGINE/DEVPLAN_3D.md` (closed) and `AUDIO_ENGINE/DEVLOG_3D.md` Entries 1–8.
 
-**Regime:** Refine. Step 1 (infrastructure + presets) is Build. Step 2 (listening) is the Refine feedback loop. Step 3 (cleanup) is Build.
+### Phase 4d: iOS Safari Remediation ✅
 
-**Detailed plan:** `AUDIO_ENGINE/DEVPLAN_3D.md`
-**Progress log:** `AUDIO_ENGINE/DEVLOG_3D.md`
-**Reference:** `AUDIO_ENGINE/SOUND_SCULPTING.md` (pad synthesis), `AUDIO_ENGINE/SOUND_SCULPTING_1.md` (organ emulation + PeriodicWave).
+Completed. 4d-1 (audio init), 4d-2 (SVG labels), 4d-3 (label occlusion). See DEVLOG Entries 27, 31.
 
-**Constraints:**
-- No changes to `VoiceHandle` interface or transport API
-- Node budget: ≤8 nodes per voice × 4 voices = 32 per-voice + ≤8 global
-- Per-voice gain stays ≤0.24 (AE-D16 principle: 4 voices < 1.0)
-- Presets are baked parameter objects — no user-adjustable knobs
+### Phase 4e: Node Interaction ✅ (core) + deferred enhancements
 
-#### Step 1: Preset Infrastructure + All Presets (Build)
+Completed (4e-1/2/3). See DEVLOG Entries 28–29. Deferred:
 
-**New files:**
-- `AUDIO_ENGINE/src/presets.ts` — `SynthPreset` type + 6 preset definitions + PeriodicWave builders
-- `AUDIO_ENGINE/src/effects.ts` — global delay/effects chain, configurable per preset
-
-**Modified files:**
-- `AUDIO_ENGINE/src/synth.ts` — `createVoice()` accepts `SynthPreset` parameter (falls back to `SYNTH_DEFAULTS` for backward compat)
-- `AUDIO_ENGINE/src/immediate-playback.ts` — `ImmediatePlaybackState.preset` field; pass to `createVoice()`
-- `AUDIO_ENGINE/src/scheduler.ts` — `CreateSchedulerOptions.preset`; pass to `createVoice()`
-- `AUDIO_ENGINE/src/index.ts` — export `SynthPreset`, preset objects, effects API
-- `INTEGRATION/src/sidebar.ts` — preset `<select>` dropdown (below Staccato/Legato toggle)
-- `INTEGRATION/src/main.ts` — wire dropdown to `ImmediatePlaybackState.preset` + `AudioTransport`
-
-**6 Presets:**
-
-| # | Name | Character | Oscillators | Filter | Envelope | LFO | Delay |
-|---|------|-----------|-------------|--------|----------|-----|-------|
-| 1 | `"classic"` | Current sound (baseline) | triangle+sine, ±3¢ | LP 1500Hz | A 120ms, R 500ms | none | none |
-| 2 | `"warm-pad"` | Warm subtractive pad | saw+tri, ±5¢ | LP 900Hz + bloom | A 350ms, R 1.4s | none | single 55ms |
-| 3 | `"breathing-pad"` | Animated pad with movement | saw+tri, ±5¢ | LP 900Hz + bloom | A 350ms, R 1.4s | filter 0.09Hz ±120Hz | single 55ms |
-| 4 | `"cathedral"` | Pipe organ + bloom | PeriodicWave principals + sine sub | LP 4200Hz | A 12ms, R 80ms | none | dual 61ms/89ms |
-| 5 | `"electric-organ"` | B3/Leslie drawbar organ | PeriodicWave drawbars (noteHz/2) | LP 3200Hz | A 6ms, R 30ms | pitch 0.8Hz (rotary) | none |
-| 6 | `"glass"` | Glass harmonica / ethereal | sine+sine, ±8¢ | LP 3600Hz | A 280ms, R 1.6s | pitch 0.25Hz ±3¢ | single 38ms |
-
-**PeriodicWave definitions (built once at init, reused across voices):**
-
-Cathedral principals: `partials: [0, 1.00, 0.42, 0.18, 0.10, 0.06, 0.05, 0, 0.03]`
-
-Electric organ drawbars (freq = noteHz/2): `partials: [0, 0.58, 0.95, 0.55, 0.62, 0, 0.28, 0, 0.24, 0, 0.16, 0, 0.12, 0, 0, 0, 0.08]`
-
-#### Step 2: Listen & Refine
-
-Play test progressions (ii–V–I, Adagio, 12-Bar Blues, Giant Steps) through each preset in both Staccato and Legato modes. Also test interactive taps and single-note node taps. User feedback → keep / discard / adjust parameters.
-
-#### Step 3: Lock & Clean
-
-Remove discarded presets. If one winner → remove dropdown, lock into `SYNTH_DEFAULTS`. If 2+ → keep dropdown. Update `ARCH_AUDIO_ENGINE.md §2b`.
+- **4e-4:** Orange disc node highlight — implement if current dot-only highlight feels insufficient
+- **4e-5:** Node size increase — NODE_HIT_RADIUS (0.20) already adequate; revisit if mobile testing reveals issues
 
 ### Phase 4: Mobile UAT (remaining)
 
 **4b:** Responsive layout — mobile keyboard interaction with textarea, library scrolling, button tap targets ≥44×44px.
 **4c:** Performance — 60fps, <100ms audio latency, SVG element count.
-**4d:** iOS Safari remediation (see expanded section below).
-
-### Phase 4d: iOS Safari Remediation (Build)
-
-**Objective:** Fix iOS Safari audio init (app-breaking, confirmed across devices) and verify two cosmetic issues that may be version-specific.
-
-**Testing data:**
-
-| Device / Environment | Audio (Issue 3) | Labels (Issue 1) | Colors (Issue 2) |
-|---------------------|-----------------|-------------------|-------------------|
-| iPhone 12 mini, iOS 18.6.2 (physical) | ✗ No audio | ✗ Mispositioned | ✗ White after load |
-| iPhone 11/12/13, iOS 14.6 (Firefox emulator) | ✗ No audio | ✓ OK | ✓ OK |
-
-**Interpretation:** The audio issue is confirmed across all iOS devices and versions — it's a fundamental WebKit autoplay policy problem. The label positioning (Issue 1) and color bleed (Issue 2) were observed only on physical iOS 18.6.2 and **not reproduced** in the iOS 14.6 emulator. Two possibilities: (a) these are iOS 18.x regressions in WebKit's SVG renderer, or (b) the Firefox emulator doesn't faithfully reproduce Safari's SVG rendering quirks. Either way, they are lower priority than the audio fix and should be verified on a physical device after 4d-1.
-
-**Device matrix:** Primary: Firefox iOS emulator (iPhone 11/12/13, iOS 14.6). Verification: physical iPhone 12 mini (iOS 18.6.2) if available. Regression-check: Chrome desktop + Android after each step.
-
-**Step ordering:** 4d-1 is the only confirmed blocker. 4d-2 and 4d-3 are conditional — execute only if reproduced on a physical device after 4d-1 is complete.
-
-#### 4d-1: Synchronous AudioContext creation (Issue 3 + Issue 4) ✅
-
-Implemented. Synchronous `initAudioSync()` + synchronous `ensureAudio()`. iOS Safari audio confirmed working on emulators (iPhone 11/12/13, iOS 14.6). Pending physical device verification. See DEVLOG Entry 27.
-
-#### 4d-2: SVG label positioning — `dominant-baseline` → `dy` (Issue 1)
-
-**Status:** Confirmed on physical devices (iPhone 12 mini iOS 18.6.2, second iPhone). Labels vertically mispositioned within node circles.
-
-**Root cause:** Safari/WebKit doesn't reliably support `dominant-baseline: "central"` on SVG `<text>` elements. Chrome/Firefox use it to vertically center text; Safari ignores or misinterprets it, causing labels to sit at the baseline instead of centered.
-
-**Affected locations (5 total):**
-
-| File | Line | Label Type | Current | Fix |
-|------|------|------------|---------|-----|
-| `renderer.ts` | 209 | Enharmonic top (sharp) | `dominant-baseline: "central"` | `dy="-0.1em"` |
-| `renderer.ts` | 224 | Enharmonic bottom (flat) | `dominant-baseline: "central"` | `dy="0.85em"` |
-| `renderer.ts` | 240 | Single note label | `dominant-baseline: "central"` | `dy="0.35em"` |
-| `path-renderer.ts` | 231 | Centroid note label | `dominant-baseline: "central"` | `dy="0.35em"` |
-| `path-renderer.ts` | 266 | Active chord label | `dominant-baseline: "central"` | `dy="0.35em"` |
-
-**`dy` values explained:**
-- `0.35em` = shift down 35% of font height, centering cap-height vertically
-- Enharmonic top: negative `dy` shifts up from the already-offset `y` position
-- Enharmonic bottom: larger positive `dy` shifts down from the already-offset `y` position
-- Values are starting points — may need visual tuning on device
-
-**Tests:**
-- [ ] All 5 `dominant-baseline` usages replaced with `dy`
-- [ ] Existing RU tests pass (text elements still created with correct attributes)
-- [ ] Device: iOS Safari — labels centered in node circles
-- [ ] Regression: Chrome desktop — labels still centered (no visible shift)
-
-#### 4d-3: Grid label occlusion by path centroid labels (Issue 2)
-
-**Status:** Confirmed on physical devices. Labels turn white only when a progression is loaded, and only for nodes included in the progression.
-
-**Root cause:** `path-renderer.ts` renders white (`#fff`) centroid note labels at root vertex positions. When a centroid label occupies the same `(x, y)` as a grid label, Safari's SVG compositor renders the white path label on top, occluding the dark `#555` grid label. Chrome handles z-order differently, keeping grid labels visible.
-
-**Diagnosis confirmed:**
-- ✓ Happens only when progression loaded (not on interactive taps alone)
-- ✓ Affects only nodes in the progression path (root vertices with centroid labels)
-
-**Fix approach — Option A (suppress redundant labels):**
-Centroid labels already show the note name at root vertices. The grid label underneath is redundant information. Suppress grid label rendering when a centroid label will occupy the same position.
-
-Implementation: In `path-renderer.ts`, after placing centroid labels, collect the set of node positions with labels. Pass this to a new `hideGridLabels(nodeIds)` function that sets `visibility="hidden"` on the corresponding grid `<text>` elements. On `PathHandle.clear()`, restore visibility.
-
-**Fix approach — Option B (offset centroid labels):**
-Offset centroid labels slightly (e.g., `dy` adjustment or small `x/y` shift) so they don't exactly overlap grid labels. Both labels remain visible.
-
-**Recommended:** Option A — cleaner visually, no double-labeling at the same position.
-
-**Changes (Option A):**
-
-| File | Change |
-|------|--------|
-| `path-renderer.ts` | Collect `Set<NodeId>` of nodes with centroid labels during path rendering |
-| `path-renderer.ts` | New helper `hideGridLabels(gridLayer, nodeIds)` — sets `visibility="hidden"` on grid `<text data-id="label-{nodeId}">` elements |
-| `path-renderer.ts` | `PathHandle.clear()` calls `restoreGridLabels()` to reset visibility |
-| `renderer.ts` | Ensure all grid labels have queryable `data-id` attribute (already present: `data-id="label-{nid}"`) |
-
-**Tests:**
-- [ ] Grid labels hidden at centroid positions when path rendered
-- [ ] Grid labels restored on `PathHandle.clear()`
-- [ ] Device: iOS Safari — no white labels after loading progression
-- [ ] Regression: Chrome desktop — grid labels still visible at non-centroid nodes
-
-### Phase 4e: Node Interaction — Single-Note Playback (Build + Refine)
-
-**Objective:** Tapping a lattice node plays that single pitch. Nodes are enlarged for comfortable touch targets. Visual feedback reuses the orange active-chord marker from path playback. Interaction policy revised: exploration (tap triangle/edge/node + audio) is allowed when a progression is loaded but not playing.
-
-**Decisions:**
-- POL-D28: Relax interaction suppression in `progression-loaded` state (allow audio + highlight; suppress only during `playback-running`)
-- POL-D29: Node selection highlight = orange disc (same as active chord path marker, `ACTIVE_MARKER_FILL` #e76f51, radius `ACTIVE_MARKER_RADIUS` 0.32) positioned on the tapped node, with note name label inside
-
-#### 4e-1: Interaction policy revision (POL-D28) ✅
-
-Implemented. Three guards removed `"progression-loaded"` from suppression: `isPlaybackSuppressed()`, `selectChord()`, and `main.ts` onPointerDown highlight wrapper. Audio + visual highlighting both work in `progression-loaded`. See DEVLOG Entry 28.
-
-#### 4e-2: HitNode in hit-test (Build) ✅
-
-Implemented. `HitNode` type (`type, nodeId, pc, u, v`) added to `HitResult` union. Node proximity check (NODE_HIT_RADIUS = 0.20) runs before edge check. 8 new tests. See DEVLOG Entry 29.
-
-#### 4e-3: Interaction dispatch for nodes (Build) ✅
-
-Implemented. `onNodeSelect` callback in `InteractionCallbacks`. `hit.type === "node"` → `playPitchClasses([pc])` in `onPointerDown()`. Node grid highlighting via dot-only `activateGridHighlight()` with node lattice coords. See DEVLOG Entry 29.
-
-#### 4e-4: Node selection highlight — orange disc (Build)
-
-Deferred. Current grid-highlighter dot-only highlight (colored stroke on node circle) is functional. Orange disc overlay (POL-D29) is a visual enhancement — implement if the current highlight feels insufficient after user testing.
-
-#### 4e-5: Node size increase (Refine) — OPTIONAL
-
-Deferred. NODE_HIT_RADIUS (0.20) already provides a comfortable touch target larger than the visual node radius (0.15). User testing confirmed current size feels fine. Revisit only if mobile testing reveals touch target issues.
 
 ### Phase 5: Final Polish & Review
 
@@ -308,7 +153,7 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 | Tristan chord Am placement | Local algorithm picks geometrically nearest Am; no `CHAIN_BLEND` value fixes it. Needs global optimizer. |
 | m7b5 non-root triangle placement | POL-D14 (deferred) |
 | **Root-in-bass voicing (AE-D19)** | Ensure chord root is lowest note in progression playback. ~2-3h effort. See ARCH_AUDIO_ENGINE.md §3. |
-| **Synthesis preset tuning** | 5 presets ship. Revisitable if future listening reveals parameter issues during normal use. |
+| **Synthesis preset tuning** | 4 presets ship. Revisitable if future listening reveals parameter issues during normal use. |
 
 ## Resolved Issues
 
@@ -372,4 +217,3 @@ End-to-end walkthrough, dead code removal, architecture alignment, close all ope
 |---|------|----------|--------|
 | D14 | 02-17 | m7b5 non-root triangle placement | Deferred post-MVP |
 | D30 | 02-24 | Root-in-bass voicing rule (AE-D19) | Open — see §Post-MVP |
-| 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 338 AE tests | DEVLOG_3D Entries 1–6 |

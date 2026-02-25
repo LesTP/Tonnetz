@@ -4,59 +4,6 @@ Module: Audio Engine (cross-cutting with Integration)
 Parent: MVP_POLISH/DEVPLAN.md §Phase 3d
 DEVPLAN: AUDIO_ENGINE/DEVPLAN_3D.md
 
-## Entry 7: Step 2 Completion — Preset Evaluation Results
-
-Date: 2026-02-25
-
-**Evaluation:** A/B listening through all 6 presets with progression playback (loop, various tempos) and interactive taps. Both Staccato and Legato modes tested.
-
-**Verdicts:**
-
-| Preset | Verdict | Notes |
-|--------|---------|-------|
-| Classic | **Rename → Soft Pad** | Sound is a soft synth pad, not piano-like. Name was misleading. |
-| Warm Pad | Keep | Pleasant warm wash, good contrast with Soft Pad |
-| Breathing Pad | **Remove** | Too similar to Warm Pad; filter LFO difference not worth the extra dropdown entry |
-| Cathedral Organ | Keep | Chiff articulation effective, good for dramatic progressions |
-| Electric Organ | Keep | Subtle Leslie wobble, distinct character |
-| Glass Harmonica | **Remove** | Liked the sound but crackles even on desktop due to long release tails (1.6s). Simplicity wins. |
-
-**Issues resolved in this session (Entry 6):**
-- Loop start crackle → DynamicsCompressorNode limiter (AE-D17) ✅
-- Staccato endings → already 50ms fade (AE-D18) ✅
-
----
-
-## Entry 8: Step 3 — Lock & Clean
-
-Date: 2026-02-25
-
-**Changes:**
-
-| File | Change |
-|------|--------|
-| `AE/src/presets.ts` | Renamed `PRESET_CLASSIC` → `PRESET_SOFT_PAD`. Removed `PRESET_BREATHING_PAD` + `PRESET_GLASS`. `PRESET_CLASSIC` retained as deprecated alias. |
-| `AE/src/presets.ts` | `ALL_PRESETS`: 6 → 4 entries |
-| `AE/src/index.ts` | Exports: +`PRESET_SOFT_PAD`, −`PRESET_BREATHING_PAD`, −`PRESET_GLASS` |
-| `AE/src/__tests__/presets.test.ts` | Updated: 98 → 74 tests (removed presets' tests removed) |
-| `INT/src/__tests__/integration-flow.test.ts` | Mock: `"classic"` → `"soft-pad"` |
-| `INT/src/__tests__/interaction-wiring.test.ts` | Mock: `"classic"` → `"soft-pad"` |
-
-**Final preset lineup (4):**
-
-| # | Name | Label | Character |
-|---|------|-------|-----------|
-| 1 | `soft-pad` | Soft Pad | Clean tri+sine baseline (default) |
-| 2 | `warm-pad` | Warm Pad | Saw+tri, filter bloom, delay |
-| 3 | `cathedral` | Cathedral Organ | PeriodicWave + sub + dual delay, chiff |
-| 4 | `electric-organ` | Electric Organ | PeriodicWave drawbars + rotary LFO |
-
-Dropdown UI kept (4 presets > 1).
-
-**Tests:** AE 305, INT 239 — all passing.
-
-**Phase 3d closed.** Revisitable if future listening reveals issues during normal use.
-
 ---
 
 ## Entry 0: Pre-Work Setup
@@ -81,39 +28,6 @@ Date: 2026-02-24
 The original Classic preset (0.24 + 0.24 = 0.48 per voice) would have caused clipping at 4 voices (1.92 peak). The 0.787 factor appeared to be an envelope sustain adjustment but was applied inconsistently and didn't prevent the issue. The current synth.ts uses a shared mixGain node, so splitting 0.24 evenly between oscillators preserves existing behavior while enabling asymmetric gains for other presets.
 
 **Tests:** N/A (documentation only)
-
----
-
-## Entry Template
-
-```
-## Entry [N]: [Title]
-
-Date: YYYY-MM-DD
-
-**Changes:**
-
-- [File]: [What changed]
-
-**Rationale:** [Why]
-
-**Tests:** [Test count delta or "N/A"]
-
-### Contract Changes (if any)
-- [Document] §[Section]: [Change]
-```
-
----
-
-## Phase Progress
-
-| Step | Description | Status |
-|------|-------------|--------|
-| 1 | Preset infrastructure + all presets | ✅ Complete |
-| 2 | Listen & refine (A/B testing) | ✅ Complete |
-| 3 | Lock & clean (remove losers) | ✅ Complete |
-
-**Phase 3d closed.** 4 presets ship. Revisitable if future listening reveals issues.
 
 ---
 
@@ -280,3 +194,135 @@ Date: 2026-02-24
 - `ARCH_AUDIO_ENGINE.md §6.1`: +`setPreset(preset: SynthPreset)`, +`getPreset(): SynthPreset` on `AudioTransport`
 
 ---
+
+## Entry 5: PeriodicWave Lazy Caching
+
+Date: 2026-02-24
+
+**Changes:**
+
+| File | Change |
+|------|--------|
+| `AE/src/presets.ts` | Lazy PeriodicWave creation via `getPeriodicWave()` — waves built on first use per AudioContext, cached in WeakMap |
+
+**Rationale:**
+
+PeriodicWave objects require an AudioContext to create. The `getPeriodicWave()` function creates waves lazily on first voice creation (not at module load), ensuring the context is available. A WeakMap keyed by AudioContext prevents memory leaks when contexts are garbage collected.
+
+**Tests:** 329 AE tests pass (existing coverage sufficient)
+
+---
+
+## Entry 6: Limiter Implementation (AE-D17)
+
+Date: 2026-02-25
+
+**Issue:** Loop restart produced audible crackle/pop on first chord. Root cause: multiple voices starting simultaneously exceeded 0dB momentarily before envelope attack smoothed the level.
+
+**Solution:** Added DynamicsCompressorNode as limiter in the effects chain output stage.
+
+**Changes:**
+
+| File | Change |
+|------|--------|
+| `AE/src/effects.ts` | Added `limiter` (DynamicsCompressorNode) between wetGain/dryGain sum and output; threshold -6dB, ratio 12:1, attack 0.003s, release 0.1s |
+| `AE/src/__tests__/effects.test.ts` | +3 tests for limiter node presence and configuration |
+
+**Decision:** AE-D17 (Limiter for loop start crackle)
+
+**Signal chain update:**
+```
+voices → input ─┬→ dryGain ──────────────────────┬→ limiter → output → destination
+                └→ delay1 → damp1 → fb1 (loop) ──┤
+                     └→ delay2 → damp2 → fb2 ────┘→ wetGain
+```
+
+**Tests:** 332 AE tests pass (+3 limiter tests)
+
+---
+
+## Entry 7: Step 2 Completion — Preset Evaluation Results
+
+Date: 2026-02-25
+
+**Evaluation:** A/B listening through all 6 presets with progression playback (loop, various tempos) and interactive taps. Both Staccato and Legato modes tested.
+
+**Verdicts:**
+
+| Preset | Verdict | Notes |
+|--------|---------|-------|
+| Classic | **Rename → Soft Pad** | Sound is a soft synth pad, not piano-like. Name was misleading. |
+| Warm Pad | Keep | Pleasant warm wash, good contrast with Soft Pad |
+| Breathing Pad | **Remove** | Too similar to Warm Pad; filter LFO difference not worth the extra dropdown entry |
+| Cathedral Organ | Keep | Chiff articulation effective, good for dramatic progressions |
+| Electric Organ | Keep | Subtle Leslie wobble, distinct character |
+| Glass Harmonica | **Remove** | Liked the sound but crackles even on desktop due to long release tails (1.6s). Simplicity wins. |
+
+**Issues resolved in Entry 6:**
+- Loop start crackle → DynamicsCompressorNode limiter (AE-D17) ✅
+- Staccato endings → already 50ms fade (AE-D18) ✅
+
+---
+
+## Entry 8: Step 3 — Lock & Clean
+
+Date: 2026-02-25
+
+**Changes:**
+
+| File | Change |
+|------|--------|
+| `AE/src/presets.ts` | Renamed `PRESET_CLASSIC` → `PRESET_SOFT_PAD`. Removed `PRESET_BREATHING_PAD` + `PRESET_GLASS`. `PRESET_CLASSIC` retained as deprecated alias. |
+| `AE/src/presets.ts` | `ALL_PRESETS`: 6 → 4 entries |
+| `AE/src/index.ts` | Exports: +`PRESET_SOFT_PAD`, −`PRESET_BREATHING_PAD`, −`PRESET_GLASS` |
+| `AE/src/__tests__/presets.test.ts` | Updated: 98 → 74 tests (removed presets' tests removed) |
+| `INT/src/__tests__/integration-flow.test.ts` | Mock: `"classic"` → `"soft-pad"` |
+| `INT/src/__tests__/interaction-wiring.test.ts` | Mock: `"classic"` → `"soft-pad"` |
+
+**Final preset lineup (4):**
+
+| # | Name | Label | Character |
+|---|------|-------|-----------|
+| 1 | `soft-pad` | Soft Pad | Clean tri+sine baseline (default) |
+| 2 | `warm-pad` | Warm Pad | Saw+tri, filter bloom, delay |
+| 3 | `cathedral` | Cathedral Organ | PeriodicWave + sub + dual delay, chiff |
+| 4 | `electric-organ` | Electric Organ | PeriodicWave drawbars + rotary LFO |
+
+Dropdown UI kept (4 presets > 1).
+
+**Tests:** AE 305, INT 239 — all passing.
+
+**Phase 3d closed.** Revisitable if future listening reveals issues during normal use.
+
+---
+
+## Phase Progress
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 1 | Preset infrastructure + all presets | ✅ Complete (Entries 1–6) |
+| 2 | Listen & refine (A/B testing) | ✅ Complete (Entry 7) |
+| 3 | Lock & clean (remove losers) | ✅ Complete (Entry 8) |
+
+**Phase 3d closed.** 4 presets ship. Revisitable if future listening reveals issues.
+
+---
+
+## Entry Template
+
+```
+## Entry [N]: [Title]
+
+Date: YYYY-MM-DD
+
+**Changes:**
+
+- [File]: [What changed]
+
+**Rationale:** [Why]
+
+**Tests:** [Test count delta or "N/A"]
+
+### Contract Changes (if any)
+- [Document] §[Section]: [Change]
+```

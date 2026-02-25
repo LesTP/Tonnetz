@@ -4,3 +4,13 @@ dist/
 # Stray tsc build artifacts (should go to dist/ via outDir)
 *.js.map
 *.d.ts.map
+
+# Analysis scripts (local dev tools)
+analyze_commits.py
+commit_analysis.ipynb
+commit_data.csv
+commit_history.txt
+commit_stats.txt
+commits.csv
+git_full_log.txt
+git_log_raw.txt

@@ -5,7 +5,7 @@ import { renderGrid } from "./renderer.js";
 import type { SvgScaffold } from "./renderer.js";
 
 /** Minimum triangle side length in pixels (RU-D10, RU-D11). */
-const MIN_TRI_SIZE_PX = 18;
+const MIN_TRI_SIZE_PX = 25;
 
 /** Resize debounce interval in milliseconds. */
 const DEBOUNCE_MS = 150;

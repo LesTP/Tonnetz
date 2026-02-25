@@ -23,12 +23,13 @@ Confirmed working on iOS emulators and physical iPhone 12 mini (iOS 18.6.2).
 
 Resolved as a side effect of 4d-2. The white centroid labels occluding dark grid labels was caused by Safari's baseline positioning — with the `dy` fix, labels render at correct positions and the overlap issue disappeared. No separate code change needed.
 
-### Phase 3d closure: 5 presets ship ✅
+### Phase 3d closure: 4 presets ship ✅
 
 Step 2 (A/B listening) completed. Results:
 - **Breathing Pad removed** — too similar to Warm Pad
 - **Classic renamed → Soft Pad** — name was misleading (it's a soft synth pad, not piano)
 - **Glass Harmonica boosted** — added `outputGain: 1.35` (was too quiet)
+- **Warm Pad filter bloom tuned** — narrower, slower sweep (start 550→700, peak 1250→1050, timeConstant 0.35→0.7)
 - All other presets kept as-is
 
 Step 3 (lock & clean) completed. `PRESET_BREATHING_PAD` removed, `PRESET_GLASS` removed (crackling on long release tails even on desktop), `PRESET_SOFT_PAD` replaces `PRESET_CLASSIC` (alias retained for backward compat). `ALL_PRESETS` now 4 entries. Dropdown UI retained.
@@ -47,9 +48,9 @@ See `AUDIO_ENGINE/DEVLOG_3D.md` Entries 7–8 for detail.
 |------|--------|
 | `RU/src/renderer.ts` | 3× `dominant-baseline: "central"` → `dy: "0.35em"` |
 | `RU/src/path-renderer.ts` | 2× `dominant-baseline: "central"` → `dy: "0.35em"` |
-| `AE/src/presets.ts` | −Breathing Pad, Classic→Soft Pad, Glass +outputGain |
+| `AE/src/presets.ts` | −Breathing Pad, Classic→Soft Pad, Glass +outputGain, Warm Pad filterBloom tuned |
 | `AE/src/index.ts` | +`PRESET_SOFT_PAD`, −`PRESET_BREATHING_PAD` |
-| `AE/src/__tests__/presets.test.ts` | 98→88 tests (updated for 5 presets) |
+| `AE/src/__tests__/presets.test.ts` | 98→74 tests (updated for 4 presets) |
 | `INT/src/sidebar.ts` | Width 300→320px, mobile `background: #fafafa`, mute switch copy |
 | `INT/src/__tests__/integration-flow.test.ts` | Mock: classic→soft-pad |
 | `INT/src/__tests__/interaction-wiring.test.ts` | Mock: classic→soft-pad |
