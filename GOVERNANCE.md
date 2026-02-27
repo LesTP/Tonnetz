@@ -215,6 +215,160 @@ For Refine phases, plan a **time budget**, not a step count.
 
 ---
 
+## Cross-Cutting Work Tracks
+
+### Sub-Track Pattern
+
+When a piece of cross-cutting polish or refactoring work grows beyond a few DEVLOG entries, spin it off into its own DEVPLAN/DEVLOG pair within the parent module directory. The parent DEVPLAN references it with a one-line pointer.
+
+**When to create a sub-track:**
+- The work has its own cold-start context distinct from the parent track
+- It spans multiple sessions or design passes
+- It touches files across multiple modules
+- It has its own decision space (distinct decision IDs)
+
+**Naming:** `DEVPLAN_<TOPIC>.md` / `DEVLOG_<TOPIC>.md` in the parent module directory. Decision IDs use a topic prefix (e.g., `SB-D1` for sidebar, `3D-D1` for synthesis).
+
+**Lifecycle:** When the sub-track is complete, update the parent DEVPLAN's Current Status and leave the sub-track files as historical reference. Do not merge them back into the parent DEVLOG.
+
+### Refine Session Discipline
+
+Refine work is inherently iterative and scope tends to expand. Apply these guardrails:
+
+**Scope declaration:** At the start of a Refine session, list the discrete work items. When scope expands mid-session ("let's also fix X"), acknowledge it explicitly: add to the list (do now) or note for next session (defer). Log scope additions in the DEVLOG entry.
+
+**Commit cadence:** Commit at logical boundaries, not at session end. A single Refine session may produce multiple commits if it covers multiple concerns:
+- Visual design changes → one commit
+- Data/content changes → separate commit
+- API/type changes in a different module → separate commit
+
+**Key rule:** "Commit" means create a **new** commit. "Amend" means modify the **previous** commit. The human chooses which. When the human says "commit," create a new commit unless they explicitly say "amend." Do not default to amend — amending rewrites history and can cause push conflicts.
+
+**Structured feedback logging:** When iterating visually (show → react → adjust), log each cycle in the DEVLOG as a numbered list per §Work Regimes/Refine. Failed attempts are especially valuable — they prevent future sessions from repeating the same approach:
+
+```
+1. [Observation] Transport row sticks out past other elements
+   Hypothesis: flex-wrap causing wrap when scrollbar appears
+   Fix: removed flex-wrap
+   Result: ✗ — scrollbar still steals layout width
+2. [Same issue]
+   Hypothesis: scrollbar-gutter: stable reserves constant space
+   Fix: added scrollbar-gutter: stable
+   Result: ✗ — scrollbar always visible, user rejected
+3. [Root cause found] Native scrollbar steals 15px; rigid min-widths overflow
+   Fix: thin 6px custom scrollbar + flex-shrink on tempo group
+   Result: ✓ — resolved
+```
+
+---
+
+## Gotchas Library
+
+Accumulated lessons from development. Each gotcha has an ID for selective inclusion in project-specific DEVPLAN Cold Start summaries.
+
+### Environment-Specific
+
+```
+G-E1: Plain git repo
+Commit with `git add -A && git commit`, not `sl` or `jf`.
+```
+
+```
+G-E2: Windows PowerShell
+No `tail`, `grep`, `head`, `cat` — use PowerShell equivalents.
+`Select-Object -Last`, `Select-String`, `Get-Content`.
+```
+
+```
+G-E3: TypeScript per-module
+TypeScript is installed per-module as a devDependency, not globally.
+`cd MODULE && npx tsc --noEmit`. Running from project root fails.
+```
+
+```
+G-E4: No monorepo tool
+No Lerna/Nx/Turborepo. Each module is an independent npm package
+with its own package.json, tsconfig.json, and vitest.config.ts.
+```
+
+### Process-Specific
+
+```
+G-P1: Commit vs amend
+"Commit" = new commit. "Amend" = modify previous commit.
+Default to NEW commit. Only amend when human explicitly says "amend."
+Amending rewrites history and causes force-push requirements.
+```
+
+```
+G-P2: Commit cadence in Refine
+One commit per logical unit, not per session. If a session covers
+visual design + data changes + API cleanup, those are three commits.
+```
+
+```
+G-P3: Scope expansion acknowledgment
+When scope grows mid-session, say so: "This is a new work item.
+Do it now or defer?" Don't silently absorb new work into the current
+commit/entry.
+```
+
+```
+G-P4: Do not commit until human confirms
+Run the app and wait for explicit approval before staging and
+committing. "Tests pass" is necessary but not sufficient for
+Refine work.
+```
+
+### Technical
+
+```
+G-T1: SVG namespace
+All SVG element creation uses `createElementNS` with
+`"http://www.w3.org/2000/svg"`.
+```
+
+```
+G-T2: JavaScript modulo
+`%` returns negative for negative operands. Use safe mod if needed.
+```
+
+```
+G-T3: injectCSS deduplication
+`injectCSS()` deduplicates by style ID. CSS changes require full
+page reload (not just HMR).
+```
+
+```
+G-T4: Scrollbar layout width
+Native browser scrollbars (~15px) steal layout width from flex
+containers, causing rigid-width children to overflow while fluid
+children shrink. Fix: thin custom scrollbar or make all children
+flexible.
+```
+
+```
+G-T5: iOS Safari AudioContext
+AudioContext creation and resume() must occur synchronously within
+the user gesture call stack. Async/await breaks the gesture chain.
+Use synchronous init (initAudioSync).
+```
+
+```
+G-T6: iOS Safari SVG text
+Safari ignores `dominant-baseline: "central"` on SVG <text>.
+Use `dy="0.35em"` instead for cross-browser vertical centering.
+```
+
+```
+G-T7: Files modified externally
+When editing files, always re-read before applying str_replace_edit
+if the file may have been modified by the editor/formatter since
+the last read.
+```
+
+---
+
 ## Cross-Module Integration
 
 Before integrating modules A and B:
