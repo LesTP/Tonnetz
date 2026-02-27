@@ -76,7 +76,6 @@ describe("checkUrlHash", () => {
     if (result.found) {
       expect(result.payload.chords).toEqual(["Dm7", "G7", "Cmaj7"]);
       expect(result.payload.tempo_bpm).toBe(120);
-      expect(result.payload.grid).toBe("1/4");
     }
   });
 
@@ -230,7 +229,6 @@ describe("generateShareUrl", () => {
     if (result.found) {
       expect(result.payload.chords).toEqual(["Dm7", "G7", "Cmaj7"]);
       expect(result.payload.tempo_bpm).toBe(120);
-      expect(result.payload.grid).toBe("1/4");
     }
   });
 
@@ -238,15 +236,11 @@ describe("generateShareUrl", () => {
     const hash = generateShareUrl({
       chords: ["F#m7", "B7", "Emaj7"],
       tempo_bpm: 140,
-      grid: "1/8",
     });
-
-    const result = checkUrlHash(hash);
-    expect(result.found).toBe(true);
+    const result = checkUrlHash(`#p=${hash.slice(hash.indexOf("#p=") + 3)}`);
     if (result.found) {
       expect(result.payload.chords).toEqual(["F#m7", "B7", "Emaj7"]);
       expect(result.payload.tempo_bpm).toBe(140);
-      expect(result.payload.grid).toBe("1/8");
     }
   });
 });

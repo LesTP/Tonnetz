@@ -105,16 +105,6 @@ describe("createSidebar", () => {
       expect(aboutBtn!.innerHTML).toContain("this is");
     });
 
-    it("creates tab bar with Play and Library tabs", () => {
-      sidebar = createSidebar(opts);
-      const playTab = q(root, "tab-play");
-      const libraryTab = q(root, "tab-library");
-      expect(playTab).not.toBeNull();
-      expect(playTab!.textContent).toBe("▶  Play");
-      expect(libraryTab).not.toBeNull();
-      expect(libraryTab!.textContent).toBe("●  Library");
-    });
-
     it("creates progression input textarea", () => {
       sidebar = createSidebar(opts);
       const textarea = q(root, "progression-input") as HTMLTextAreaElement;
@@ -122,29 +112,25 @@ describe("createSidebar", () => {
       expect(textarea.tagName).toBe("TEXTAREA");
     });
 
-    it("creates transport buttons (Play, Stop, Loop, Clear)", () => {
+    it("creates transport buttons (Play/Stop toggle, Loop, Clear)", () => {
       sidebar = createSidebar(opts);
       const playBtn = q(root, "play-btn");
-      const stopBtn = q(root, "stop-btn");
       const loopBtn = q(root, "loop-btn");
       const clearBtn = q(root, "clear-btn");
 
       expect(playBtn!.textContent).toBe("▶");
-      expect(stopBtn!.textContent).toBe("■");
       expect(loopBtn!.querySelector("svg")).not.toBeNull();
-      expect(clearBtn!.textContent).toBe("Clear");
+      expect(clearBtn!.textContent).toBe("✕");
     });
 
-    it("creates tempo slider with initial value", () => {
+    it("creates tempo field with initial value", () => {
       sidebar = createSidebar({ ...opts, initialTempo: 140 });
-      const slider = q(root, "tempo-slider") as HTMLInputElement;
-      const label = q(root, "tempo-label");
+      const field = q(root, "tempo-field") as HTMLInputElement;
 
-      expect(slider).not.toBeNull();
-      expect(slider.value).toBe("140");
-      expect(slider.min).toBe("20");
-      expect(slider.max).toBe("960");
-      expect(label!.textContent).toBe("140 BPM");
+      expect(field).not.toBeNull();
+      expect(field.value).toBe("140");
+      expect(field.min).toBe("20");
+      expect(field.max).toBe("960");
     });
 
     it("creates hamburger button in canvas area", () => {
@@ -154,11 +140,20 @@ describe("createSidebar", () => {
       expect(hamburger!.textContent).toBe("☰");
     });
 
-    it("creates library panel with placeholder", () => {
+    it("creates library list container in main panel", () => {
       sidebar = createSidebar(opts);
-      const libraryPanel = q(root, "panel-library");
-      expect(libraryPanel).not.toBeNull();
-      expect(libraryPanel!.textContent).toContain("Library coming soon");
+      const list = q(root, "library-list");
+      expect(list).not.toBeNull();
+      // Library list is inside the main panel, not a separate tab
+      const panel = q(root, "panel-play")!;
+      expect(panel.contains(list)).toBe(true);
+    });
+
+    it("creates separator between controls and library", () => {
+      sidebar = createSidebar(opts);
+      const panel = q(root, "panel-play")!;
+      const hr = panel.querySelector("hr");
+      expect(hr).not.toBeNull();
     });
 
     it("getCanvasContainer() returns the canvas area element", () => {
@@ -175,58 +170,18 @@ describe("createSidebar", () => {
     });
   });
 
-  // ── Tab Switching ──────────────────────────────────────────────────
+  // ── Single Panel (tabs removed) ─────────────────────────────────────
 
-  describe("tab switching", () => {
-    it("Play tab is active by default, Library panel hidden", () => {
+  describe("single panel", () => {
+    it("main panel is always visible (no tab switching)", () => {
       sidebar = createSidebar(opts);
-      const playPanel = q(root, "panel-play")!;
-      const libraryPanel = q(root, "panel-library")!;
-      const playTab = q(root, "tab-play")!;
-      const libraryTab = q(root, "tab-library")!;
-
-      expect(playPanel.classList.contains("tonnetz-hidden")).toBe(false);
-      expect(libraryPanel.classList.contains("tonnetz-hidden")).toBe(true);
-      expect(playTab.classList.contains("tonnetz-sidebar-tab-btn--active")).toBe(true);
-      expect(libraryTab.classList.contains("tonnetz-sidebar-tab-btn--active")).toBe(false);
-    });
-
-    it("clicking Library tab shows library panel, hides play panel", () => {
-      sidebar = createSidebar(opts);
-      const libraryTab = q(root, "tab-library")!;
-      libraryTab.click();
-
-      const playPanel = q(root, "panel-play")!;
-      const libraryPanel = q(root, "panel-library")!;
-      expect(playPanel.classList.contains("tonnetz-hidden")).toBe(true);
-      expect(libraryPanel.classList.contains("tonnetz-hidden")).toBe(false);
-    });
-
-    it("clicking Play tab restores play panel", () => {
-      sidebar = createSidebar(opts);
-      q(root, "tab-library")!.click();
-      q(root, "tab-play")!.click();
-
       const playPanel = q(root, "panel-play")!;
       expect(playPanel.classList.contains("tonnetz-hidden")).toBe(false);
     });
 
-    it("switchToTab() programmatically switches tabs", () => {
+    it("switchToTab is a no-op for backward compat", () => {
       sidebar = createSidebar(opts);
       sidebar.switchToTab("library");
-
-      const libraryPanel = q(root, "panel-library")!;
-      expect(libraryPanel.classList.contains("tonnetz-hidden")).toBe(false);
-
-      sidebar.switchToTab("play");
-      const playPanel = q(root, "panel-play")!;
-      expect(playPanel.classList.contains("tonnetz-hidden")).toBe(false);
-    });
-
-    it("clicking active tab is a no-op", () => {
-      sidebar = createSidebar(opts);
-      q(root, "tab-play")!.click(); // Already active
-
       const playPanel = q(root, "panel-play")!;
       expect(playPanel.classList.contains("tonnetz-hidden")).toBe(false);
     });
@@ -235,41 +190,43 @@ describe("createSidebar", () => {
   // ── Button States ──────────────────────────────────────────────────
 
   describe("button states", () => {
-    it("Play/Stop/Loop/Clear all disabled initially", () => {
+    it("Play/Loop/Clear all disabled initially", () => {
       sidebar = createSidebar(opts);
       expect((q(root, "play-btn") as HTMLButtonElement).disabled).toBe(true);
-      expect((q(root, "stop-btn") as HTMLButtonElement).disabled).toBe(true);
       expect((q(root, "loop-btn") as HTMLButtonElement).disabled).toBe(true);
       expect((q(root, "clear-btn") as HTMLButtonElement).disabled).toBe(true);
     });
 
-    it("setProgressionLoaded(true) enables Play, Loop, Clear; Stop stays disabled", () => {
+    it("setProgressionLoaded(true) enables Play, Loop, Clear", () => {
       sidebar = createSidebar(opts);
       sidebar.setProgressionLoaded(true);
 
       expect((q(root, "play-btn") as HTMLButtonElement).disabled).toBe(false);
-      expect((q(root, "stop-btn") as HTMLButtonElement).disabled).toBe(true);
       expect((q(root, "loop-btn") as HTMLButtonElement).disabled).toBe(false);
       expect((q(root, "clear-btn") as HTMLButtonElement).disabled).toBe(false);
     });
 
-    it("setPlaybackRunning(true) disables Play, enables Stop", () => {
+    it("setPlaybackRunning(true) shows Stop icon on Play/Stop toggle", () => {
       sidebar = createSidebar(opts);
       sidebar.setProgressionLoaded(true);
       sidebar.setPlaybackRunning(true);
 
-      expect((q(root, "play-btn") as HTMLButtonElement).disabled).toBe(true);
-      expect((q(root, "stop-btn") as HTMLButtonElement).disabled).toBe(false);
+      const playBtn = q(root, "play-btn") as HTMLButtonElement;
+      expect(playBtn.disabled).toBe(false);
+      expect(playBtn.textContent).toBe("■");
+      expect(playBtn.getAttribute("aria-label")).toBe("Stop");
     });
 
-    it("setPlaybackRunning(false) re-enables Play, disables Stop", () => {
+    it("setPlaybackRunning(false) shows Play icon on Play/Stop toggle", () => {
       sidebar = createSidebar(opts);
       sidebar.setProgressionLoaded(true);
       sidebar.setPlaybackRunning(true);
       sidebar.setPlaybackRunning(false);
 
-      expect((q(root, "play-btn") as HTMLButtonElement).disabled).toBe(false);
-      expect((q(root, "stop-btn") as HTMLButtonElement).disabled).toBe(true);
+      const playBtn = q(root, "play-btn") as HTMLButtonElement;
+      expect(playBtn.disabled).toBe(false);
+      expect(playBtn.textContent).toBe("▶");
+      expect(playBtn.getAttribute("aria-label")).toBe("Play");
     });
 
     it("setProgressionLoaded(false) disables all transport buttons", () => {
@@ -332,11 +289,11 @@ describe("createSidebar", () => {
       expect(opts.onPlay).toHaveBeenCalled();
     });
 
-    it("Stop button fires onStop", () => {
+    it("Play/Stop toggle fires onStop when playing", () => {
       sidebar = createSidebar(opts);
       sidebar.setProgressionLoaded(true);
       sidebar.setPlaybackRunning(true);
-      q(root, "stop-btn")!.click();
+      q(root, "play-btn")!.click();
       expect(opts.onStop).toHaveBeenCalled();
     });
 
@@ -398,59 +355,38 @@ describe("createSidebar", () => {
   // ── Tempo Control ──────────────────────────────────────────────────
 
   describe("tempo control", () => {
-    it("tempo slider fires onTempoChange on input", () => {
+    it("tempo field fires onTempoChange on input", () => {
       sidebar = createSidebar(opts);
-      const slider = q(root, "tempo-slider") as HTMLInputElement;
-      slider.value = "160";
-      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      const field = q(root, "tempo-field") as HTMLInputElement;
+      field.value = "160";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
 
       expect(opts.onTempoChange).toHaveBeenCalledWith(160);
-      expect(q(root, "tempo-label")!.textContent).toBe("160 BPM");
     });
 
-    it("setTempo() updates slider and label", () => {
+    it("setTempo() updates field value", () => {
       sidebar = createSidebar(opts);
       sidebar.setTempo(88);
 
-      const slider = q(root, "tempo-slider") as HTMLInputElement;
-      expect(slider.value).toBe("88");
-      expect(q(root, "tempo-label")!.textContent).toBe("88 BPM");
+      const field = q(root, "tempo-field") as HTMLInputElement;
+      expect(field.value).toBe("88");
     });
 
     it("tempo is clamped to 20–960 range", () => {
       sidebar = createSidebar({ ...opts, initialTempo: 10 });
-      const slider = q(root, "tempo-slider") as HTMLInputElement;
-      expect(slider.value).toBe("20");
+      const field = q(root, "tempo-field") as HTMLInputElement;
+      expect(field.value).toBe("20");
 
       sidebar.setTempo(9999);
-      expect(slider.value).toBe("960");
-      expect(q(root, "tempo-label")!.textContent).toBe("960 BPM");
+      expect(field.value).toBe("960");
     });
 
-    it("tempo label updates without marking (POL-D17)", () => {
-      sidebar = createSidebar({ ...opts, initialTempo: 120 });
-      const label = q(root, "tempo-label")!;
-      expect(label.textContent).toBe("120 BPM");
-
-      sidebar.setTempo(50);
-      expect(label.textContent).toBe("50 BPM");
-
-      sidebar.setTempo(200);
-      expect(label.textContent).toBe("200 BPM");
-    });
-
-    it("tempo label updates on slider input", () => {
+    it("tempo field clamps on blur", () => {
       sidebar = createSidebar(opts);
-      const slider = q(root, "tempo-slider") as HTMLInputElement;
-      const label = q(root, "tempo-label")!;
-
-      slider.value = "55";
-      slider.dispatchEvent(new Event("input", { bubbles: true }));
-      expect(label.textContent).toBe("55 BPM");
-
-      slider.value = "400";
-      slider.dispatchEvent(new Event("input", { bubbles: true }));
-      expect(label.textContent).toBe("400 BPM");
+      const field = q(root, "tempo-field") as HTMLInputElement;
+      field.value = "5";
+      field.dispatchEvent(new Event("blur", { bubbles: true }));
+      expect(field.value).toBe("20");
     });
   });
 
@@ -521,7 +457,7 @@ describe("createSidebar", () => {
       const overlay = q(root, "overlay-how");
       expect(overlay).not.toBeNull();
       expect(overlay!.textContent).toContain("How to Use");
-      expect(overlay!.textContent).toContain("Tap triangle");
+      expect(overlay!.textContent).toContain("Three Ways to Play");
     });
 
     it("ⓘ button opens What This Is overlay", () => {

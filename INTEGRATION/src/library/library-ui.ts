@@ -32,7 +32,7 @@ const L = {
   detail: "tonnetz-lib-detail",
   comment: "tonnetz-lib-comment",
   chords: "tonnetz-lib-chords",
-  loadBtn: "tonnetz-lib-load-btn",
+  playBtn: "tonnetz-lib-play-btn",
   empty: "tonnetz-lib-empty",
   hidden: HIDDEN_CLASS,
 } as const;
@@ -106,8 +106,8 @@ const STYLES = `
   padding: 8px 10px;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
 }
 
 .${L.title} {
@@ -160,6 +160,16 @@ const STYLES = `
   color: #555;
   margin: 8px 0;
 }
+.${L.comment} ul {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+}
+.${L.comment} li {
+  margin-bottom: 2px;
+}
+.${L.comment} b {
+  color: #444;
+}
 
 .${L.chords} {
   font-size: 11px;
@@ -172,19 +182,27 @@ const STYLES = `
   word-break: break-word;
 }
 
-.${L.loadBtn} {
-  width: 100%;
-  padding: 6px 0;
+/* Play triangle button */
+.${L.playBtn} {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 4px;
-  background: #2a9d8f;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
+  background: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   transition: background 0.15s;
 }
-.${L.loadBtn}:hover { background: #21867a; }
+.${L.playBtn}:hover {
+  background: #e8f6f4;
+}
+.${L.playBtn} svg {
+  display: block;
+}
 
 .${L.empty} {
   text-align: center;
@@ -282,6 +300,11 @@ export function createLibraryUI(options: LibraryUIOptions): LibraryUI {
     const card = el("div", L.card, { "data-entry-id": entry.id, "data-testid": `lib-card-${entry.id}` });
 
     const summary = el("div", L.summary);
+
+    // Text content (flex column, takes remaining space)
+    const summaryText = el("div");
+    summaryText.style.cssText = "flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;";
+
     const titleEl = el("div", L.title);
     titleEl.textContent = entry.title;
 
@@ -298,40 +321,38 @@ export function createLibraryUI(options: LibraryUIOptions): LibraryUI {
     const preview = el("div", L.preview);
     preview.textContent = chordPreview(entry.chords);
 
-    summary.appendChild(titleEl);
-    summary.appendChild(meta);
-    summary.appendChild(preview);
+    summaryText.appendChild(titleEl);
+    summaryText.appendChild(meta);
+    summaryText.appendChild(preview);
 
-    // Detail (expanded)
+    // Play triangle button (teal, right side)
+    const playBtn = el("button", L.playBtn, { "data-testid": `lib-play-${entry.id}`, "aria-label": `Play ${entry.title}` });
+    playBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18"><polygon points="4,2 16,9 4,16" fill="#2a9d8f"/></svg>`;
+
+    summary.appendChild(summaryText);
+    summary.appendChild(playBtn);
+
+    // Detail (expanded) — comment and tempo info only
     const detail = el("div", L.detail);
 
     const comment = el("div", L.comment);
-    comment.textContent = entry.comment;
-
-    const chordsEl = el("div", L.chords);
-    chordsEl.textContent = chordPreview(entry.chords, 999);
+    comment.innerHTML = entry.comment;
 
     const tempoInfo = el("div", L.meta);
     tempoInfo.textContent = `${entry.tempo} BPM · ${entry.harmonicFeature.join(", ")}`;
 
-    const loadBtn = el("button", L.loadBtn, { "data-testid": `lib-load-${entry.id}` });
-    loadBtn.textContent = "Load Progression";
-
     detail.appendChild(comment);
     detail.appendChild(tempoInfo);
-    detail.appendChild(chordsEl);
-    detail.appendChild(loadBtn);
 
     card.appendChild(summary);
     card.appendChild(detail);
 
-    // Events
-    summary.addEventListener("click", () => {
+    // Events — click summary text to expand, click triangle to load+play
+    summaryText.addEventListener("click", () => {
       if (expandedCardId === entry.id) {
         card.classList.remove(L.cardExpanded);
         expandedCardId = null;
       } else {
-        // Collapse previous
         if (expandedCardId) {
           cardEls.get(expandedCardId)?.classList.remove(L.cardExpanded);
         }
@@ -340,7 +361,7 @@ export function createLibraryUI(options: LibraryUIOptions): LibraryUI {
       }
     });
 
-    loadBtn.addEventListener("click", (e) => {
+    playBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       onLoad(entry);
     });

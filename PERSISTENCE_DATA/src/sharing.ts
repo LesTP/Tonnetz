@@ -3,46 +3,18 @@
  *
  * Encode progressions as human-readable URL hash fragments and decode them back.
  *
- * Format (PD-DEV-D5):
- *   Dm7-G7-Cmaj7&t=120&g=4&v=1
+ * Format:
+ *   Dm7-G7-Cmaj7&t=120
  *
  * Parameters:
  *   (leading, before first &) — dash-separated chord symbols
  *   t — tempo BPM (integer)
- *   g — grid denominator (4 for "1/4", 8 for "1/8", etc.)
- *   v — schema version (integer)
  *
  * Sharp encoding: "#" in chord symbols is encoded as "s" in the URL
- * (e.g., F#7 → Fs7). Decoded back on read. (PD-DEV-D5)
+ * (e.g., F#7 → Fs7). Decoded back on read.
  *
  * The returned string is the hash fragment content — the caller adds the "#p=" prefix.
  */
-
-import {
-  type SharePayload,
-  type GridValue,
-  CURRENT_SCHEMA_VERSION,
-} from "./types.js";
-
-// ---------------------------------------------------------------------------
-// Grid conversion
-// ---------------------------------------------------------------------------
-
-/** Map grid string → denominator integer for URL encoding. */
-const GRID_TO_DENOM: ReadonlyMap<GridValue, number> = new Map([
-  ["1/4", 4],
-  ["1/8", 8],
-  ["1/3", 3],
-  ["1/6", 6],
-]);
-
-/** Reverse map: denominator integer → grid string. */
-const DENOM_TO_GRID: ReadonlyMap<number, GridValue> = new Map([
-  [4, "1/4"],
-  [8, "1/8"],
-  [3, "1/3"],
-  [6, "1/6"],
-]);
 
 // ---------------------------------------------------------------------------
 // Sharp encoding
@@ -68,6 +40,15 @@ function decodeSharp(chord: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface SharePayload {
+  readonly tempo_bpm: number;
+  readonly chords: readonly string[];
+}
+
+// ---------------------------------------------------------------------------
 // encodeShareUrl
 // ---------------------------------------------------------------------------
 
@@ -77,18 +58,14 @@ function decodeSharp(chord: string): string {
  * @returns The fragment content (without `#p=` prefix).
  *
  * @example
- * encodeShareUrl({ chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120, grid: "1/4" })
- * // → "Dm7-G7-Cmaj7&t=120&g=4&v=1"
+ * encodeShareUrl({ chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 120 })
+ * // → "Dm7-G7-Cmaj7&t=120"
  */
 export function encodeShareUrl(
-  record: Pick<SharePayload, "grid" | "tempo_bpm" | "chords"> &
-    Partial<Pick<SharePayload, "schema_version">>,
+  record: SharePayload,
 ): string {
-  const version = record.schema_version ?? CURRENT_SCHEMA_VERSION;
-  const denom = GRID_TO_DENOM.get(record.grid) ?? 4;
   const chords = record.chords.map(encodeSharp).join("-");
-
-  return `${chords}&t=${record.tempo_bpm}&g=${denom}&v=${version}`;
+  return `${chords}&t=${record.tempo_bpm}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,12 +75,11 @@ export function encodeShareUrl(
 /**
  * Decode a URL fragment string back to a SharePayload.
  *
- * Returns `null` on any failure (malformed string, missing parameters,
- * invalid grid denominator, etc.).
+ * Returns `null` on any failure (malformed string, missing parameters, etc.).
  *
  * @example
- * decodeShareUrl("Dm7-G7-Cmaj7&t=120&g=4&v=1")
- * // → { schema_version: 1, grid: "1/4", tempo_bpm: 120, chords: ["Dm7","G7","Cmaj7"] }
+ * decodeShareUrl("Dm7-G7-Cmaj7&t=120")
+ * // → { tempo_bpm: 120, chords: ["Dm7","G7","Cmaj7"] }
  */
 export function decodeShareUrl(payload: string): SharePayload | null {
   if (!payload || typeof payload !== "string") return null;
@@ -123,31 +99,17 @@ export function decodeShareUrl(payload: string): SharePayload | null {
     params.set(pair.slice(0, eqIdx), pair.slice(eqIdx + 1));
   }
 
-  // Extract and validate required parameters
+  // Extract tempo (required)
   const tStr = params.get("t");
-  const gStr = params.get("g");
-  const vStr = params.get("v");
-
-  if (tStr === undefined || gStr === undefined || vStr === undefined) {
-    return null;
-  }
+  if (tStr === undefined) return null;
 
   const tempo_bpm = Number(tStr);
-  const gridDenom = Number(gStr);
-  const schema_version = Number(vStr);
-
   if (!Number.isFinite(tempo_bpm)) return null;
-  if (!Number.isFinite(schema_version)) return null;
-
-  const grid = DENOM_TO_GRID.get(gridDenom);
-  if (grid === undefined) return null;
 
   // Parse chords
   if (chordsStr.length === 0) return null;
   const chords = chordsStr.split("-").map(decodeSharp);
-
-  // Validate all chords are non-empty strings
   if (chords.some((c) => c.length === 0)) return null;
 
-  return { schema_version, grid, tempo_bpm, chords };
+  return { tempo_bpm, chords };
 }

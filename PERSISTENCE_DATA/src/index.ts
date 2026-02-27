@@ -8,8 +8,9 @@ export type {
   GridValue,
   ProgressionRecord,
   SettingsRecord,
-  SharePayload,
 } from "./types.js";
+
+export type { SharePayload } from "./sharing.js";
 
 // Constants
 export {

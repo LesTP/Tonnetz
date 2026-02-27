@@ -27,8 +27,6 @@ export interface SidebarOptions {
   onClear: () => void;
   /** Callback when tempo slider changes. */
   onTempoChange: (bpm: number) => void;
-  /** Callback when path mode toggle changes. */
-  onPathModeChange: (mode: "root" | "tonal") => void;
   /** Callback when loop toggle changes. */
   onLoopToggle: (enabled: boolean) => void;
   /** Callback when playback mode toggle changes (piano = hard cut, pad = voice continuation). */
@@ -60,8 +58,6 @@ export interface Sidebar {
   setLoopEnabled(enabled: boolean): void;
   /** Query the loop toggle state. */
   isLoopEnabled(): boolean;
-  /** Get the current path display mode. */
-  getPathMode(): "root" | "tonal";
   /** Set the playback mode (piano/pad). */
   setPlaybackMode(mode: "piano" | "pad"): void;
   /** Get the current playback mode. */
@@ -70,7 +66,8 @@ export interface Sidebar {
   setPreset(preset: SynthPreset): void;
   /** Get the current synthesis preset. */
   getPreset(): SynthPreset;
-  /** Programmatically switch to a tab. */
+  /** Programmatically switch to a tab.
+   * @deprecated Tabs removed — single-panel view. No-op for backward compat. */
   switchToTab(tab: "play" | "library"): void;
   /** Get the library list container (for Phase 2 population). */
   getLibraryListContainer(): HTMLElement;
@@ -100,29 +97,21 @@ const C = {
   infoFooter: "tonnetz-sidebar-info-footer",
   infoFooterBtn: "tonnetz-sidebar-info-footer-btn",
   infoFooterBtnLarge: "tonnetz-sidebar-info-footer-btn-lg",
-  tabBar: "tonnetz-sidebar-tabs",
-  tabBtn: "tonnetz-sidebar-tab-btn",
-  tabBtnActive: "tonnetz-sidebar-tab-btn--active",
   tabPanel: "tonnetz-sidebar-tab-panel",
   inputGroup: "tonnetz-sidebar-input-group",
   textarea: "tonnetz-sidebar-textarea",
   transport: "tonnetz-sidebar-transport",
   transportBtn: "tonnetz-sidebar-transport-btn",
   transportBtnActive: "tonnetz-sidebar-transport-btn--active",
-  tempoSection: "tonnetz-sidebar-tempo",
-  tempoHeader: "tonnetz-sidebar-tempo-header",
-  tempoMarking: "tonnetz-sidebar-tempo-marking",
-  tempoSlider: "tonnetz-sidebar-tempo-slider",
-  tempoLabel: "tonnetz-sidebar-tempo-label",
-  pathToggle: "tonnetz-sidebar-path-toggle",
-  pathToggleBtn: "tonnetz-sidebar-path-toggle-btn",
-  pathToggleBtnActive: "tonnetz-sidebar-path-toggle-btn--active",
-  presetSection: "tonnetz-sidebar-preset",
-  presetLabel: "tonnetz-sidebar-preset-label",
+  tempoGroup: "tonnetz-sidebar-tempo-group",
+  tempoField: "tonnetz-sidebar-tempo-field",
+  tempoSuffix: "tonnetz-sidebar-tempo-suffix",
+  settingsRow: "tonnetz-sidebar-settings-row",
+  settingsToggle: "tonnetz-sidebar-settings-toggle",
   presetSelect: "tonnetz-sidebar-preset-select",
-  loadBtn: "tonnetz-sidebar-load-btn",
   clearBtn: "tonnetz-sidebar-clear-btn",
   libraryList: "tonnetz-sidebar-library-list",
+  separator: "tonnetz-sidebar-separator",
   canvasArea: "tonnetz-canvas-area",
   hamburger: "tonnetz-hamburger",
   floatingTransport: "tonnetz-floating-transport",
@@ -194,11 +183,26 @@ const STYLES = `
   }
 }
 
-/* Scrollable content wrapper (everything except info footer) */
+/* Scrollable content wrapper */
 .${C.sidebarScroll} {
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.12) transparent;
   min-height: 0;
+}
+.${C.sidebarScroll}::-webkit-scrollbar {
+  width: 6px;
+}
+.${C.sidebarScroll}::-webkit-scrollbar-track {
+  background: transparent;
+}
+.${C.sidebarScroll}::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+  border-radius: 3px;
+}
+.${C.sidebarScroll}::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
 }
 
 /* Header */
@@ -206,6 +210,7 @@ const STYLES = `
   flex-shrink: 0;
   padding: 24px 14px 16px;
   text-align: center;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .${C.titleRow} {
@@ -239,7 +244,10 @@ const STYLES = `
   flex-shrink: 0;
   display: flex;
   gap: 8px;
-  padding: 10px 14px 12px;
+  padding: 10px 20px 12px 14px;
+  box-sizing: border-box;
+  width: 100%;
+  border-top: 1px solid #e0e0e0;
 }
 .${C.infoFooterBtn} {
   flex: 1;
@@ -263,42 +271,36 @@ const STYLES = `
   color: #444;
 }
 
-/* Tab bar */
-.${C.tabBar} {
-  display: flex;
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #d0d0d0;
-  margin-top: 14px;
-}
-
-.${C.tabBtn} {
-  flex: 1;
-  padding: 8px 0;
-  border: none;
-  background: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: #777;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
-}
-.${C.tabBtn}:hover {
-  color: #333;
-}
-.${C.tabBtnActive} {
-  color: #2a9d8f;
-  border-bottom-color: #2a9d8f;
-}
-
 /* Tab panels */
 .${C.tabPanel} {
   flex: 1;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.12) transparent;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.${C.tabPanel}::-webkit-scrollbar {
+  width: 6px;
+}
+.${C.tabPanel}::-webkit-scrollbar-track {
+  background: transparent;
+}
+.${C.tabPanel}::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+  border-radius: 3px;
+}
+.${C.tabPanel}::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+}
+
+/* Separator */
+.${C.separator} {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 0;
 }
 
 /* Input group */
@@ -324,35 +326,13 @@ const STYLES = `
   border-color: #2a9d8f;
 }
 
-/* Load button */
-.${C.loadBtn} {
-  align-self: stretch;
-  padding: 8px 18px;
-  border: none;
-  border-radius: 6px;
-  background: #2a9d8f;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  min-height: 40px;
-  transition: background 0.15s;
-  letter-spacing: 0.3px;
-}
-.${C.loadBtn}:hover:not(:disabled) {
-  background: #21867a;
-}
-.${C.loadBtn}:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+/* Clear button
 
 /* Transport buttons */
 .${C.transport} {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
 }
 
 /* Transport buttons — shared base */
@@ -399,21 +379,20 @@ const STYLES = `
   border-color: #21867a;
 }
 
-/* Clear button — subtle, red accent on hover */
+/* Clear button — icon style, red accent on hover */
 .${C.clearBtn} {
   min-width: 44px;
   min-height: 44px;
-  padding: 0 14px;
-  border: 1.5px solid #ddd;
+  padding: 0;
+  border: 1.5px solid #ccc;
   border-radius: 6px;
   background: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
+  font-size: 18px;
   cursor: pointer;
   color: #999;
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .${C.clearBtn}:hover:not(:disabled) {
@@ -425,96 +404,86 @@ const STYLES = `
   opacity: 0.3;
   cursor: not-allowed;
   color: #bbb;
-  border-color: #e8e8e8;
+  border-color: #ddd;
 }
 
-/* Tempo section */
-.${C.tempoSection} {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.${C.tempoHeader} {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.${C.tempoMarking} {
-  font-size: 13px;
-  font-weight: 600;
-  font-style: italic;
-  color: #444;
-}
-
-.${C.tempoSlider} {
-  width: 100%;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: #ddd;
-  border-radius: 2px;
-  outline: none;
-}
-.${C.tempoSlider}::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #2a9d8f;
-  cursor: pointer;
-}
-
-.${C.tempoLabel} {
-  font-size: 12px;
-  color: #555;
-  white-space: nowrap;
-  min-width: 56px;
-  text-align: right;
-}
-
-/* Path mode toggle */
-.${C.pathToggle} {
+/* Tempo group (bordered container matching transport button height) */
+.${C.tempoGroup} {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: #f0f0f0;
+  margin-left: auto;
+  flex-shrink: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1.5px solid #ccc;
   border-radius: 6px;
-  padding: 2px;
-}
-.${C.pathToggleBtn} {
-  flex: 1;
-  padding: 5px 8px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  color: #888;
-  transition: background 0.15s, color 0.15s;
-}
-.${C.pathToggleBtn}:hover {
-  color: #555;
-}
-.${C.pathToggleBtnActive} {
   background: #fff;
-  color: #222;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: border-color 0.15s;
+}
+.${C.tempoGroup}:focus-within {
+  border-color: #2a9d8f;
+}
+.${C.tempoGroup}.disabled {
+  opacity: 0.3;
+  border-color: #ddd;
+}
+.${C.tempoField} {
+  width: 42px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  text-align: center;
+  color: #333;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.${C.tempoField}:focus {
+  border-color: #2a9d8f;
+}
+.${C.tempoField}:disabled {
+  cursor: not-allowed;
+  border-color: #ddd;
+  color: #aaa;
+}
+.${C.tempoField}::-webkit-inner-spin-button,
+.${C.tempoField}::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.${C.tempoSuffix} {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
 }
 
-/* Preset dropdown */
-.${C.presetSection} {
+/* Settings row (preset dropdown + playback mode toggle) */
+.${C.settingsRow} {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.${C.presetLabel} {
+.${C.settingsToggle} {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1.5px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
   font-size: 12px;
   font-weight: 500;
+  cursor: pointer;
   color: #666;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
+}
+.${C.settingsToggle}:hover {
+  color: #555;
+  border-color: #aaa;
 }
 .${C.presetSelect} {
   flex: 1;
@@ -522,8 +491,8 @@ const STYLES = `
   border: 1.5px solid #ccc;
   border-radius: 6px;
   background: #fff;
-  font-size: 13px;
-  color: #333;
+  font-size: 12px;
+  color: #666;
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s;
@@ -756,7 +725,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onStop,
     onClear,
     onTempoChange,
-    onPathModeChange,
     onLoopToggle,
     onPlaybackModeChange,
     onPresetChange,
@@ -771,7 +739,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   let progressionLoaded = false;
   let playbackRunning = false;
   let loopEnabled = false;
-  let activeTab: "play" | "library" = "play";
   let currentPreset: SynthPreset = DEFAULT_PRESET;
 
   // ── Build DOM ──────────────────────────────────────────────────────
@@ -806,32 +773,19 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   infoFooter.appendChild(howBtn);
   infoFooter.appendChild(aboutBtn);
 
-  // Tab bar
-  const tabBar = el("nav", C.tabBar);
-  const playTabBtn = el("button", `${C.tabBtn} ${C.tabBtnActive}`, { "data-tab": "play", "data-testid": "tab-play" });
-  playTabBtn.textContent = "▶  Play";
-  const libraryTabBtn = el("button", C.tabBtn, { "data-tab": "library", "data-testid": "tab-library" });
-  libraryTabBtn.innerHTML = `<span style="font-size:1.5em">●</span>  Library`;
-  tabBar.appendChild(playTabBtn);
-  tabBar.appendChild(libraryTabBtn);
-
   header.appendChild(titleEl);
-  header.appendChild(tabBar);
 
-  // ── Play Tab Panel ─────────────────────────────────────────────────
+  // ── Main Panel (controls + library in one scrollable view) ─────────
 
-  const playPanel = el("section", C.tabPanel, { "data-tab": "play", "data-testid": "panel-play" });
+  const playPanel = el("section", C.tabPanel, { "data-testid": "panel-play" });
 
   // Progression input
   const inputGroup = el("div", C.inputGroup);
-  const inputLabel = el("label");
-  inputLabel.textContent = "Progression:";
   const textarea = el("textarea", C.textarea, {
     placeholder: "Enter chords (e.g., Dm7 G7 Cmaj7)",
     "data-testid": "progression-input",
   });
   textarea.rows = 3;
-  inputGroup.appendChild(inputLabel);
   inputGroup.appendChild(textarea);
 
   // Transport buttons
@@ -841,10 +795,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   playBtn.textContent = "▶";
   playBtn.disabled = true;
 
-  const stopBtn = el("button", C.transportBtn, { "data-testid": "stop-btn", "aria-label": "Stop" });
-  stopBtn.textContent = "■";
-  stopBtn.disabled = true;
-
   const loopBtn = el("button", C.transportBtn, { "data-testid": "loop-btn", "aria-label": "Loop" });
   loopBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.5-4"/><path d="M14 8a6 6 0 0 1-10.5 4"/><polyline points="12,1 13,4 10,4.5"/><polyline points="4,15 3,12 6,11.5"/></svg>`;
   loopBtn.disabled = true;
@@ -853,56 +803,35 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   shareBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8H2V14H14V8H10"/><polyline points="4,5 8,1 12,5"/><line x1="8" y1="1" x2="8" y2="10"/></svg>`;
   shareBtn.disabled = true;
 
-  const clearBtn = el("button", C.clearBtn, { "data-testid": "clear-btn" });
-  clearBtn.textContent = "Clear";
+  const clearBtn = el("button", C.clearBtn, { "data-testid": "clear-btn", "aria-label": "Clear" });
+  clearBtn.textContent = "✕";
   clearBtn.disabled = true;
 
-  transportRow.appendChild(playBtn);
-  transportRow.appendChild(stopBtn);
-  transportRow.appendChild(loopBtn);
-  transportRow.appendChild(shareBtn);
-  transportRow.appendChild(clearBtn);
-
-  // Tempo control
-  const tempoSection = el("div", C.tempoSection);
-  const tempoHeader = el("div", C.tempoHeader);
-  const tempoLabel = el("span", C.tempoLabel, { "data-testid": "tempo-label" });
-  tempoLabel.textContent = `${clampTempo(initialTempo)} BPM`;
-  tempoHeader.appendChild(tempoLabel);
-
-  const tempoSlider = el("input", C.tempoSlider, {
-    type: "range",
+  // Tempo group (field + suffix in bordered container)
+  const tempoGroup = el("div", `${C.tempoGroup} disabled`, { "data-testid": "tempo-group" });
+  const tempoField = el("input", C.tempoField, {
+    type: "number",
     min: String(TEMPO_MIN),
     max: String(TEMPO_MAX),
     value: String(clampTempo(initialTempo)),
-    "data-testid": "tempo-slider",
-    "aria-label": "Tempo",
+    "data-testid": "tempo-field",
+    "aria-label": "Tempo BPM",
   });
-  tempoSection.appendChild(tempoHeader);
-  tempoSection.appendChild(tempoSlider);
+  const tempoSuffix = el("span", C.tempoSuffix);
+  tempoSuffix.textContent = "BPM";
+  (tempoField as HTMLInputElement).disabled = true;
+  tempoGroup.appendChild(tempoField);
+  tempoGroup.appendChild(tempoSuffix);
 
-  // Path mode toggle (Root Motion vs Tonal Centroid)
-  const pathToggle = el("div", C.pathToggle, { "data-testid": "path-toggle" });
-  const rootBtn = el("button", `${C.pathToggleBtn} ${C.pathToggleBtnActive}`, { "data-testid": "path-mode-root" });
-  rootBtn.textContent = "Root Motion";
-  const tonalBtn = el("button", C.pathToggleBtn, { "data-testid": "path-mode-tonal" });
-  tonalBtn.textContent = "Tonal Centroid";
-  pathToggle.appendChild(rootBtn);
-  pathToggle.appendChild(tonalBtn);
+  transportRow.appendChild(playBtn);
+  transportRow.appendChild(loopBtn);
+  transportRow.appendChild(shareBtn);
+  transportRow.appendChild(clearBtn);
+  transportRow.appendChild(tempoGroup);
 
-  // Playback mode toggle (Staccato / Legato)
-  const modeToggle = el("div", C.pathToggle, { "data-testid": "mode-toggle" });
-  const pianoBtn = el("button", `${C.pathToggleBtn} ${C.pathToggleBtnActive}`, { "data-testid": "mode-piano" });
-  pianoBtn.textContent = "Staccato";
-  const padBtn = el("button", C.pathToggleBtn, { "data-testid": "mode-pad" });
-  padBtn.textContent = "Legato";
-  modeToggle.appendChild(pianoBtn);
-  modeToggle.appendChild(padBtn);
+  // Settings row (preset dropdown + playback mode toggle)
+  const settingsRow = el("div", C.settingsRow, { "data-testid": "settings-row" });
 
-  // Synthesis preset dropdown
-  const presetSection = el("div", C.presetSection, { "data-testid": "preset-section" });
-  const presetLabel = el("label", C.presetLabel);
-  presetLabel.textContent = "Sound";
   const presetSelect = el("select", C.presetSelect, { "data-testid": "preset-select" }) as HTMLSelectElement;
   for (const preset of ALL_PRESETS) {
     const option = document.createElement("option");
@@ -910,34 +839,31 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     option.textContent = preset.label;
     presetSelect.appendChild(option);
   }
-  presetSection.appendChild(presetLabel);
-  presetSection.appendChild(presetSelect);
 
-  // Assemble play panel
+  const playbackModeBtn = el("button", C.settingsToggle, { "data-testid": "playback-mode-toggle" });
+  playbackModeBtn.textContent = "Staccato";
+
+  settingsRow.appendChild(presetSelect);
+  settingsRow.appendChild(playbackModeBtn);
+
+  // Separator line between controls and library
+  const separator = el("hr", C.separator);
+
+  // Library section (inline, below separator)
+  const libraryList = el("div", C.libraryList, { "data-testid": "library-list" });
+
+  // Assemble panel (controls + separator + library)
   playPanel.appendChild(inputGroup);
   playPanel.appendChild(transportRow);
-  playPanel.appendChild(tempoSection);
-  playPanel.appendChild(pathToggle);
-  playPanel.appendChild(modeToggle);
-  playPanel.appendChild(presetSection);
-
-  // ── Library Tab Panel ──────────────────────────────────────────────
-
-  const libraryPanel = el("section", `${C.tabPanel} ${C.hidden}`, { "data-tab": "library", "data-testid": "panel-library" });
-  const libraryList = el("div", C.libraryList, { "data-testid": "library-list" });
-  const libraryPlaceholder = el("div");
-  libraryPlaceholder.style.cssText = "text-align:center;color:#999;padding:24px 0;font-size:13px;";
-  libraryPlaceholder.textContent = "Library coming soon";
-  libraryList.appendChild(libraryPlaceholder);
-  libraryPanel.appendChild(libraryList);
+  playPanel.appendChild(settingsRow);
+  playPanel.appendChild(separator);
+  playPanel.appendChild(libraryList);
 
   // ── Assemble Sidebar ───────────────────────────────────────────────
 
-  // Scrollable wrapper: header + tab panels scroll together; info footer stays fixed at bottom
   const scrollWrapper = el("div", C.sidebarScroll);
   scrollWrapper.appendChild(header);
   scrollWrapper.appendChild(playPanel);
-  scrollWrapper.appendChild(libraryPanel);
   sidebar.appendChild(scrollWrapper);
   sidebar.appendChild(infoFooter);
 
@@ -1018,50 +944,41 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   }
 
   const HOW_TO_USE_HTML = `
-    <h2>Interacting with the Lattice</h2>
-    <p>Tap any triangle on the lattice to hear a triad. Tap near a shared edge between two triangles to hear a four-note union chord.</p>
+    <h2>Three Ways to Play</h2>
     <ul>
-      <li><strong>Tap triangle</strong> — play triad (major or minor)</li>
-      <li><strong>Tap near edge</strong> — play union chord (4 notes)</li>
-      <li><strong>Drag anywhere</strong> — pan the view</li>
-      <li><strong>Scroll / pinch</strong> — zoom in/out</li>
-      <li><strong>Press and hold</strong> — sustain chord while held</li>
+      <li><strong>Play directly</strong> by clicking on elements — nodes (for single notes), triangles (for triads), or edges (for tetrachords).</li>
+      <li><strong>Type your own progression</strong> into the top field and press play.</li>
+      <li><strong>Load from the library</strong> below to play it; click a card title to expand for more info on the progression.</li>
     </ul>
+    <p>Drag anywhere to pan the view. Scroll or pinch to zoom in/out. Press and hold to sustain a chord.</p>
 
-    <h2>Loading a Progression</h2>
-    <p>Type or paste chord symbols into the text field and press <strong>▶ Play</strong>.</p>
-    <p>Supported formats: <code>Dm7 | G7 | Cmaj7</code> or <code>Dm7 G7 Cmaj7</code></p>
-    <p>Each chord plays for one bar (4 beats). Use the tempo slider to control speed.</p>
+    <h2>Chord Duration</h2>
+    <p>Each chord plays for one beat. For songs with one chord per bar, each chord represents a whole note (e.g. <code>Am Dm Am E</code>).</p>
+    <p>To play two chords in one bar, treat each chord as a half note and double the tempo. For example, <code>|C |Am |Dm |G7 C|</code> would be represented as <code>C C Am Am Dm Dm G7 C</code> and played at twice the tempo.</p>
 
-    <h2>Multiple Chords per Bar</h2>
-    <p>To play two chords in one bar, write each chord twice and double the tempo. For example:</p>
-    <p><code>Dm7 Dm7 G7 G7 Cmaj7 Cmaj7</code> at 240 BPM sounds the same as <code>Dm7 G7 Cmaj7</code> at 120 BPM — but with two chord changes per bar.</p>
+    <h2>Sharing</h2>
+    <p>The app supports sharing/bookmarking any progression by encoding it into a URL, in the form of:</p>
+    <p><code>&lt;URL&gt;/#p=Am-C-D-F-Am-C-E-E&amp;t=80</code></p>
+    <p>When a progression is loaded, you can generate a link to it using the share button.</p>
 
-    <h2>Supported Chord Types</h2>
+    <h2>Supported Chord Reference</h2>
+    <p><strong>Directly parsed:</strong> maj, min, dim, aug, 7, m7, maj7, 6, add9, 6/9, dim7, m7b5</p>
+    <p><strong>Accepted via input cleaning (aliases):</strong></p>
     <ul>
-      <li>Triads: <code>C</code>, <code>Cm</code>, <code>Cdim</code>, <code>Caug</code></li>
-      <li>7ths: <code>C7</code>, <code>Cmaj7</code>, <code>Cm7</code>, <code>Cdim7</code>, <code>Cm7b5</code></li>
-      <li>Extensions: <code>C6</code>, <code>Cadd9</code>, <code>C6/9</code></li>
+      <li><code>C9</code>, <code>C+9</code> → <code>Cadd9</code> — 9th chord shorthand</li>
+      <li><code>Cø7</code>, <code>Cø</code> → <code>Cm7b5</code> — half-diminished</li>
+      <li><code>CΔ7</code>, <code>CΔ</code>, <code>C△7</code>, <code>C△</code> → <code>Cmaj7</code> — triangle symbol</li>
+      <li><code>C-7</code>, <code>C-</code> → <code>Cm7</code>, <code>Cm</code> — dash-as-minor</li>
+      <li><code>C/E</code> → <code>C</code> — slash bass stripped</li>
+      <li><code>C(b9)</code> → <code>C</code> — parenthesized alterations stripped</li>
+      <li><code>Csus4</code>, <code>Csus2</code>, <code>Csus</code> → <code>C</code> — sus stripped</li>
+      <li><code>Caug7</code> → <code>Caug</code> — aug extension stripped</li>
     </ul>
-
-    <h2>Keyboard Shortcuts</h2>
-    <ul>
-      <li><code>Space</code> — play / stop</li>
-      <li><code>Escape</code> — clear progression</li>
-    </ul>
-
-    <h2>Playback Controls</h2>
-    <ul>
-      <li><strong>▶</strong> Play — start progression playback</li>
-      <li><strong>■</strong> Stop — stop playback</li>
-      <li><strong>🔁</strong> Loop — toggle auto-repeat</li>
-      <li><strong>Clear</strong> — dismiss progression and return to exploration</li>
-    </ul>
+    <p>Unrecognized symbols are silently stripped — the progression plays with whatever parsed successfully.</p>
+    <p><strong>Not supported:</strong> aug extended chords (aug7, augMaj7), 11/13 tensions.</p>
 
     <h2>Troubleshooting</h2>
-    <ul>
-      <li><strong>No sound on iPhone/iPad?</strong> Check that the silent mode switch on the side of the device is off (showing no orange).</li>
-    </ul>
+    <p><strong>No sound on iPhone/iPad?</strong> Check that the silent mode switch on the side of the device is off (showing no orange).</p>
   `;
 
   const ABOUT_HTML = `
@@ -1094,11 +1011,26 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   // ── Button state management ────────────────────────────────────────
 
   function updateButtonStates(): void {
-    playBtn.disabled = playbackRunning || (!progressionLoaded && !textarea.value.trim());
-    stopBtn.disabled = !playbackRunning;
+    const hasText = !!textarea.value.trim();
+    const hasContent = progressionLoaded || hasText;
+    playBtn.disabled = !playbackRunning && !hasContent;
     loopBtn.disabled = !progressionLoaded;
     shareBtn.disabled = !progressionLoaded;
-    clearBtn.disabled = !progressionLoaded;
+    clearBtn.disabled = !hasContent;
+    tempoField.disabled = !hasContent;
+    if (tempoField.disabled) {
+      tempoGroup.classList.add("disabled");
+    } else {
+      tempoGroup.classList.remove("disabled");
+    }
+    // Play/Stop toggle: swap icon based on state
+    if (playbackRunning) {
+      playBtn.textContent = "■";
+      playBtn.setAttribute("aria-label", "Stop");
+    } else {
+      playBtn.textContent = "▶";
+      playBtn.setAttribute("aria-label", "Play");
+    }
   }
 
   function updateLoopVisual(): void {
@@ -1106,23 +1038,6 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       loopBtn.classList.add(C.transportBtnActive);
     } else {
       loopBtn.classList.remove(C.transportBtnActive);
-    }
-  }
-
-  // ── Tab switching ──────────────────────────────────────────────────
-
-  function switchTab(tab: "play" | "library"): void {
-    activeTab = tab;
-    if (tab === "play") {
-      playTabBtn.classList.add(C.tabBtnActive);
-      libraryTabBtn.classList.remove(C.tabBtnActive);
-      playPanel.classList.remove(C.hidden);
-      libraryPanel.classList.add(C.hidden);
-    } else {
-      libraryTabBtn.classList.add(C.tabBtnActive);
-      playTabBtn.classList.remove(C.tabBtnActive);
-      libraryPanel.classList.remove(C.hidden);
-      playPanel.classList.add(C.hidden);
     }
   }
 
@@ -1162,6 +1077,13 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   // ── Event handlers ─────────────────────────────────────────────────
 
+  function handlePlayStop(): void {
+    if (playbackRunning) {
+      handleStop();
+    } else {
+      handlePlay();
+    }
+  }
   function handlePlay(): void {
     const text = textarea.value.trim();
     if (text) {
@@ -1217,22 +1139,11 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     onLoopToggle(loopEnabled);
   }
 
-  let pathMode: "root" | "tonal" = "root";
-  function handlePathToggle(mode: "root" | "tonal"): void {
-    if (mode === pathMode) return;
-    pathMode = mode;
-    rootBtn.className = `${C.pathToggleBtn} ${mode === "root" ? C.pathToggleBtnActive : ""}`;
-    tonalBtn.className = `${C.pathToggleBtn} ${mode === "tonal" ? C.pathToggleBtnActive : ""}`;
-    onPathModeChange(mode);
-  }
-
   let playbackMode: "piano" | "pad" = "piano";
-  function handleModeToggle(mode: "piano" | "pad"): void {
-    if (mode === playbackMode) return;
-    playbackMode = mode;
-    pianoBtn.className = `${C.pathToggleBtn} ${mode === "piano" ? C.pathToggleBtnActive : ""}`;
-    padBtn.className = `${C.pathToggleBtn} ${mode === "pad" ? C.pathToggleBtnActive : ""}`;
-    if (onPlaybackModeChange) onPlaybackModeChange(mode);
+  function handlePlaybackModeToggle(): void {
+    playbackMode = playbackMode === "piano" ? "pad" : "piano";
+    playbackModeBtn.textContent = playbackMode === "piano" ? "Staccato" : "Legato";
+    if (onPlaybackModeChange) onPlaybackModeChange(playbackMode);
   }
 
   function handlePresetChange(): void {
@@ -1245,17 +1156,13 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   }
 
   function handleTempoInput(): void {
-    const bpm = clampTempo(Number(tempoSlider.value));
-    tempoLabel.textContent = `${bpm} BPM`;
+    const bpm = clampTempo(Number(tempoField.value));
     onTempoChange(bpm);
   }
 
-  function handleTabClick(e: Event): void {
-    const target = e.currentTarget as HTMLElement;
-    const tab = target.getAttribute("data-tab") as "play" | "library" | null;
-    if (tab && tab !== activeTab) {
-      switchTab(tab);
-    }
+  function handleTempoBlur(): void {
+    const bpm = clampTempo(Number(tempoField.value));
+    tempoField.value = String(bpm);
   }
 
   function handleHamburger(): void {
@@ -1291,21 +1198,16 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
   // ── Attach listeners ───────────────────────────────────────────────
 
-  playBtn.addEventListener("click", handlePlay);
-  stopBtn.addEventListener("click", handleStop);
+  playBtn.addEventListener("click", handlePlayStop);
   clearBtn.addEventListener("click", handleClear);
   loopBtn.addEventListener("click", handleLoopToggle);
   shareBtn.addEventListener("click", handleShare);
-  rootBtn.addEventListener("click", () => handlePathToggle("root"));
-  tonalBtn.addEventListener("click", () => handlePathToggle("tonal"));
-  pianoBtn.addEventListener("click", () => handleModeToggle("piano"));
-  padBtn.addEventListener("click", () => handleModeToggle("pad"));
+  playbackModeBtn.addEventListener("click", handlePlaybackModeToggle);
   presetSelect.addEventListener("change", handlePresetChange);
   howBtn.addEventListener("click", handleHowToUse);
   aboutBtn.addEventListener("click", handleAbout);
-  tempoSlider.addEventListener("input", handleTempoInput);
-  playTabBtn.addEventListener("click", handleTabClick);
-  libraryTabBtn.addEventListener("click", handleTabClick);
+  tempoField.addEventListener("input", handleTempoInput);
+  tempoField.addEventListener("blur", handleTempoBlur);
   hamburgerBtn.addEventListener("click", handleHamburger);
   backdrop.addEventListener("click", handleBackdropClick);
   textarea.addEventListener("keydown", handleTextareaKeydown);
@@ -1345,8 +1247,7 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
     setTempo(bpm: number): void {
       const clamped = clampTempo(bpm);
-      tempoSlider.value = String(clamped);
-      tempoLabel.textContent = `${clamped} BPM`;
+      tempoField.value = String(clamped);
     },
 
     setLoopEnabled(enabled: boolean): void {
@@ -1357,12 +1258,13 @@ export function createSidebar(options: SidebarOptions): Sidebar {
     isLoopEnabled(): boolean {
       return loopEnabled;
     },
-    getPathMode(): "root" | "tonal" {
-      return pathMode;
-    },
 
     setPlaybackMode(mode: "piano" | "pad"): void {
-      handleModeToggle(mode);
+      if (mode !== playbackMode) {
+        playbackMode = mode;
+        playbackModeBtn.textContent = mode === "piano" ? "Staccato" : "Legato";
+        if (onPlaybackModeChange) onPlaybackModeChange(mode);
+      }
     },
 
     getPlaybackMode(): "piano" | "pad" {
@@ -1378,8 +1280,8 @@ export function createSidebar(options: SidebarOptions): Sidebar {
       return currentPreset;
     },
 
-    switchToTab(tab: "play" | "library"): void {
-      switchTab(tab);
+    switchToTab(_tab: "play" | "library"): void {
+      // No-op — single-panel view, tabs removed
     },
 
     getLibraryListContainer(): HTMLElement {
@@ -1396,16 +1298,14 @@ export function createSidebar(options: SidebarOptions): Sidebar {
 
     destroy(): void {
       // Remove listeners
-      playBtn.removeEventListener("click", handlePlay);
-      stopBtn.removeEventListener("click", handleStop);
+      playBtn.removeEventListener("click", handlePlayStop);
       clearBtn.removeEventListener("click", handleClear);
       loopBtn.removeEventListener("click", handleLoopToggle);
       presetSelect.removeEventListener("change", handlePresetChange);
       howBtn.removeEventListener("click", handleHowToUse);
       aboutBtn.removeEventListener("click", handleAbout);
-      tempoSlider.removeEventListener("input", handleTempoInput);
-      playTabBtn.removeEventListener("click", handleTabClick);
-      libraryTabBtn.removeEventListener("click", handleTabClick);
+      tempoField.removeEventListener("input", handleTempoInput);
+      tempoField.removeEventListener("blur", handleTempoBlur);
       hamburgerBtn.removeEventListener("click", handleHamburger);
       backdrop.removeEventListener("click", handleBackdropClick);
       textarea.removeEventListener("keydown", handleTextareaKeydown);

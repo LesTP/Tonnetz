@@ -35,7 +35,7 @@ All pointer/touch interactions are classified by movement:
 * Tap/click triangle → play triad
 * Hold triangle → chord sounds for duration of hold (release stops)
 * Tap/click near shared edge → play union chord (see Hit-Testing Model below) (UX-D1)
-* Node selection → single pitch preview (future)
+* Tap/click node → play single pitch (Phase 4e, POL-D29)
 
 ### Hit-Testing Model (UX-D1)
 
@@ -134,28 +134,32 @@ The interface is organized into two primary zones with responsive behavior:
 
 ### Sidebar Content Order (top to bottom)
 
-1. **Header (persistent across tabs)**
-   - **Title / branding** — "Tone Nets" (30px) with subtitle "an interactive Tonnetz explorer" (17px), centered, full-width, visually separated from tabs by thin grey border (POL-D18)
-   - **Tab bar** — two tabs: `▶ Play` (default) | `● Library` (circle icon, POL-D18)
+1. **Header** (persistent, pinned above scroll)
+   - **Title / branding** — "Tone Nets" (30px) with subtitle "an interactive Tonnetz explorer" (17px), centered, full-width
+   - Separated from content below by thin grey border
 
-2. **Tab: Play** (doing — active controls)
-   - **Progression input** — textarea for paste/type
-   - **Playback controls** — standard transport icons (POL-D11):
-     - ▶ Play (auto-loads from textarea if needed), ■ Stop, 🔁 Loop (geometric SVG cycle icon, toggle), 🔗 Share (link icon, POL-D27), ✕ Clear (also resets camera + textarea, POL-D21)
-   - **Tempo controller** — slider (20–960 BPM, default 150) + BPM display (POL-D17, POL-D26: no Italian markings)
-   - **Staccato / Legato toggle** — playback mode switch (POL-D19)
+2. **Controls section** (single scrollable panel, SB-D7)
+   - **Progression input** — textarea for paste/type (no label; placeholder text serves as prompt)
+   - **Playback controls + tempo** — single transport row (SB-D1, SB-D2, SB-D4):
+     - ▶/■ Play/Stop toggle (single button, icon swaps on state), 🔁 Loop (geometric SVG cycle icon, toggle), 🔗 Share (link icon, POL-D27), ✕ Clear (icon, also resets camera + textarea, POL-D21), `[BPM]` tempo field (numeric input, 20–960, default 150)
+   - **Settings row** — preset dropdown + playback mode toggle on one row:
+     - Sound preset: dropdown (Cathedral Organ default)
+     - Playback mode: "Staccato" ↔ "Legato" (click to toggle, POL-D19)
+   - Separated from library below by thin grey border
 
-3. **Tab: Library** (choosing — browse and select)
+3. **Library section** (scrolls with controls, SB-D5, SB-D7)
    - **Filter tabs** — All | By Genre | By Harmonic Feature
-   - **Scrollable entry list** — expandable accordion cards (POL-D12):
-     - Summary: title, composer, genre badge, chord preview
-     - Detail (expanded): comment, roman numerals, tempo, full chords, Load button
-   - Selecting "Load" from a card → loads progression + auto-switches to Play tab
+   - **Scrollable entry list** — expandable accordion cards with teal ▶ triangle (SB-D5):
+     - Summary: title, composer, genre badge, chord preview, ▶ play button (right-aligned)
+     - Detail (expanded): comment, tempo, harmonic features (informational only, no Load button)
+     - Clicking ▶ triangle → loads + plays + closes sidebar on mobile
+     - Clicking card text → expands/collapses detail
 
-4. **Info buttons** (pinned at sidebar bottom, POL-D18)
+4. **Info buttons** (pinned at sidebar bottom, above border, POL-D18)
    - "How / to use" (pink) → interaction guide, keyboard shortcuts, supported chord symbols, input tips, library usage
    - "What / this is" (blue) → Tonnetz history & theory, harmonic geometry, credits/author
    - Open full-viewport overlay modals
+   - Separated from library above by thin grey border
 
 ### 4b. Progression Library
 
@@ -301,7 +305,7 @@ UX introduces the following interface expectations:
 * tonal center highlighting
 * harmonic heatmaps
 * guided harmonic navigation
-* node-proximity interaction (three-triangle overlap at node — currently undefined)
+* ~~node-proximity interaction (three-triangle overlap at node — currently undefined)~~ — node tap plays single pitch (Phase 4e); three-triangle overlap still undefined
 * theming architecture — customizable color palette for triangle fills, dots, path, highlights, grid (target: module assembly phase)
 
 ---

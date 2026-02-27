@@ -177,19 +177,15 @@ function loadProgressionFromChords(chords: string[]): boolean {
     currentPathHandle.clear();
   }
 
-  // Render progression path (respecting current path mode toggle)
-  const pathMode = sidebar.getPathMode();
-  const shapesForPath = pathMode === "tonal"
-    ? result.shapes.map((s) => ({ ...s, centroid_uv: s.tonal_centroid_uv }))
-    : result.shapes;
+  // Render progression path (always root motion mode)
   currentPathHandle = renderProgressionPath(
     scaffold.layers["layer-path"],
-    shapesForPath,
-    { chordLabels: result.cleanedSymbols, showCentroidLabels: pathMode !== "tonal" },
+    result.shapes,
+    { chordLabels: result.cleanedSymbols, showCentroidLabels: true },
   );
 
   // Auto-center viewport to frame the progression path (POL-D20)
-  const worldCentroids = shapesForPath.map(
+  const worldCentroids = result.shapes.map(
     (s) => latticeToWorld(s.centroid_uv.u, s.centroid_uv.v),
   );
   const progExtent = pointsWorldExtent(worldCentroids);
@@ -243,7 +239,7 @@ function loadProgressionFromChords(chords: string[]): boolean {
           handlePlay();
           return;
         }
-        // Normal completion: clear highlights
+        // Natural completion: clean up highlights
         deactivateGridHighlight(activeGridHandle);
         activeGridHandle = null;
         currentPathHandle?.setActiveChord(-1);
@@ -343,25 +339,6 @@ function handlePresetChange(preset: SynthPreset): void {
   }
 }
 
-function handlePathModeChange(mode: "root" | "tonal"): void {
-  log.info("display", `Path mode: ${mode}`);
-  if (!currentPathHandle || currentShapes.length === 0) return;
-
-  // Re-render the path using the selected centroid
-  currentPathHandle.clear();
-  const shapesForPath = mode === "tonal"
-    ? currentShapes.map((s) => ({
-        ...s,
-        centroid_uv: s.tonal_centroid_uv,
-      }))
-    : currentShapes;
-  currentPathHandle = renderProgressionPath(
-    scaffold.layers["layer-path"],
-    shapesForPath,
-    { chordLabels: currentChordSymbols, showCentroidLabels: mode !== "tonal" },
-  );
-}
-
 // ── Step 2: Sidebar + Layout ────────────────────────────────────────
 
 const sidebar: Sidebar = createSidebar({
@@ -372,7 +349,6 @@ const sidebar: Sidebar = createSidebar({
   onClear: handleClear,
   onTempoChange: handleTempoChange,
   onLoopToggle: handleLoopToggle,
-  onPathModeChange: handlePathModeChange,
   onPlaybackModeChange: (mode) => {
     const enabled = mode === "pad";
     if (audioState.transport) {
@@ -389,7 +365,6 @@ const sidebar: Sidebar = createSidebar({
     const hash = generateShareUrl({
       chords: currentChordSymbols,
       tempo_bpm: tempo,
-      grid: "1/4",
     });
     return `${window.location.origin}${window.location.pathname}${hash}`;
   },
@@ -410,11 +385,13 @@ const libraryUI = createLibraryUI({
     persistence.settings = { ...persistence.settings, tempo_bpm: entry.tempo };
     updateSettings(persistence, { tempo_bpm: entry.tempo });
     sidebar.setTempo(entry.tempo);
-    // Load progression
+    // Load progression and auto-play
     const chords = [...entry.chords];
     if (loadProgressionFromChords(chords)) {
       sidebar.setInputText(chords.join(" "));
       sidebar.switchToTab("play");
+      handlePlay();
+      sidebar.close();
     }
   },
 });

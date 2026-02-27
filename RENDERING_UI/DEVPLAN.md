@@ -42,23 +42,17 @@ SVG-based rendering and interaction subsystem for the Tonnetz Interactive Harmon
 
 All phases through Phase 6 (Public API Assembly) are complete. The module is functionally complete for all Rendering/UI responsibilities that do not depend on Audio Engine.
 
-### Blocking Items (Deferred to Cross-Module Integration)
+### Blocking Items (Resolved — Wired in Integration Module)
 
-| Item | Description | Blocked By | API Ready? |
-|------|-------------|------------|------------|
-| **Phase 4b: Playback Animation** | Subscribe to `AudioTransport.onChordChange()`, call `PathHandle.setActiveChord()` | Audio Engine | ✅ Yes — `PathHandle.setActiveChord()` implemented |
-| **Transport Sync** | rAF loop with `AudioTransport.getTime()` for smooth path progress | Audio Engine | ✅ Yes — wiring only |
-| **Error Handling Implementation** | Add try/catch patterns per RU-D16 (ARCH §15) | None — can be added incrementally | N/A |
+| Item | Description | Resolution |
+|------|-------------|------------|
+| **Phase 4b: Playback Animation** | Subscribe to `AudioTransport.onChordChange()`, call `PathHandle.setActiveChord()` | ✅ Wired in `INTEGRATION/src/transport-wiring.ts` |
+| **Transport Sync** | rAF loop with `AudioTransport.getTime()` for smooth path progress | ✅ Wired in Integration |
+| **Error Handling Implementation** | Add try/catch patterns per RU-D16 (ARCH §15) | Deferred — can be added incrementally |
 
-### Integration Readiness
+### Integration Readiness — ✅ Complete
 
-The following APIs are implemented and tested, ready for Audio Engine integration:
-- `PathHandle.setActiveChord(index)` — highlight active chord during playback
-- `PathHandle.getChordCount()` — progression length for transport scheduling
-- `UIStateController.startPlayback()` / `stopPlayback()` — state transitions
-- `ControlPanel` play/stop button callbacks
-
-When Audio Engine implements `AudioTransport`, integration is trivial event subscription wiring.
+All APIs were successfully wired in the Integration module. The sidebar now uses `createSidebar()` (POL-D1) instead of the legacy `ControlPanel`.
 
 ---
 
@@ -248,20 +242,13 @@ Code review identified 7 improvements (see DEVLOG Entry 19):
 |-------|-------|------------|--------|
 | 3 | Shape rendering — triangle fills, extension fills, dot clusters, root marker | Phase 2 | ✅ Complete |
 | 4 | Progression path rendering — centroid path, `setActiveChord` API | Phase 3 | ✅ Complete |
-| 5 | Layout integration — control panel (incl. clear button), toolbar, responsive resize | Phase 4 | Ready |
+| 5 | Layout integration — control panel (incl. clear button), toolbar, responsive resize | Phase 4 | ✅ Complete (superseded by sidebar, POL-D1) |
 | 6 | Public API assembly, type signatures, integration tests | Phase 5 | ✅ Complete |
-| — | **Deferred: Audio Integration** | Audio Engine | Blocked |
+| — | **Audio Integration** | Audio Engine | ✅ Complete — wired in Integration module |
 
-### Deferred Work (Audio Integration)
+### Audio Integration — ✅ Resolved
 
-The following items are blocked by Audio Engine implementation:
-
-| Item | Description | Dependency |
-|------|-------------|------------|
-| Playback animation | Subscribe to `AudioTransport.onChordChange()`, call `PathHandle.setActiveChord()` | Audio Engine transport |
-| Transport sync | rAF loop with `AudioTransport.getTime()` for smooth path progress | Audio Engine transport |
-
-These will be addressed in a cross-module integration phase after Audio Engine is implemented. The `PathHandle.setActiveChord()` API is already available — integration is trivial wiring.
+Playback animation and transport sync were wired in the Integration module (`transport-wiring.ts`). `PathHandle.setActiveChord()` is called from `AudioTransport.onChordChange()`. No further RU work needed.
 
 ### Phase 5 Scope (Expanded)
 

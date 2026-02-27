@@ -52,7 +52,7 @@ Window size in anchor coordinates adapts to the rendering surface:
 | Tablet (~768px) | 18×18 anchors | ~648 triangles, ~361 nodes |
 | Phone (<768px) | 12×12 anchors | ~288 triangles, ~169 nodes |
 
-The window size is chosen so that individual triangles remain large enough for comfortable touch interaction. The renderer selects bounds at initialization based on container dimensions and a **minimum triangle screen size** threshold (`MIN_TRI_SIZE_PX = 25`, revised from 40 in Phase 4a — roughly doubles the lattice on tablets). If the container is resized across a breakpoint, the window can be rebuilt with new bounds.
+The window size is chosen so that individual triangles remain large enough for comfortable touch interaction. The renderer selects bounds at initialization based on container dimensions and a **minimum triangle screen size** threshold (`MIN_TRI_SIZE_PX = 18`, revised from 40→25→18 — larger grid on phones, more nodes before hitting edges). If the container is resized across a breakpoint, the window can be rebuilt with new bounds.
 
 Future option:
 
@@ -102,7 +102,7 @@ Initial camera computes scale so the active window fills the container:
 scale = min(containerWidth, containerHeight) / windowWorldExtent
 ```
 
-A minimum triangle screen size is enforced (`MIN_TRI_SIZE_PX = 25`, revised from 40 in Phase 4a) to ensure touch usability. If the computed scale would produce triangles smaller than this threshold, the window bounds are reduced (fewer anchors) rather than shrinking triangles.
+A minimum triangle screen size is enforced (`MIN_TRI_SIZE_PX = 18`, revised from 40→25→18) to ensure touch usability. If the computed scale would produce triangles smaller than this threshold, the window bounds are reduced (fewer anchors) rather than shrinking triangles.
 
 Zoom is applied as a multiplier on this base scale via the SVG `viewBox`.
 
@@ -521,7 +521,7 @@ Status: Closed
 Priority: Critical
 Decision:
 Window size adapts to viewport: 24×24 (desktop), 18×18 (tablet), 12×12 (phone).
-Selection is based on minimum triangle screen size (~40px side length).
+Selection is based on minimum triangle screen size (18px side length, revised from 40→25→18).
 Rationale:
 Responsive window sizing ensures triangles remain large enough for touch
 interaction on smaller screens.

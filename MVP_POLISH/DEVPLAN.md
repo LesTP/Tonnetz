@@ -31,7 +31,9 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Next:** 4b/4c (mobile UAT + performance) → 5 (final polish)
+**Next:** Sidebar Redesign (Pass 1) → 4b/4c (mobile UAT + performance) → 5 (final polish)
+
+**Active sub-track:** `MVP_POLISH/DEVPLAN_SIDEBAR.md` — multi-pass sidebar redesign (compact → library rework → tab merge)
 
 **Completed:**
 - 0 (pre-polish bug fixes)

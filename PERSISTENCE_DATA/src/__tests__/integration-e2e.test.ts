@@ -87,8 +87,6 @@ describe("Phase 6a: API surface", () => {
     // They are never executed at runtime — the test passes if this file compiles.
     const _grid: GridValue = "1/4";
     const _payload: SharePayload = {
-      schema_version: 1,
-      grid: "1/4",
       tempo_bpm: 150,
       chords: ["C"],
     };
@@ -157,9 +155,7 @@ describe("Phase 6b: end-to-end integration", () => {
       const decoded = decodeShareUrl(url);
       expect(decoded).not.toBeNull();
       expect(decoded!.tempo_bpm).toBe(140);
-      expect(decoded!.grid).toBe("1/8");
       expect(decoded!.chords).toEqual(["Dm7", "G7", "Cmaj7"]);
-      expect(decoded!.schema_version).toBe(CURRENT_SCHEMA_VERSION);
     });
   });
 
@@ -280,29 +276,11 @@ describe("Phase 6b: end-to-end integration", () => {
     });
   });
 
-  describe("URL sharing with all grid values", () => {
-    const grids: GridValue[] = ["1/4", "1/8", "1/3", "1/6"];
-
-    for (const grid of grids) {
-      it(`round-trips grid "${grid}"`, () => {
-        const encoded = encodeShareUrl({
-          chords: ["C", "Am", "F", "G"],
-          tempo_bpm: 150,
-          grid,
-        });
-        const decoded = decodeShareUrl(encoded);
-        expect(decoded).not.toBeNull();
-        expect(decoded!.grid).toBe(grid);
-      });
-    }
-  });
-
-  describe("sharps survive URL round-trip", () => {
+  describe("URL sharing", () => {
     it("F#m7 → encode → decode → F#m7", () => {
       const encoded = encodeShareUrl({
         chords: ["F#m7", "C#7", "G#m"],
         tempo_bpm: 100,
-        grid: "1/4" as GridValue,
       });
       const decoded = decodeShareUrl(encoded);
       expect(decoded).not.toBeNull();

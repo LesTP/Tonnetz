@@ -139,14 +139,12 @@ describe("Subsystem imports (smoke test)", () => {
       const payload = {
         chords: ["Dm7", "G7", "Cmaj7"],
         tempo_bpm: 120,
-        grid: "1/4" as GridValue,
       };
       const encoded = encodeShareUrl(payload);
       const decoded = decodeShareUrl(encoded);
       expect(decoded).not.toBeNull();
       expect(decoded!.chords).toEqual(["Dm7", "G7", "Cmaj7"]);
       expect(decoded!.tempo_bpm).toBe(120);
-      expect(decoded!.grid).toBe("1/4");
     });
   });
 });

@@ -541,7 +541,6 @@ describe("Persistence integration", () => {
     if (check.found) {
       expect(check.payload.chords).toEqual(["Dm7", "G7", "Cmaj7"]);
       expect(check.payload.tempo_bpm).toBe(140);
-      expect(check.payload.grid).toBe("1/4");
     }
   });
 
