@@ -31,7 +31,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 
 ## Current Status
 
-**Next:** Sidebar Redesign (Pass 1) → 4b/4c (mobile UAT + performance) → 5 (final polish)
+**Next:** 4c (performance) → 5 (final polish)
 
 **Active sub-track:** `MVP_POLISH/DEVPLAN_SIDEBAR.md` — multi-pass sidebar redesign (compact → library rework → tab merge)
 
@@ -44,6 +44,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 - Placement heuristics
 - Chord input improvements
 - 4a (mobile touch + responsive)
+- 4b (responsive layout — user confirmed on physical devices)
 - 4d-1 (iOS audio)
 - 4e-1/2/3 (node interaction)
 - 3d (synthesis presets: 4 presets ship, dropdown UI, limiter)
@@ -77,6 +78,7 @@ Product-level polish track for the Tonnetz Interactive Harmonic Explorer. All fo
 | Placement | Centroid focus + cluster gravity blend, distance-gated root reuse | Entries 16, 18 |
 | Chord input | 9th aliases, silent strip of unrecognized symbols | Entry 19 |
 | 4a | Mobile touch: pinch-zoom, breakpoint 1024px, floating transport, share button | Entry 20 |
+| 4b | Responsive layout: mobile keyboard interaction, library scrolling, button tap targets — user confirmed on physical devices | Entry 33 |
 | 4d-1 | iOS Safari audio: synchronous AudioContext creation | Entry 27 |
 | 4e-1/2/3 | Node interaction: policy revision (D28), hit-test, dispatch | Entries 28–29 |
 | 3d Step 1 | Synthesis presets: infrastructure, 6 presets, effects chain, limiter (AE-D17), integration wiring, 332 AE tests | DEVLOG_3D Entries 1–6 |
@@ -131,7 +133,6 @@ Completed (4e-1/2/3). See DEVLOG Entries 28–29. Deferred:
 
 ### Phase 4: Mobile UAT (remaining)
 
-**4b:** Responsive layout — mobile keyboard interaction with textarea, library scrolling, button tap targets ≥44×44px.
 **4c:** Performance — 60fps, <100ms audio latency, SVG element count.
 
 ### Phase 5: Final Polish & Review

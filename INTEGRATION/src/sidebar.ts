@@ -982,23 +982,36 @@ export function createSidebar(options: SidebarOptions): Sidebar {
   `;
 
   const ABOUT_HTML = `
-    <h2>What is a Tonnetz?</h2>
-    <p>The Tonnetz (German: "tone network") is a geometric lattice that maps musical pitch classes into a two-dimensional space where spatial proximity represents harmonic relationships.</p>
+    <h2>Tone Nets</h2>
+    <p><em>An interactive Tonnetz explorer</em></p>
 
-    <h2>How Harmony Maps to Geometry</h2>
-    <p>On the Tonnetz, each node represents a pitch class (C, C#, D, etc.). Adjacent nodes along each axis are related by specific intervals:</p>
+    <p>Attempts to bring together the ancient sciences of music and geometry — and sometimes astronomy — go back at least to the Pythagoreans. In this tradition, harmonic relationships were understood not only as sounds, but as proportions that also describe spatial order and cosmic structure.</p>
+
+    <p>Ptolemy's harmonic ratios, Robert Fludd's monochord of the Universe, and Johannes Kepler's harmony of the spheres are all fruits of the attempts to build a unified theory of the universe on mathematical foundation.</p>
+
+    <p>The <strong>Tonnetz</strong> (German: "tone network") is one such system: a geometric representation of traditional triadic harmony. First proposed by Leonhard Euler in 1739 and later developed into its modern form by 19th- and 20th-century theorists, it provides a way to visualize harmonic relationships as spatial proximity.</p>
+
+    <p>Tonnetz is a lattice of triangles. Horizontal triangle base represents a perfect fifth (7 semitones), while the sides represent major third (4 semitones) and minor third (3 semitones).
+    On this lattice, upward-pointing triangles correspond to minor triads, and downward-pointing ones correspond to major triads.
+    Adjacent triangles can combine to form seventh chords; dim and aug chords are straight lines along the diagonals, and other extended harmonies appear as more or less regular clusters.</p>
+
+    <p>Many common harmonic moves can be visualized as small geometric steps across the lattice. For example, movement along the circle of fifths appears as a straight stepwise horizontal line.</p>
+
+    <p>There are three transformations that produce the smoothest possible voice leading between triads. Changing one note in a triad generates one of three adjacent chords:</p>
     <ul>
-      <li><strong>Horizontal axis</strong> — perfect fifths (7 semitones)</li>
-      <li><strong>Diagonal axis (up-right)</strong> — major thirds (4 semitones)</li>
-      <li><strong>Diagonal axis (up-left)</strong> — minor thirds (3 semitones)</li>
+      <li>C (C–E–G) → Cm (C–Eb–G): parallel motion</li>
+      <li>C (C–E–G) → Am (A–C–E): relative motion</li>
+      <li>C (C–E–G) → Em (E–G–B): leading-tone exchange</li>
     </ul>
-    <p>Major triads form upward-pointing triangles. Minor triads form downward-pointing triangles. Voice-leading between chords corresponds to short geometric distances on the lattice.</p>
+    <p>On the Tonnetz lattice, these transformations appear as small steps from one triangle to an adjacent one, sharing an edge and two nodes.</p>
 
-    <h2>Voice-Leading as Distance</h2>
-    <p>Smooth voice-leading between two chords means the notes move by small intervals — which translates to small geometric steps on the Tonnetz.</p>
+    <p><strong>Tone Nets</strong>, an interactive Tonnetz visualizer, allows you to play chords and single notes, enter and explore your own progressions, see how harmonic movement maps onto the lattice, or load and play progressions from the library. The examples included illustrate many familiar harmonic patterns from classical, jazz, and popular music.</p>
 
-    <h2>About Tone Nets</h2>
+    <hr style="margin: 1.5em 0; border: none; border-top: 1px solid #ddd;" />
+
     <p>Tone Nets is built by The Moving Finger Studios.</p>
+
+    <p>Contact us with comments, requests, bug reports at themovingfinger(at)mike-y.com</p>
   `;
 
   // ── Mount ──────────────────────────────────────────────────────────
