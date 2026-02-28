@@ -7,6 +7,7 @@ dist/
 
 # Analysis scripts (local dev tools)
 analyze_commits.py
+generate_charts.py
 commit_analysis.ipynb
 commit_data.csv
 commit_history.txt
@@ -14,3 +15,5 @@ commit_stats.txt
 commits.csv
 git_full_log.txt
 git_log_raw.txt
+chart_*.png
+.venv/

@@ -88,7 +88,7 @@ Subsystem responsibilities:
 | Rendering/UI       | lattice rendering, interaction handling, animations              |
 | Audio Engine       | chord voicing, synthesis, playback scheduling                    |
 | Persistence/Data   | progression storage, import/export, URL sharing                  |
-| Deployment/Hosting | build, hosting topology, caching/versioning                      |
+| Deployment/Hosting | build, hosting topology, caching/versioning, base path          |
 | UX                 | detailed definitions for interaction behaviors                   |
 
 
@@ -360,7 +360,7 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 | URL → Progression | PD → HC → RU + AE | `decodeShareUrl(hash)` → `parseChordSymbol()` each → `mapProgressionToShapes()` → `UIState.loadProgression()` | Auto-load shared progression from URL fragment |
 | Load → Progression | PD → HC → RU + AE | `loadProgression(id)` → same parse pipeline | Load saved progression from local storage |
 | Save ← UI | RU → PD | Sidebar save action → `saveProgression({ title, tempo_bpm, chords })` | Persist current progression locally |
-| Share ← UI | RU → PD | Share button → `encodeShareUrl(chords, tempo, grid)` → full URL → clipboard (with textarea+execCommand fallback for non-HTTPS) (POL-D27) | Generate shareable URL |
+| Share ← UI | RU → PD | Share button → `encodeShareUrl(chords, tempo, grid)` → full URL → clipboard (with textarea+execCommand fallback for non-HTTPS) (POL-D27). Base path `/tonnetz/` required per ARCH_DEPLOYMENT_HOSTING.md §4.2. | Generate shareable URL |
 | Settings ← UI | RU → PD | Tempo change, view prefs → `saveSettings(partial)` | Persist user preferences |
 | Duration → Beats | Integration | Each chord token = 4 beats (one bar). `shapesToChordEvents(shapes)` produces `ChordEvent[]` directly — no grid conversion needed (POL-D17). |
 
