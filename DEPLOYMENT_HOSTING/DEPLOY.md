@@ -12,7 +12,8 @@ This is the operational deployment guide. For architecture decisions, hosting de
 ```
 cd INTEGRATION && npm run build        # build
 npm run preview                        # test locally at localhost:4173/tonnetz/
-rsync -avz --delete dist/ mikey@s501.sureserver.com:~/www/www/tonnetz/   # deploy
+scp -r dist/* mikey@s501.sureserver.com:~/www/www/tonnetz/              # deploy
+ssh mikey@s501.sureserver.com "chmod -R 755 ~/www/www/tonnetz/"         # fix permissions
 ```
 
 ---
@@ -157,22 +158,32 @@ ssh mikey@s501.sureserver.com "rm -rf ~/www/www/tonnetz-prev && cp -r ~/www/www/
 ### Step 4: Deploy
 
 ```bash
-rsync -avz --delete dist/ mikey@s501.sureserver.com:~/www/www/tonnetz/
-```
-
-Flags:
-- `-a` — archive mode (preserves permissions, timestamps)
-- `-v` — verbose (shows files transferred)
-- `-z` — compress during transfer
-- `--delete` — removes server files not in local `dist/` (cleans up old hashed bundles)
-
-**Alternative** (if rsync is unavailable):
-
-```bash
 scp -r dist/* mikey@s501.sureserver.com:~/www/www/tonnetz/
 ```
 
-Note: `scp` does not remove stale files. Old hashed bundles will accumulate on the server. Run periodic cleanup manually if using `scp`.
+Note: `scp` does not remove old hashed bundles from the server. They are harmless (nothing references them), but will accumulate over time. To clean up stale bundles after deploying:
+
+```bash
+ssh mikey@s501.sureserver.com "ls ~/www/www/tonnetz/assets/"
+# Delete any old index-*.js files that don't match the current build
+ssh mikey@s501.sureserver.com "rm ~/www/www/tonnetz/assets/index-OLD_HASH.js"
+```
+
+**Alternative** (Linux/macOS/WSL — handles cleanup automatically):
+
+```bash
+rsync -avz --delete --chmod=D755,F644 dist/ mikey@s501.sureserver.com:~/www/www/tonnetz/
+```
+
+### Step 4b: Fix permissions
+
+`scp` preserves local file permissions, which on Windows may result in restricted directory permissions (e.g., `700` on `assets/`) that prevent Apache from serving the files. After every deploy:
+
+```bash
+ssh mikey@s501.sureserver.com "chmod -R 755 ~/www/www/tonnetz/"
+```
+
+**Symptom if skipped:** page loads blank, browser console shows the JS bundle blocked with MIME type `"text/html"` — Apache can't read the `assets/` directory, so WordPress's catch-all returns HTML instead.
 
 ### Step 5: Verify production
 
@@ -253,7 +264,7 @@ ssh "$SERVER" "rm -rf $REMOTE_PREV; cp -r $REMOTE_DIR $REMOTE_PREV 2>/dev/null |
 
 echo ""
 echo "=== Deploying ==="
-rsync -avz --delete INTEGRATION/dist/ "$SERVER:$REMOTE_DIR/"
+rsync -avz --delete --chmod=D755,F644 INTEGRATION/dist/ "$SERVER:$REMOTE_DIR/"
 
 echo ""
 echo "=== Verifying ==="

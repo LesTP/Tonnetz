@@ -362,7 +362,7 @@ The integration module is the top-level orchestrator that wires subsystem APIs t
 | Save ← UI | RU → PD | Sidebar save action → `saveProgression({ title, tempo_bpm, chords })` | Persist current progression locally |
 | Share ← UI | RU → PD | Share button → `encodeShareUrl(chords, tempo, grid)` → full URL → clipboard (with textarea+execCommand fallback for non-HTTPS) (POL-D27). Base path `/tonnetz/` required per ARCH_DEPLOYMENT_HOSTING.md §4.2. | Generate shareable URL |
 | Settings ← UI | RU → PD | Tempo change, view prefs → `saveSettings(partial)` | Persist user preferences |
-| Duration → Beats | Integration | Each chord token = 4 beats (one bar). `shapesToChordEvents(shapes)` produces `ChordEvent[]` directly — no grid conversion needed (POL-D17). |
+| Duration → Beats | Integration | Each chord token = 4 beats (one bar). Integration builds `ChordEvent[]` manually with uniform 4-beat durations — `AE.shapesToChordEvents()` is not used (INT-D5, POL-D17). |
 
 ### Data Flow: Progression Load Pipeline
 
@@ -378,7 +378,8 @@ PD record { chords: ["Dm7","G7","Cmaj7"], tempo_bpm: 150 }
   ├─→ RU: camera.fitToBounds(pathExtent) (auto-center viewport, POL-D20)
   │
   ├─→ AE: setTempo(150)
-  └─→ AE: shapesToChordEvents(shapes) → scheduleProgression(events)
+  ├─→ INT: build ChordEvent[] manually (4 beats per chord, INT-D5)
+  └─→ AE: scheduleProgression(events)
 ```
 
 ## Dependency Direction
@@ -398,8 +399,8 @@ No subsystem imports from the integration module. Subsystems do not import from 
 The integration module owns the application startup sequence:
 
 1. **Load settings** — `PD.loadSettings()` → retrieve persisted tempo, view preferences
-2. **Init Audio Engine** — `initAudio()` (deferred until first user gesture per browser autoplay policy)
-3. **Init Rendering/UI** — scaffold SVG, camera, interaction controller, layout, control panel
+2. **Init Rendering/UI** — scaffold SVG, camera, interaction controller, layout, control panel
+3. **Init Audio Engine** — `initAudio()` (deferred until first user gesture per browser autoplay policy)
 4. **Apply settings** — `setTempo(settings.tempo_bpm)`, apply saved view state to camera
 5. **Check URL hash** — if `location.hash` contains `#p=...`:
    - `PD.decodeShareUrl(hash)` → progression record
@@ -408,7 +409,7 @@ The integration module owns the application startup sequence:
 6. **Wire callbacks** — bind interaction, transport, and persistence event handlers
 7. **Ready** — UI in idle or progression-loaded state
 
-Audio Engine initialization (step 2) may be deferred to first user interaction (tap/click) to comply with browser autoplay policies. The integration module handles this by lazy-initializing on the first `InteractionCallbacks.onPointerDown`.
+Audio Engine initialization (step 3) may be deferred to first user interaction (tap/click) to comply with browser autoplay policies. The integration module handles this by lazy-initializing on the first `InteractionCallbacks.onPointerDown`.
 
 ## UI State Enforcement
 

@@ -571,7 +571,9 @@ if (urlCheck.found) {
   const { chords, tempo_bpm } = urlCheck.payload;
   persistence.settings = { ...persistence.settings, tempo_bpm };
   sidebar.setTempo(tempo_bpm);
-  loadProgressionFromChords([...chords]);
+  if (loadProgressionFromChords([...chords])) {
+    sidebar.setInputText(currentChordSymbols.join(" "));
+  }
 }
 
 // ── Step 14: Ready ──────────────────────────────────────────────────
